@@ -1,18 +1,16 @@
 ﻿#region Using directives
-using System;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using Serilog;
 using Spectre.Console;
 using YAi.Persona.Extensions;
 using YAi.Persona.Models;
 using YAi.Persona.Services;
+using System.Text;
 #endregion
+
+
+Console.OutputEncoding = Encoding.UTF8;
+Console.InputEncoding = Encoding.UTF8;
 
 try
 {
@@ -27,26 +25,36 @@ try
 		.WriteTo.File(logFile)
 		.CreateLogger();
 
-	Log.Information("Starting YAi CLI");
+	Log.Information("Starting YAi! CLI");
 	PrintBanner();
 	Log.Information("Asset root: {AssetRoot}", appPaths.AssetRoot);
 	Log.Information("Asset workspace root: {AssetWorkspaceRoot}", appPaths.AssetWorkspaceRoot);
 	Log.Information("User data root: {UserDataRoot}", appPaths.UserDataRoot);
 	Log.Information("Runtime workspace root: {RuntimeWorkspaceRoot}", appPaths.RuntimeWorkspaceRoot);
 
-	// Build a minimal service provider without requiring the generic Host package.
-	var services = new ServiceCollection();
-	services.AddSingleton<AppPaths>(appPaths);
 
-	// Provide a minimal IConfiguration (Persona services currently don't depend on it heavily)
-	services.AddYAiPersonaServices();
+
+	var services = new ServiceCollection();
 	services.AddLogging(logging => logging.AddSerilog(Log.Logger, dispose: false));
+	services.AddYAiPersonaServices(appPaths);
 
 	var sp = services.BuildServiceProvider();
 
 	var workspace = sp.GetRequiredService<WorkspaceProfileService>();
 	var config = sp.GetRequiredService<ConfigService>();
+	var appConfig = sp.GetRequiredService<AppConfig>();
 	var runtime = sp.GetRequiredService<RuntimeState>();
+	var promptBuilder = sp.GetRequiredService<PromptBuilder>();
+	var openRouterClient = sp.GetRequiredService<OpenRouterClient>();
+	var history = sp.GetRequiredService<HistoryService>();
+	var bootstrapSvc = sp.GetRequiredService<BootstrapInterviewService>();
+
+	runtime.AgentName = string.IsNullOrWhiteSpace(appConfig.App.Name) ? "YAi" : appConfig.App.Name;
+	runtime.UserName = string.IsNullOrWhiteSpace(appConfig.App.UserName) ? Environment.UserName : appConfig.App.UserName;
+
+	Log.Information("OpenRouter model: {Model}", openRouterClient.CurrentModel);
+	Log.Information("OpenRouter verbosity: {Verbosity}", openRouterClient.CurrentVerbosity);
+	Log.Information("OpenRouter cache enabled: {CacheEnabled}", openRouterClient.CacheEnabled);
 
 	// Ensure templates and runtime workspace are ready
 	try
@@ -67,14 +75,14 @@ try
 		if (cmd == "--bootstrap")
 		{
 			Log.Information("Starting bootstrap workflow");
-			await DoBootstrapAsync(config, runtime, workspace);
+			await DoBootstrapAsync(config, runtime, workspace, bootstrapSvc);
 			Log.Information("Bootstrap workflow completed");
 		}
 		else if (cmd == "--ask")
 		{
 			Log.Information("Starting ask workflow");
 			var prompt = cliArgs.Length > 1 ? string.Join(' ', cliArgs.Skip(1)) : string.Empty;
-			await DoAskAsync(sp, prompt);
+			await DoAskAsync(promptBuilder, openRouterClient, history, appConfig, prompt);
 			Log.Information("Ask workflow completed");
 		}
 		else if (cmd == "--translate")
@@ -87,34 +95,14 @@ try
 			}
 			else
 			{
-				var promptBuilder = sp.GetRequiredService<PromptBuilder>();
-				OpenRouterClient? openrouter = null;
-				try { openrouter = sp.GetService<OpenRouterClient>(); } catch (Exception ex) { Console.WriteLine($"OpenRouter client not available: {ex.Message}"); }
-
-				if (openrouter == null)
-				{
-					Console.WriteLine("OpenRouter client not configured (OPENROUTER_API_KEY missing).");
-				}
-				else
-				{
-					var messages = promptBuilder.BuildMessages("translate", text);
-					try
-					{
-						var resp = await openrouter.SendChatAsync(messages, CancellationToken.None);
-						Console.WriteLine(resp.Text);
-					}
-					catch (Exception ex)
-					{
-						Console.WriteLine($"Translate failed: {ex.Message}");
-					}
-				}
+				await DoTranslateAsync(promptBuilder, openRouterClient, history, appConfig, text);
 			}
 			Log.Information("Translate workflow completed");
 		}
 		else if (cmd == "--talk" || cmd == "-talk")
 		{
 			Log.Information("Starting talk workflow");
-			await DoTalkAsync(sp);
+			await DoTalkAsync(promptBuilder, openRouterClient, history, appConfig);
 			Log.Information("Talk workflow completed");
 		}
 		else
@@ -145,20 +133,73 @@ static void PrintUsage()
 
 static void PrintBanner()
 {
+	var timestamp = DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm:ss zzz");
+	var title = new FigletText("YAi!")
+	{
+		Color = Color.Cyan1
+	};
+
 	AnsiConsole.WriteLine();
-	AnsiConsole.MarkupLine("[bold cyan]YAi copyright[/]");
-	AnsiConsole.MarkupLine("[bold yellow]Organization:[/] [bold white]UmbertoGiacobbiDotBiz 2025-2026[/]");
-	AnsiConsole.MarkupLine("[green]- Email:[/] hello@umbertogiacobbi.biz");
-	AnsiConsole.MarkupLine("[blue]- LinkedIn:[/] linkedin.com/in/umbertogiacobbi");
-	AnsiConsole.MarkupLine("[magenta]- Website:[/] umbertogiacobbi.biz");
+	AnsiConsole.Write(title);
+	AnsiConsole.WriteLine();
+	AnsiConsole.MarkupLine("[grey70]An opinionated AI CLI for fast, focused workflows[/]");
+	AnsiConsole.Write(new Panel(new Markup(
+		"[bold yellow]Organization:[/] [white]UmbertoGiacobbiDotBiz 2025-2026[/]\n" +
+		"[green]Email:[/] [white]hello@umbertogiacobbi.biz[/]\n" +
+		"[blue]LinkedIn:[/] [white]linkedin.com/in/umbertogiacobbi[/]\n" +
+		"[magenta]Website:[/] [white]umbertogiacobbi.biz[/]\n" +
+		$"[grey70]Generated:[/] [white]{timestamp}[/]"))
+	{
+		Border = BoxBorder.Double,
+		BorderStyle = new Style(foreground: Color.DeepSkyBlue1),
+		Padding = new Padding(1, 0, 1, 0),
+		Header = new PanelHeader("[bold white]YAi CLI[/]", Justify.Center),
+		Expand = false
+	});
 	AnsiConsole.WriteLine();
 }
 
-static Task DoBootstrapAsync(ConfigService config, RuntimeState runtime, WorkspaceProfileService workspace)
+static async Task DoBootstrapAsync(
+	ConfigService config,
+	RuntimeState runtime,
+	WorkspaceProfileService workspace,
+	BootstrapInterviewService bootstrapSvc)
 {
 	try
 	{
 		workspace.EnsureInitializedFromTemplates();
+
+		if (bootstrapSvc.NeedsBootstrap ())
+		{
+			AnsiConsole.WriteLine ();
+			AnsiConsole.MarkupLine ("[bold cyan]First-run setup — let's personalise your AI assistant.[/]");
+			AnsiConsole.MarkupLine ("[grey70]Answer each question and press Enter. Type a dash [-] to skip.[/]");
+			AnsiConsole.WriteLine ();
+
+			var qa = new List<(string Question, string Answer)> ();
+
+			foreach (var (key, question) in BootstrapInterviewService.Questions)
+			{
+				AnsiConsole.MarkupLine ($"[yellow]{question}[/]");
+				var answer = AnsiConsole.Ask<string> ("[grey50]>[/] ").Trim ();
+
+				if (answer == "-")
+				{
+					continue;
+				}
+
+				qa.Add ((question, answer));
+			}
+
+			AnsiConsole.WriteLine ();
+			AnsiConsole.MarkupLine ("[grey70]Updating your profiles — this may take a moment...[/]");
+
+			await bootstrapSvc.ExtractAndPersistAsync (qa, CancellationToken.None);
+
+			AnsiConsole.MarkupLine ("[green]Profiles updated.[/]");
+			AnsiConsole.WriteLine ();
+		}
+
 		var state = new BootstrapState
 		{
 			BootstrapTimestampUtc = DateTimeOffset.UtcNow,
@@ -168,31 +209,19 @@ static Task DoBootstrapAsync(ConfigService config, RuntimeState runtime, Workspa
 
 		config.SaveBootstrapState(state);
 		runtime.IsBootstrapped = true;
-		Console.WriteLine("Bootstrap completed.");
+		AnsiConsole.MarkupLine ("[green]Bootstrap completed.[/]");
 	}
 	catch (Exception ex)
 	{
-		Console.WriteLine($"Bootstrap error: {ex.Message}");
+		AnsiConsole.MarkupLine ($"[red]Bootstrap error: {ex.Message}[/]");
 	}
-
-	return Task.CompletedTask;
 }
 
-static async Task DoAskAsync(IServiceProvider sp, string prompt)
+static async Task DoAskAsync(PromptBuilder promptBuilder, OpenRouterClient openrouter, HistoryService history, AppConfig appConfig, string prompt)
 {
 	if (string.IsNullOrWhiteSpace(prompt))
 	{
 		Console.WriteLine("No prompt provided.");
-		return;
-	}
-
-	var promptBuilder = sp.GetRequiredService<PromptBuilder>();
-	OpenRouterClient? openrouter = null;
-	try { openrouter = sp.GetService<OpenRouterClient>(); } catch (Exception ex) { Console.WriteLine($"OpenRouter client not available: {ex.Message}"); }
-
-	if (openrouter == null)
-	{
-		Console.WriteLine("OpenRouter client not configured (OPENROUTER_API_KEY missing).");
 		return;
 	}
 
@@ -201,6 +230,7 @@ static async Task DoAskAsync(IServiceProvider sp, string prompt)
 	{
 		var resp = await openrouter.SendChatAsync(messages, CancellationToken.None);
 		Console.WriteLine(resp.Text);
+		RecordHistoryEntry(history, appConfig, prompt, resp.Text, "ask");
 	}
 	catch (Exception ex)
 	{
@@ -208,11 +238,32 @@ static async Task DoAskAsync(IServiceProvider sp, string prompt)
 	}
 }
 
-static async Task DoTalkAsync(IServiceProvider sp)
+static async Task DoTranslateAsync(PromptBuilder promptBuilder, OpenRouterClient openrouter, HistoryService history, AppConfig appConfig, string text)
+{
+	if (string.IsNullOrWhiteSpace(text))
+	{
+		Console.WriteLine("No text provided.");
+		return;
+	}
+
+	var messages = promptBuilder.BuildMessages("translate", text);
+	try
+	{
+		var resp = await openrouter.SendChatAsync(messages, CancellationToken.None);
+		Console.WriteLine(resp.Text);
+		RecordHistoryEntry(history, appConfig, text, resp.Text, "translate");
+	}
+	catch (Exception ex)
+	{
+		Console.WriteLine($"Translate failed: {ex.Message}");
+	}
+}
+
+static async Task DoTalkAsync(PromptBuilder promptBuilder, OpenRouterClient openrouter, HistoryService history, AppConfig appConfig)
 {
 	Console.WriteLine("Entering talk REPL (type 'exit' to quit)");
-	var promptBuilder = sp.GetRequiredService<PromptBuilder>();
-	var openrouter = sp.GetService<OpenRouterClient>();
+	var conversation = new List<OpenRouterChatMessage>();
+	var sessionEntries = new List<HistoryEntry>();
 
 	while (true)
 	{
@@ -221,18 +272,28 @@ static async Task DoTalkAsync(IServiceProvider sp)
 		if (line == null || line.Trim().ToLowerInvariant() == "exit") break;
 		if (string.IsNullOrWhiteSpace(line)) continue;
 
-		var messages = promptBuilder.BuildMessages("talk", line);
+		var userInput = line;
+
+		var messages = promptBuilder.BuildMessages("talk", userInput, conversation);
 		try
 		{
-			if (openrouter != null)
+			var resp = await openrouter.SendChatAsync(messages, CancellationToken.None);
+			var assistantReply = resp.Text ?? string.Empty;
+			Console.WriteLine(assistantReply);
+
+			conversation.Add(new OpenRouterChatMessage { Role = "user", Content = userInput });
+			conversation.Add(new OpenRouterChatMessage { Role = "assistant", Content = assistantReply });
+
+			var entry = new HistoryEntry
 			{
-				var resp = await openrouter.SendChatAsync(messages, CancellationToken.None);
-				Console.WriteLine(resp.Text);
-			}
-			else
-			{
-				Console.WriteLine("No OpenRouter client available.");
-			}
+				Prompt = userInput,
+				Response = assistantReply,
+				Mode = "talk",
+				TimestampUtc = DateTimeOffset.UtcNow
+			};
+
+			sessionEntries.Add(entry);
+			RecordHistoryEntry(history, appConfig, userInput, assistantReply, "talk");
 		}
 		catch (Exception ex)
 		{
@@ -240,6 +301,27 @@ static async Task DoTalkAsync(IServiceProvider sp)
 		}
 	}
 
+	if (appConfig.App.HistoryEnabled && sessionEntries.Count > 0)
+	{
+		history.SaveChatSession(new ChatSession { Entries = sessionEntries });
+	}
+
 	Console.WriteLine("Exiting REPL");
+}
+
+static void RecordHistoryEntry(HistoryService history, AppConfig appConfig, string prompt, string? response, string mode)
+{
+	if (!appConfig.App.HistoryEnabled)
+	{
+		return;
+	}
+
+	history.SaveEntry(new HistoryEntry
+	{
+		Prompt = prompt,
+		Response = response ?? string.Empty,
+		Mode = mode,
+		TimestampUtc = DateTimeOffset.UtcNow
+	});
 }
 

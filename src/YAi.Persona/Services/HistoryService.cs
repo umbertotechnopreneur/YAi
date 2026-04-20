@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using YAi.Persona.Models;
@@ -18,6 +19,8 @@ namespace YAi.Persona.Services
 
         public void SaveEntry(HistoryEntry entry)
         {
+            Directory.CreateDirectory(_paths.HistoryRoot);
+
             var sessionFile = Path.Combine(_paths.HistoryRoot, entry.Id + ".json");
             var json = JsonSerializer.Serialize(entry, _jsonOptions);
             var bytes = System.Text.Encoding.UTF8.GetBytes(json);
@@ -26,10 +29,76 @@ namespace YAi.Persona.Services
 
         public void SaveChatSession(ChatSession session)
         {
+            Directory.CreateDirectory(_paths.HistoryRoot);
+
             var sessionFile = Path.Combine(_paths.HistoryRoot, session.Id + ".session.json");
             var json = JsonSerializer.Serialize(session, _jsonOptions);
             var bytes = System.Text.Encoding.UTF8.GetBytes(json);
             AtomicFileWriter.WriteAtomic(sessionFile, bytes);
+        }
+
+        public IReadOnlyList<HistoryEntry> LoadRecentHistory(int maxEntries = 50)
+        {
+            if (maxEntries <= 0 || !Directory.Exists(_paths.HistoryRoot))
+            {
+                return [];
+            }
+
+            var files = Directory.GetFiles(_paths.HistoryRoot, "*.json")
+                .Where(file => !file.EndsWith(".session.json", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(File.GetLastWriteTimeUtc)
+                .Take(maxEntries)
+                .ToArray();
+
+            var entries = new List<HistoryEntry>();
+            foreach (var file in files)
+            {
+                var entry = ReadJson<HistoryEntry>(file);
+                if (entry is not null)
+                {
+                    entries.Add(entry);
+                }
+            }
+
+            return entries;
+        }
+
+        public IReadOnlyList<ChatSession> LoadRecentSessions(int maxSessions = 10)
+        {
+            if (maxSessions <= 0 || !Directory.Exists(_paths.HistoryRoot))
+            {
+                return [];
+            }
+
+            var files = Directory.GetFiles(_paths.HistoryRoot, "*.session.json")
+                .OrderByDescending(File.GetLastWriteTimeUtc)
+                .Take(maxSessions)
+                .ToArray();
+
+            var sessions = new List<ChatSession>();
+            foreach (var file in files)
+            {
+                var session = ReadJson<ChatSession>(file);
+                if (session is not null)
+                {
+                    sessions.Add(session);
+                }
+            }
+
+            return sessions;
+        }
+
+        private T? ReadJson<T>(string path)
+        {
+            try
+            {
+                var json = File.ReadAllText(path);
+                return JsonSerializer.Deserialize<T>(json, _jsonOptions);
+            }
+            catch
+            {
+                return default;
+            }
         }
     }
 }

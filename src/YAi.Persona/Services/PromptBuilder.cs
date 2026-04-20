@@ -1,73 +1,70 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.Extensions.Logging;
 using YAi.Persona.Models;
 
-namespace YAi.Persona.Services
+namespace YAi.Persona.Services;
+
+public sealed class PromptBuilder
 {
-    public sealed class PromptBuilder
+    private readonly PromptAssetService _assets;
+    private readonly RuntimeState _runtime;
+    private readonly ILogger<PromptBuilder> _logger;
+
+    public PromptBuilder(PromptAssetService assets, RuntimeState runtime, ILogger<PromptBuilder> logger)
     {
-        private readonly PromptAssetService _assets;
-        private readonly RuntimeState _runtime;
-        private readonly ILogger<PromptBuilder> _logger;
+        _assets = assets ?? throw new ArgumentNullException(nameof(assets));
+        _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
 
-        public PromptBuilder(PromptAssetService assets, RuntimeState runtime, ILogger<PromptBuilder> logger)
+    public List<OpenRouterChatMessage> BuildMessages(string promptKey, string userMessage, IEnumerable<OpenRouterChatMessage>? conversation = null)
+    {
+        _logger.LogDebug("Building chat messages for prompt key {PromptKey}", promptKey);
+
+        var messages = new List<OpenRouterChatMessage>();
+
+        AddFirstAvailableSection(messages, "base", "system");
+        AddFirstAvailableSection(messages, promptKey, string.Equals(promptKey, "talk", StringComparison.OrdinalIgnoreCase) ? "chat" : null);
+
+        // Runtime identity
+        var identity = $"Agent: {_runtime.AgentName ?? "Agent"}, User: {_runtime.UserName ?? "User"}";
+        messages.Add(new OpenRouterChatMessage { Role = "system", Content = identity });
+
+        // existing conversation turns
+        if (conversation != null)
         {
-            _assets = assets ?? throw new ArgumentNullException(nameof(assets));
-            _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            messages.AddRange(conversation);
         }
 
-        public List<OpenRouterChatMessage> BuildMessages(string promptKey, string userMessage, IEnumerable<OpenRouterChatMessage>? conversation = null)
+        // user message
+        messages.Add(new OpenRouterChatMessage { Role = "user", Content = userMessage ?? string.Empty });
+
+        _logger.LogInformation("Built {MessageCount} chat messages for prompt key {PromptKey}", messages.Count, promptKey);
+
+        return messages;
+    }
+
+    private void AddFirstAvailableSection(List<OpenRouterChatMessage> messages, params string?[] keys)
+    {
+        foreach (var key in keys)
         {
-            _logger.LogDebug("Building chat messages for prompt key {PromptKey}", promptKey);
+            if (string.IsNullOrWhiteSpace(key))
+                continue;
 
-            var messages = new List<OpenRouterChatMessage>();
-
-            AddFirstAvailableSection(messages, "base", "system");
-            AddFirstAvailableSection(messages, promptKey, string.Equals(promptKey, "talk", StringComparison.OrdinalIgnoreCase) ? "chat" : null);
-
-            // Runtime identity
-            var identity = $"Agent: {_runtime.AgentName ?? "Agent"}, User: {_runtime.UserName ?? "User"}";
-            messages.Add(new OpenRouterChatMessage { Role = "system", Content = identity });
-
-            // existing conversation turns
-            if (conversation != null)
+            try
             {
-                messages.AddRange(conversation);
+                var section = _assets.LoadPromptSection(key);
+                if (!string.IsNullOrWhiteSpace(section))
+                {
+                    messages.Add(new OpenRouterChatMessage { Role = "system", Content = section });
+                    _logger.LogDebug("Added prompt section {PromptKey}", key);
+                    return;
+                }
             }
-
-            // user message
-            messages.Add(new OpenRouterChatMessage { Role = "user", Content = userMessage ?? string.Empty });
-
-            _logger.LogInformation("Built {MessageCount} chat messages for prompt key {PromptKey}", messages.Count, promptKey);
-
-            return messages;
-        }
-
-        private void AddFirstAvailableSection(List<OpenRouterChatMessage> messages, params string?[] keys)
-        {
-            foreach (var key in keys)
+            catch
             {
-                if (string.IsNullOrWhiteSpace(key))
-                    continue;
-
-                try
-                {
-                    var section = _assets.LoadPromptSection(key);
-                    if (!string.IsNullOrWhiteSpace(section))
-                    {
-                        messages.Add(new OpenRouterChatMessage { Role = "system", Content = section });
-                        _logger.LogDebug("Added prompt section {PromptKey}", key);
-                        return;
-                    }
-                }
-                catch
-                {
-                    _logger.LogDebug("Prompt section {PromptKey} was unavailable", key);
-                }
+                _logger.LogDebug("Prompt section {PromptKey} was unavailable", key);
             }
         }
     }
 }
+

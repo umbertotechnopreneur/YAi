@@ -1,21 +1,79 @@
 
 namespace YAi.Persona.Services;
 
+/// <summary>
+/// Manages application paths for assets, configuration, logs, and workspace directories.
+/// </summary>
 public sealed class AppPaths
 {
+    /// <summary>
+    /// Gets the root directory for application assets.
+    /// </summary>
     public string AssetRoot { get; }
+
+    /// <summary>
+    /// Gets the root directory for asset workspace files.
+    /// </summary>
     public string AssetWorkspaceRoot { get; }
+
+    /// <summary>
+    /// Gets the root directory for user data storage.
+    /// </summary>
     public string UserDataRoot { get; }
+
+    /// <summary>
+    /// Gets the directory for configuration files.
+    /// </summary>
     public string ConfigRoot { get; }
+
+    /// <summary>
+    /// Gets the directory for application logs.
+    /// </summary>
     public string LogsRoot { get; }
+
+    /// <summary>
+    /// Gets the directory for conversation history files.
+    /// </summary>
     public string HistoryRoot { get; }
+
+    /// <summary>
+    /// Gets the directory for runtime workspace files.
+    /// </summary>
     public string RuntimeWorkspaceRoot { get; }
 
+    /// <summary>
+    /// Gets the path to the application configuration file.
+    /// </summary>
     public string AppConfigPath => Path.Combine(ConfigRoot, "appconfig.json");
+
+    /// <summary>
+    /// Gets the path to the first-run configuration file.
+    /// </summary>
     public string FirstRunPath => Path.Combine(ConfigRoot, "first-run.json");
+
+    /// <summary>
+    /// Gets the path to the user profile markdown file.
+    /// </summary>
     public string UserProfilePath => Path.Combine(RuntimeWorkspaceRoot, "USER.md");
+
+    /// <summary>
+    /// Gets the path to the soul profile markdown file.
+    /// </summary>
     public string SoulProfilePath => Path.Combine(RuntimeWorkspaceRoot, "SOUL.md");
 
+    /// <summary>
+    /// Gets the path to the local SQLite database used for LLM call logging.
+    /// </summary>
+    public string LlmDbPath => Path.Combine(UserDataRoot, "data", "llm-calls.db");
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AppPaths"/> class.
+    /// Resolves application paths for assets, configuration, logs, and workspace directories.
+    /// Allows override of user data root via the YAI_USER_DATA_ROOT environment variable.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when YAI_USER_DATA_ROOT is not an absolute path or is under the application install directory.
+    /// </exception>
     public AppPaths()
     {
         AssetRoot = AppContext.BaseDirectory ?? Directory.GetCurrentDirectory();
@@ -49,6 +107,12 @@ public sealed class AppPaths
         RuntimeWorkspaceRoot = Path.Combine(UserDataRoot, "workspace");
     }
 
+    /// <summary>
+    /// Creates all required application directories and verifies write access.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when unable to write to the user data root directory.
+    /// </exception>
     public void EnsureDirectories()
     {
         Directory.CreateDirectory(ConfigRoot);
@@ -69,6 +133,12 @@ public sealed class AppPaths
         }
     }
 
+    /// <summary>
+    /// Generates a temporary file path within the specified target directory.
+    /// Creates the target directory if it does not exist.
+    /// </summary>
+    /// <param name="targetPath">The target file path to determine the directory for the temporary file.</param>
+    /// <returns>A temporary file path with a random filename in the target directory.</returns>
     public string GetTempPathInDirectory(string targetPath)
     {
         var dir = Path.GetDirectoryName(targetPath) ?? RuntimeWorkspaceRoot;

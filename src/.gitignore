@@ -1,0 +1,71 @@
+# Build outputs
+[Bb]in/
+[Oo]bj/
+out/
+publish/
+artifacts/
+
+# .NET user-specific files
+*.user
+*.rsuser
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Visual Studio / VS Code
+.vs/
+.vscode/
+
+# Rider / ReSharper
+_ReSharper*/
+*.DotSettings.user
+
+# NuGet
+packages/
+*.nupkg
+*.snupkg
+
+# Test and diagnostics
+TestResults/
+coverage/
+coverage-*/
+BenchmarkDotNet.Artifacts/
+
+# Local temp folders
+.tmp/
+tmp/
+temp/
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# SQLite files used for local log storage
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite3
+
+# Node / Vue / Vite / Vuetify
+node_modules/
+dist/
+.vite/
+.cache/
+.npm/
+.pnpm-store/
+*.tsbuildinfo
+vite.svg
+
+# Environment overrides
+.env
+.env.*
+!.env.example
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+Desktop.ini

@@ -1,0 +1,16 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.1.0">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>db1f96c0-c38f-4e83-a223-47e3b8d0e001</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\YAi.Services.Core\YAi.Services.Core.csproj" />
+    <ProjectReference Include="..\YAi.Services.Defaults\YAi.Services.Defaults.csproj" />
+  </ItemGroup>
+
+</Project>

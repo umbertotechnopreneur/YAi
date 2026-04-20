@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/docs/" />
+  <Folder Name="/services/">
+    <Project Path="YAi.Services.Core/YAi.Services.Core.csproj" />
+    <Project Path="YAi.Services.Defaults/YAi.Services.Defaults.csproj" />
+    <Project Path="YAi.Services.Telemetry/YAi.Services.Telemetry.csproj" Id="ab3e1ddf-467e-423d-b7a1-8395bd52b8d5" />
+    <Project Path="YAi.Services/YAi.Services.csproj" />
+  </Folder>
+  <Project Path="YAi.Client.CLI/YAi.Client.CLI.csproj" Id="3da3ea4e-505a-4a92-8872-2aabe22af6c4" />
+  <Project Path="YAi.Persona/YAi.Persona.csproj" Id="66d18aa4-7826-443c-a04d-0a6293a54b4c" />
+</Solution>

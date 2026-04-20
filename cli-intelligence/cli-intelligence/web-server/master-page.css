@@ -1,0 +1,326 @@
+/* ============================================================
+   master-page.css — CLI Intelligence web theme
+   Font: Inter (body) + JetBrains Mono (code/mono)
+   ============================================================ */
+
+/* ── Design tokens ────────────────────────────────────────── */
+:root {
+    /* Palette */
+    --color-bg:           #0d0f14;
+    --color-surface:      #13161d;
+    --color-surface-alt:  #1a1e28;
+    --color-border:       #262c3a;
+    --color-border-light: #2e3546;
+
+    /* Accent */
+    --color-accent:       #7c6af7;
+    --color-accent-dim:   rgba(124, 106, 247, 0.18);
+    --color-accent-glow:  rgba(124, 106, 247, 0.35);
+
+    /* Text */
+    --color-text-primary:   #e8eaf0;
+    --color-text-secondary: #8e96aa;
+    --color-text-muted:     #555d72;
+
+    /* Status */
+    --color-success: #4ade80;
+    --color-warning: #facc15;
+    --color-danger:  #f87171;
+
+    /* Spacing */
+    --space-xs:  4px;
+    --space-sm:  8px;
+    --space-md:  16px;
+    --space-lg:  24px;
+    --space-xl:  40px;
+    --space-2xl: 64px;
+
+    /* Layout */
+    --max-width: 900px;
+    --header-h:  60px;
+    --footer-h:  52px;
+    --radius:    10px;
+    --radius-sm: 6px;
+
+    /* Typography */
+    --font-body: 'Inter', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+    /* Transitions */
+    --t-fast: 120ms ease;
+    --t-base: 200ms ease;
+}
+
+/* ── Reset ────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: var(--font-body);
+    background-color: var(--color-bg);
+    color: var(--color-text-primary);
+    line-height: 1.6;
+}
+
+a {
+    color: var(--color-accent);
+    text-decoration: none;
+    transition: color var(--t-fast);
+}
+a:hover { color: #a99bf9; }
+
+code, pre, .mono {
+    font-family: var(--font-mono);
+}
+
+/* ── master-page layout ───────────────────────────────────── */
+.master-page {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* ── Header ───────────────────────────────────────────────── */
+.site-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    height: var(--header-h);
+    background-color: rgba(13, 15, 20, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.header-inner {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: 0 var(--space-lg);
+    height: 100%;
+    display: flex;
+    align-items: center;
+    gap: var(--space-lg);
+}
+
+.header-brand {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-weight: 600;
+    font-size: 1rem;
+    letter-spacing: 0.01em;
+    color: var(--color-text-primary);
+    user-select: none;
+}
+
+.brand-icon {
+    color: var(--color-accent);
+    font-size: 0.75rem;
+    line-height: 1;
+}
+
+.header-nav {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    flex: 1;
+}
+
+.nav-link {
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    transition: color var(--t-fast), background-color var(--t-fast);
+}
+.nav-link:hover,
+.nav-link.active {
+    color: var(--color-text-primary);
+    background-color: var(--color-surface-alt);
+}
+.nav-link.active {
+    color: var(--color-accent);
+}
+
+.header-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--color-success);
+}
+
+.status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background-color: var(--color-success);
+    box-shadow: 0 0 6px var(--color-success);
+    animation: pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.45; }
+}
+
+/* ── Main ─────────────────────────────────────────────────── */
+.site-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.main-inner {
+    max-width: var(--max-width);
+    width: 100%;
+    margin: 0 auto;
+    padding: var(--space-2xl) var(--space-lg);
+    flex: 1;
+}
+
+/* ── Placeholder section ──────────────────────────────────── */
+.content-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: var(--space-2xl) var(--space-xl);
+    border: 1px dashed var(--color-border-light);
+    border-radius: var(--radius);
+    background-color: var(--color-surface);
+    min-height: 360px;
+    gap: var(--space-md);
+}
+
+.placeholder-icon {
+    font-size: 2rem;
+    color: var(--color-accent);
+    opacity: 0.5;
+    margin-bottom: var(--space-sm);
+}
+
+.placeholder-title {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--color-text-primary);
+}
+
+.placeholder-body {
+    font-size: 1rem;
+    color: var(--color-text-secondary);
+    line-height: 1.7;
+    max-width: 480px;
+}
+
+.placeholder-actions {
+    display: flex;
+    gap: var(--space-sm);
+    margin-top: var(--space-sm);
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+/* ── Buttons ──────────────────────────────────────────────── */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 22px;
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    font-weight: 600;
+    font-family: var(--font-body);
+    cursor: pointer;
+    border: none;
+    transition: background-color var(--t-fast), box-shadow var(--t-fast), color var(--t-fast);
+    text-decoration: none;
+}
+
+.btn-primary {
+    background-color: var(--color-accent);
+    color: #fff;
+}
+.btn-primary:hover {
+    background-color: #9585f9;
+    color: #fff;
+    box-shadow: 0 0 18px var(--color-accent-glow);
+}
+
+.btn-ghost {
+    background-color: transparent;
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border-light);
+}
+.btn-ghost:hover {
+    background-color: var(--color-surface-alt);
+    color: var(--color-text-primary);
+    border-color: var(--color-accent);
+}
+
+/* ── Footer ───────────────────────────────────────────────── */
+.site-footer {
+    height: var(--footer-h);
+    border-top: 1px solid var(--color-border);
+    background-color: var(--color-surface);
+}
+
+.footer-inner {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: 0 var(--space-lg);
+    height: 100%;
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+}
+
+.footer-sep { opacity: 0.35; }
+
+.footer-version { font-family: var(--font-mono); font-size: 0.75rem; }
+
+.footer-link {
+    color: var(--color-text-muted);
+    transition: color var(--t-fast);
+}
+.footer-link:hover { color: var(--color-text-secondary); }
+
+/* ── Utility cards (reusable) ─────────────────────────────── */
+.card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: var(--space-lg);
+}
+
+.card-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: var(--space-sm);
+    color: var(--color-text-primary);
+}
+
+.card-body {
+    font-size: 0.9rem;
+    color: var(--color-text-secondary);
+}
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 600px) {
+    .header-nav { display: none; }
+    .main-inner  { padding: var(--space-xl) var(--space-md); }
+    .content-placeholder { padding: var(--space-xl) var(--space-md); min-height: 280px; }
+    .placeholder-title { font-size: 1.5rem; }
+}

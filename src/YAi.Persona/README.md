@@ -1,14 +1,12 @@
 # YAi.Persona
 
-[Brief description]
-
-This folder contains the `YAi.Persona` project — a small support library and persona definitions used by the YAi! workspace. Replace the sections below with concrete information about the project, its purpose, and how to build or run it.
+The `YAi.Persona` project provides the path model, bootstrap state, workspace seeding, and prompt composition used by the YAi! CLI.
 
 ## What is this project / folder
 
 - **Project name:** YAi.Persona
-- **Purpose:** [Short sentence describing the role of this project in the workspace]
-- **Contents:** [List of important files and folders found here]
+- **Purpose:** Provide the runtime workspace layout and prompt-loading helpers used by the CLI.
+- **Contents:** `Models/`, `Services/`, and the empty `workspace/` source folder that is populated at build/runtime through the CLI packaging rules.
 
 ## Quick Start (placeholders)
 
@@ -27,7 +25,9 @@ dotnet run --project YAi.Persona.csproj
 
 ## Usage
 
-- [Describe how this project is consumed by other projects or run directly]
+- Consumed by `src/YAi.Client.CLI` through project reference.
+- `AppPaths` resolves the packaged asset workspace from the CLI output and the user workspace from `%LOCALAPPDATA%\YAi\workspace` unless `YAI_USER_DATA_ROOT` overrides it.
+- `WorkspaceProfileService` copies the shipped markdown templates into the user workspace on first run and preserves existing files.
 
 ## Development Notes
 

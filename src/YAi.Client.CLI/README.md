@@ -31,11 +31,11 @@ Environment
 
 Assets
 
-The persona asset workspace is located in `src/YAi.Persona/workspace` and is copied to the CLI output during build. Ensure `USER.template.md`, `SOUL.template.md`, and `SYSTEM-PROMPTS.md` exist in the asset folder.
+The shipped markdown templates live in `src/YAi.Resources/reference/templates` and are copied into the CLI output as `workspace/` during build. On first run, the CLI seeds `%LOCALAPPDATA%\YAi\workspace` from that packaged workspace without overwriting existing files.
 
 Examples
 
-Initialize the runtime workspace (creates `first-run.json` under the user data root):
+Initialize the runtime workspace (creates the user workspace under `%LOCALAPPDATA%\YAi\workspace` and seeds the shipped markdown files):
 
 ```powershell
 dotnet run --project src/YAi.Client.CLI -- --bootstrap

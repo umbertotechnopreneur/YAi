@@ -19,7 +19,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\YAi.Persona\workspace\**\*">
+    <Content Include="..\YAi.Resources\reference\templates\**\*.md">
+      <TargetPath>workspace\%(Filename)%(Extension)</TargetPath>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

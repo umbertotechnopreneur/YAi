@@ -1,14 +1,18 @@
-﻿using System;
+﻿#region Using directives
+using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Serilog;
+using Spectre.Console;
 using YAi.Persona.Extensions;
 using YAi.Persona.Models;
 using YAi.Persona.Services;
+#endregion
 
 try
 {
@@ -24,6 +28,11 @@ try
 		.CreateLogger();
 
 	Log.Information("Starting YAi CLI");
+	PrintBanner();
+	Log.Information("Asset root: {AssetRoot}", appPaths.AssetRoot);
+	Log.Information("Asset workspace root: {AssetWorkspaceRoot}", appPaths.AssetWorkspaceRoot);
+	Log.Information("User data root: {UserDataRoot}", appPaths.UserDataRoot);
+	Log.Information("Runtime workspace root: {RuntimeWorkspaceRoot}", appPaths.RuntimeWorkspaceRoot);
 
 	// Build a minimal service provider without requiring the generic Host package.
 	var services = new ServiceCollection();
@@ -31,6 +40,7 @@ try
 
 	// Provide a minimal IConfiguration (Persona services currently don't depend on it heavily)
 	services.AddYAiPersonaServices();
+	services.AddLogging(logging => logging.AddSerilog(Log.Logger, dispose: false));
 
 	var sp = services.BuildServiceProvider();
 
@@ -53,17 +63,23 @@ try
 	if (cliArgs.Length > 0)
 	{
 		var cmd = cliArgs[0].ToLowerInvariant();
+		Log.Information("Dispatching command {Command}", cmd);
 		if (cmd == "--bootstrap")
 		{
+			Log.Information("Starting bootstrap workflow");
 			await DoBootstrapAsync(config, runtime, workspace);
+			Log.Information("Bootstrap workflow completed");
 		}
 		else if (cmd == "--ask")
 		{
+			Log.Information("Starting ask workflow");
 			var prompt = cliArgs.Length > 1 ? string.Join(' ', cliArgs.Skip(1)) : string.Empty;
 			await DoAskAsync(sp, prompt);
+			Log.Information("Ask workflow completed");
 		}
 		else if (cmd == "--translate")
 		{
+			Log.Information("Starting translate workflow");
 			var text = cliArgs.Length > 1 ? string.Join(' ', cliArgs.Skip(1)) : string.Empty;
 			if (string.IsNullOrWhiteSpace(text))
 			{
@@ -93,10 +109,13 @@ try
 					}
 				}
 			}
+			Log.Information("Translate workflow completed");
 		}
-		else if (cmd == "--talk")
+		else if (cmd == "--talk" || cmd == "-talk")
 		{
+			Log.Information("Starting talk workflow");
 			await DoTalkAsync(sp);
+			Log.Information("Talk workflow completed");
 		}
 		else
 		{
@@ -121,7 +140,18 @@ finally
 
 static void PrintUsage()
 {
-	Console.WriteLine("Usage: yai [--bootstrap|--ask <text>|--translate <text>|--talk]");
+	Console.WriteLine("Usage: yai [--bootstrap|--ask <text>|--translate <text>|--talk|-talk]");
+}
+
+static void PrintBanner()
+{
+	AnsiConsole.WriteLine();
+	AnsiConsole.MarkupLine("[bold cyan]YAi copyright[/]");
+	AnsiConsole.MarkupLine("[bold yellow]Organization:[/] [bold white]UmbertoGiacobbiDotBiz 2025-2026[/]");
+	AnsiConsole.MarkupLine("[green]- Email:[/] hello@umbertogiacobbi.biz");
+	AnsiConsole.MarkupLine("[blue]- LinkedIn:[/] linkedin.com/in/umbertogiacobbi");
+	AnsiConsole.MarkupLine("[magenta]- Website:[/] umbertogiacobbi.biz");
+	AnsiConsole.WriteLine();
 }
 
 static Task DoBootstrapAsync(ConfigService config, RuntimeState runtime, WorkspaceProfileService workspace)

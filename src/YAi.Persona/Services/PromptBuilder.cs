@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.Logging;
 using YAi.Persona.Models;
 
 namespace YAi.Persona.Services
@@ -9,39 +10,23 @@ namespace YAi.Persona.Services
     {
         private readonly PromptAssetService _assets;
         private readonly RuntimeState _runtime;
+        private readonly ILogger<PromptBuilder> _logger;
 
-        public PromptBuilder(PromptAssetService assets, RuntimeState runtime)
+        public PromptBuilder(PromptAssetService assets, RuntimeState runtime, ILogger<PromptBuilder> logger)
         {
             _assets = assets ?? throw new ArgumentNullException(nameof(assets));
             _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         public List<OpenRouterChatMessage> BuildMessages(string promptKey, string userMessage, IEnumerable<OpenRouterChatMessage>? conversation = null)
         {
+            _logger.LogDebug("Building chat messages for prompt key {PromptKey}", promptKey);
+
             var messages = new List<OpenRouterChatMessage>();
 
-            // System prompt: include base instructions when available
-            try
-            {
-                var system = _assets.LoadPromptSection("system");
-                if (!string.IsNullOrWhiteSpace(system))
-                    messages.Add(new OpenRouterChatMessage { Role = "system", Content = system });
-            }
-            catch
-            {
-                // ignore missing system section
-            }
-
-            // Mode-specific section
-            try
-            {
-                var section = _assets.LoadPromptSection(promptKey);
-                if (!string.IsNullOrWhiteSpace(section))
-                    messages.Add(new OpenRouterChatMessage { Role = "system", Content = section });
-            }
-            catch
-            {
-            }
+            AddFirstAvailableSection(messages, "base", "system");
+            AddFirstAvailableSection(messages, promptKey, string.Equals(promptKey, "talk", StringComparison.OrdinalIgnoreCase) ? "chat" : null);
 
             // Runtime identity
             var identity = $"Agent: {_runtime.AgentName ?? "Agent"}, User: {_runtime.UserName ?? "User"}";
@@ -56,7 +41,33 @@ namespace YAi.Persona.Services
             // user message
             messages.Add(new OpenRouterChatMessage { Role = "user", Content = userMessage ?? string.Empty });
 
+            _logger.LogInformation("Built {MessageCount} chat messages for prompt key {PromptKey}", messages.Count, promptKey);
+
             return messages;
+        }
+
+        private void AddFirstAvailableSection(List<OpenRouterChatMessage> messages, params string?[] keys)
+        {
+            foreach (var key in keys)
+            {
+                if (string.IsNullOrWhiteSpace(key))
+                    continue;
+
+                try
+                {
+                    var section = _assets.LoadPromptSection(key);
+                    if (!string.IsNullOrWhiteSpace(section))
+                    {
+                        messages.Add(new OpenRouterChatMessage { Role = "system", Content = section });
+                        _logger.LogDebug("Added prompt section {PromptKey}", key);
+                        return;
+                    }
+                }
+                catch
+                {
+                    _logger.LogDebug("Prompt section {PromptKey} was unavailable", key);
+                }
+            }
         }
     }
 }

@@ -6,11 +6,9 @@ YAi! is currently a .NET 10 solution built around a single ASP.NET Aspire orches
 - `YAi.Services.Core/`: ASP.NET Core Web API service.
 - `YAi.Services.Defaults/`: shared Aspire defaults for service discovery, health checks, resilience, and OpenTelemetry.
 
-Planned additions include a terminal UI app built with `Terminal.Gui` and a frontend built with Vue 3, Vuetify, and Vite.
+Planned additions include a CLI-Intelligence app built with Spectre.Console and a frontend built with Vue 3, Vuetify, and Vite.
 
-`Terminal.Gui` is a cross-platform .NET library for building rich terminal user interfaces (TUIs). It provides high-level controls (windows, dialogs, lists, text fields, menus) and handles input, layout, and rendering across Windows, macOS, and Linux terminals. We use it for interactive CLI experiences where a graphical terminal layout and keyboard-driven navigation improve usability without requiring a full graphical frontend. (https://github.com/gui-cs/Terminal.Gui)
-
-For designing complex layouts visually, we also reference `TerminalGuiDesigner` — a companion tool that lets developers craft views interactively and export layouts compatible with `Terminal.Gui`. It speeds UI iteration and helps onboard designers to the terminal UX workflow. (https://github.com/gui-cs/TerminalGuiDesigner)
+CLI-Intelligence should be an interactive-first Spectre.Console app with hierarchical menus and screens. Clear the console fully before rendering each screen, render the standard banner, then a blank line, then the screen content. Make ESC always navigate back to the previous menu or screen. Treat switch-based flags as secondary; use them only for automation or non-interactive runs.
 
 Use this file as the primary repository-specific instruction set for AI coding agents. Keep behavior concise, durable, and aligned with the current workspace.
 
@@ -45,13 +43,22 @@ Use this file as the primary repository-specific instruction set for AI coding a
 ### Task tracking
 
 - Use the agent planning workflow provided by the host.
-- When the user explicitly asks for agent-mode tracking artifacts, use `.github/tasks/todo.md` and `.github/tasks/lessons.md`.
+- Use `.github/tasks/todo.md` and `.github/tasks/lessons.md` as the standard task-tracking files for this repo.
+- Keep those files in sync with active work and captured lessons when agent-mode tracking is being used.
 - Do not create ad hoc task files unless the user explicitly asks for them.
-- Do not assume `tasks/todo.md` or `tasks/lessons.md` exist.
+- Do not introduce alternate task-tracking files.
 
 ---
 
 ## 3. Current Repo Map
+
+### OpenClaw alignment
+
+1. Keep YAi! as compatible with OpenClaw as practical wherever the products overlap in behavior, terminology, or user flow.
+2. Use the attached OpenClaw repo folders, especially `docs/`, `src/`, and `extensions/`, as current reference material when implementing related features.
+3. Prefer proven patterns, naming, and documentation from OpenClaw instead of inventing parallel approaches when the same concept already exists there.
+4. Re-read the attached OpenClaw folders often, because they are updated frequently and should be treated as the latest source of reference information.
+5. Apply the same compatibility mindset to docs and code: if OpenClaw already documents or solves an adjacent problem well, mirror the intent and adapt it to YAi! rather than starting from scratch.
 
 ### Orchestration
 
@@ -71,9 +78,15 @@ Use this file as the primary repository-specific instruction set for AI coding a
 
 ### Planned clients
 
-- Future CLI work should use `Terminal.Gui` for terminal UX.
+- Future CLI work should use Spectre.Console for terminal UX.
 - Future web frontend work should use Vue 3, Vuetify, and Vite.
 - Keep frontend code isolated from backend projects rather than mixing Node assets into .NET service folders.
+
+### Program structure
+
+1. Keep Program.cs minimal and easy to scan.
+2. Move configuration mapping classes out of Program.cs into a Models folder.
+3. Keep startup wiring, configuration binding, and object mapping separate from application flow.
 
 ---
 
@@ -97,11 +110,16 @@ Use this file as the primary repository-specific instruction set for AI coding a
 2. Use SQLite only for local or application log storage.
 3. Do not treat SQLite log storage as the primary application database unless the user explicitly asks for that change.
 4. Keep logging configuration centralized and avoid duplicating sink setup across projects.
+5. Use `ILogger` via DI for diagnostics and debugging, and start with extensive logging early in implementation so behavior is easy to trace.
+6. Prefer more logging at the beginning of a change, then trim only once the flow is stable and the signal is clear.
 
-### Terminal UI
+### CLI-Intelligence
 
-1. For CLI graphics, prefer `Terminal.Gui` over custom console drawing. `Terminal.Gui` offers a mature set of controls and layout management that reduces low-level terminal handling, speeds development of interactive text UIs, and keeps the UX consistent across platforms.
-2. Keep terminal UI code separate from Web API concerns and Aspire orchestration.
+1. For CLI graphics, prefer Spectre.Console over custom console drawing. Build CLI-Intelligence as an interactive-first app with hierarchical menus and screens.
+2. Clear the console fully before rendering each screen, render the standard banner, then a blank line, then the screen content.
+3. Make ESC always navigate back to the previous menu or screen.
+4. Treat switch-based flags as secondary; use them only for automation or non-interactive runs.
+5. Keep CLI UI code separate from Web API concerns and Aspire orchestration.
 
 ### Frontend
 
@@ -175,6 +193,15 @@ Cleanup and automated maintenance
 
 - When you open a file to modify it, remove unused `using` directives, sort remaining `using`s, and run an IDE/code-cleanup pass if available (format, remove unreachable/useless code, apply simple refactors).
 - If, while working, you spot improvements or dead/legacy code, perform the cleanup and small refactors in-place rather than leaving TODOs. Prefer safe, local refactors that improve clarity and remove duplication.
+
+XML documentation and regions
+
+- Add XML comments to classes and public methods for clarity.
+- Include `<summary>` for all classes and public methods.
+- Include `<param>` for method parameters and `<returns>` for return values where applicable.
+- Keep comments concise, informative, and aligned with standard C# documentation conventions.
+- Wrap `using` directives in a `#region Using directives` block at the top of each file.
+- Use matching `#region` blocks for fields and properties when the file contains them.
 
 Refactoring and backward compatibility
 

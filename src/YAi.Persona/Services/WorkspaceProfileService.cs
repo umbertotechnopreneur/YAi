@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using Microsoft.Extensions.Logging;
 using YAi.Persona.Models;
 
 namespace YAi.Persona.Services
@@ -9,38 +11,49 @@ namespace YAi.Persona.Services
     {
         private readonly AppPaths _paths;
         private readonly MemoryFileParser _parser;
+        private readonly ILogger<WorkspaceProfileService> _logger;
 
-        public WorkspaceProfileService(AppPaths paths, MemoryFileParser parser)
+        public WorkspaceProfileService(AppPaths paths, MemoryFileParser parser, ILogger<WorkspaceProfileService> logger)
         {
             _paths = paths ?? throw new ArgumentNullException(nameof(paths));
             _parser = parser ?? throw new ArgumentNullException(nameof(parser));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         public void EnsureInitializedFromTemplates()
         {
             _paths.EnsureDirectories();
 
-            var userTarget = _paths.UserProfilePath;
-            var soulTarget = _paths.SoulProfilePath;
+            _logger.LogInformation("Seeding workspace templates from {SourceWorkspace} to {TargetWorkspace}", _paths.AssetWorkspaceRoot, _paths.RuntimeWorkspaceRoot);
 
-            var userTemplate = Path.Combine(_paths.AssetWorkspaceRoot, "USER.template.md");
-            var soulTemplate = Path.Combine(_paths.AssetWorkspaceRoot, "SOUL.template.md");
+            var templateFiles = Directory.EnumerateFiles(_paths.AssetWorkspaceRoot, "*.md", SearchOption.TopDirectoryOnly);
+            var copiedCount = 0;
 
-            if (!File.Exists(userTarget))
+            foreach (var templateFile in templateFiles)
             {
-                if (!File.Exists(userTemplate))
-                    throw new FileNotFoundException("USER.template.md missing from asset workspace", userTemplate);
-                var data = File.ReadAllBytes(userTemplate);
-                AtomicFileWriter.WriteAtomic(userTarget, data);
+                var fileName = Path.GetFileName(templateFile);
+                var targetPath = Path.Combine(_paths.RuntimeWorkspaceRoot, fileName);
+                if (File.Exists(targetPath))
+                {
+                    _logger.LogDebug("Skipping existing workspace file {TargetPath}", targetPath);
+                    continue;
+                }
+
+                try
+                {
+                    var data = File.ReadAllBytes(templateFile);
+                    AtomicFileWriter.WriteAtomic(targetPath, data);
+                    copiedCount++;
+                    _logger.LogInformation("Copied template {SourcePath} to {TargetPath}", templateFile, targetPath);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to copy template {SourcePath} to {TargetPath}", templateFile, targetPath);
+                    throw;
+                }
             }
 
-            if (!File.Exists(soulTarget))
-            {
-                if (!File.Exists(soulTemplate))
-                    throw new FileNotFoundException("SOUL.template.md missing from asset workspace", soulTemplate);
-                var data = File.ReadAllBytes(soulTemplate);
-                AtomicFileWriter.WriteAtomic(soulTarget, data);
-            }
+            _logger.LogInformation("Workspace template seeding complete. Copied {CopiedCount} files into {TargetWorkspace}", copiedCount, _paths.RuntimeWorkspaceRoot);
         }
 
         public string LoadUserProfile()
@@ -81,13 +94,22 @@ namespace YAi.Persona.Services
 
         public void ValidateConfig()
         {
-            // Ensure asset templates exist
-            var userTemplate = Path.Combine(_paths.AssetWorkspaceRoot, "USER.template.md");
-            var soulTemplate = Path.Combine(_paths.AssetWorkspaceRoot, "SOUL.template.md");
-            if (!File.Exists(userTemplate))
-                throw new FileNotFoundException("Missing USER.template.md in asset workspace", userTemplate);
-            if (!File.Exists(soulTemplate))
-                throw new FileNotFoundException("Missing SOUL.template.md in asset workspace", soulTemplate);
+            var workspaceFiles = Directory.EnumerateFiles(_paths.AssetWorkspaceRoot, "*.md", SearchOption.TopDirectoryOnly).ToArray();
+            if (workspaceFiles.Length == 0)
+                throw new FileNotFoundException("No markdown templates were found in the asset workspace", _paths.AssetWorkspaceRoot);
+
+            RequireTemplate("USER.template.md");
+            RequireTemplate("SOUL.template.md");
+        }
+
+        private void RequireTemplate(string fileName)
+        {
+            var templatePath = Path.Combine(_paths.AssetWorkspaceRoot, fileName);
+            if (!File.Exists(templatePath))
+            {
+                _logger.LogError("Missing required template {TemplatePath}", templatePath);
+                throw new FileNotFoundException($"Missing {fileName} in asset workspace", templatePath);
+            }
         }
     }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Net.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using YAi.Persona.Services;
 using YAi.Persona.Models;
 
@@ -21,9 +22,7 @@ namespace YAi.Persona.Extensions
             services.AddSingleton<HistoryService>();
             services.AddSingleton<RuntimeState>();
 
-            services.AddSingleton<PromptBuilder>(sp => new PromptBuilder(
-                sp.GetRequiredService<PromptAssetService>(),
-                sp.GetRequiredService<RuntimeState>()));
+            services.AddSingleton<PromptBuilder>();
 
             services.AddSingleton<OpenRouterClient>(sp => new OpenRouterClient(new HttpClient()));
 

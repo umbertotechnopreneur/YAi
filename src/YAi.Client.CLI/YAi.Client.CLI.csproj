@@ -26,8 +26,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\YAi.Resources\reference\templates\**\*.md">
+    <!-- Top-level templates copied flat to workspace/ -->
+    <Content Include="..\YAi.Resources\reference\templates\*.md">
       <TargetPath>workspace\%(Filename)%(Extension)</TargetPath>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <!-- Workspace subdirectory templates preserving full directory structure -->
+    <Content Include="..\YAi.Resources\reference\templates\workspace\**\*.md">
+      <TargetPath>workspace\%(RecursiveDir)%(Filename)%(Extension)</TargetPath>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

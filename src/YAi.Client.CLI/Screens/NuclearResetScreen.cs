@@ -76,9 +76,9 @@ public sealed class NuclearResetScreen : Screen
 		}
 
 		AnsiConsole.MarkupLine ("[bold red]Go nuclear[/]");
-		AnsiConsole.MarkupLine ($"[grey70]This will delete the custom user data root at {Markup.Escape (_paths.UserDataRoot)} and everything beneath it.[/]");
-		AnsiConsole.MarkupLine ("[grey70]Asset files in the application install folder are left untouched.[/]");
-		AnsiConsole.WriteLine ();
+        AnsiConsole.MarkupLine($"[grey70]This will delete the workspace root ({Markup.Escape(_paths.WorkspaceRoot)}), data root ({Markup.Escape(_paths.DataRoot)}), and config root ({Markup.Escape(_paths.ConfigRoot)}) and everything beneath them.[/]");
+        AnsiConsole.MarkupLine("[grey70]Asset files in the application install folder are left untouched.[/]");
+        AnsiConsole.WriteLine ();
 
 		IReadOnlyList<(string Category, string Label, string Path, bool IsCustom)> entries = _paths.GetCustomDataEntries ();
 		RenderPathTable ("Custom paths that will be removed", entries, "[yellow]custom[/]");
@@ -99,22 +99,24 @@ public sealed class NuclearResetScreen : Screen
 
 		AnsiConsole.WriteLine ();
 
-		bool rootExisted = Directory.Exists (_paths.UserDataRoot);
+        bool rootExisted = Directory.Exists(_paths.WorkspaceRoot) || Directory.Exists(_paths.DataRoot) || Directory.Exists(_paths.ConfigRoot);
 
-		await AnsiConsole.Status ()
-			.Spinner (Spinner.Known.Dots)
+        await AnsiConsole.Status()
+            .Spinner (Spinner.Known.Dots)
 			.SpinnerStyle (new Style (Color.Red1))
-			.StartAsync ("[red]Deleting custom data root...[/]", _ =>
-			{
+            .StartAsync("[red]Deleting workspace, data, and config roots...[/]", _ =>
+            {
 				DeleteCustomDataRoot ();
 				return Task.FromResult (true);
 			})
 			.ConfigureAwait (false);
 
-		AnsiConsole.MarkupLine ($"[green]Deleted custom data root:[/] {Markup.Escape (_paths.UserDataRoot)}");
-		AnsiConsole.WriteLine ();
+        AnsiConsole.MarkupLine($"[green]Deleted workspace root:[/] {Markup.Escape(_paths.WorkspaceRoot)}");
+        AnsiConsole.MarkupLine($"[green]Deleted data root:[/] {Markup.Escape(_paths.DataRoot)}");
+        AnsiConsole.MarkupLine($"[green]Deleted config root:[/] {Markup.Escape(_paths.ConfigRoot)}");
+        AnsiConsole.WriteLine();
 
-		RenderOutcomeTable (entries, rootExisted);
+        RenderOutcomeTable (entries, rootExisted);
 		AnsiConsole.WriteLine ();
 
 		return true;
@@ -128,16 +130,21 @@ public sealed class NuclearResetScreen : Screen
 
 	private void DeleteCustomDataRoot ()
 	{
-		if (!Directory.Exists (_paths.UserDataRoot))
-		{
-			return;
-		}
+        DeleteRoot(_paths.WorkspaceRoot);
+        DeleteRoot(_paths.DataRoot);
+        DeleteRoot(_paths.ConfigRoot);
+    }
 
-		ClearReadOnlyAttributes (_paths.UserDataRoot);
-		Directory.Delete (_paths.UserDataRoot, true);
-	}
+    private static void DeleteRoot(string root)
+    {
+        if (!Directory.Exists(root))
+            return;
 
-	private static void ClearReadOnlyAttributes (string rootPath)
+        ClearReadOnlyAttributes(root);
+        Directory.Delete(root, true);
+    }
+
+    private static void ClearReadOnlyAttributes (string rootPath)
 	{
 		foreach (string entryPath in Directory.EnumerateFileSystemEntries (rootPath, "*", SearchOption.AllDirectories))
 		{

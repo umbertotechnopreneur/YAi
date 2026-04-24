@@ -18,202 +18,211 @@
  * You should have received a copy of the GNU Affero General Public License along
  * with YAi!. If not, see <https://www.gnu.org/licenses/>.
  *
- * YAi!
+ * YAi! Persona
  * Application path resolution and directory setup
  */
 
 namespace YAi.Persona.Services;
 
 /// <summary>
-/// Manages application paths for assets, configuration, logs, and workspace directories.
+/// Manages all application paths.
+/// <para>
+/// The workspace/data split follows the memory spec:
+/// <list type="bullet">
+///   <item><description><see cref="WorkspaceRoot"/> — human-owned, editable, portable memory files
+///     (<c>%USERPROFILE%\.yai\workspace</c>). Override with <c>YAI_WORKSPACE_ROOT</c>.</description></item>
+///   <item><description><see cref="DataRoot"/> — runtime-generated data, logs, history, cache
+///     (<c>%LOCALAPPDATA%\YAi\data</c>). Override with <c>YAI_DATA_ROOT</c>.</description></item>
+/// </list>
+/// </para>
 /// </summary>
 public sealed class AppPaths
 {
-    /// <summary>
+    #region Asset paths (read-only, bundled with binary)
 
-    /// <summary>
-    /// Gets the root directory for bundled skill markdown files.
-    /// </summary>
-    public string AssetSkillsRoot => Path.Combine(AssetWorkspaceRoot, "skills");
-
-    /// <summary>
-    /// Gets the root directory for runtime skill markdown files.
-    /// </summary>
-    public string RuntimeSkillsRoot => Path.Combine(RuntimeWorkspaceRoot, "skills");
-    /// Gets the root directory for application assets.
-    /// </summary>
+    /// <summary>Gets the root directory for application assets.</summary>
     public string AssetRoot { get; }
 
-    /// <summary>
-    /// Gets the root directory for asset workspace files.
-    /// </summary>
+    /// <summary>Gets the root directory for bundled workspace template files.</summary>
     public string AssetWorkspaceRoot { get; }
 
-    /// <summary>
-    /// Gets the root directory for user data storage.
-    /// </summary>
-    public string UserDataRoot { get; }
+    /// <summary>Gets the root directory for bundled skill markdown files.</summary>
+    public string AssetSkillsRoot => Path.Combine(AssetWorkspaceRoot, "skills");
 
-    /// <summary>
-    /// Gets the directory for configuration files.
-    /// </summary>
-    public string ConfigRoot { get; }
-
-    /// <summary>
-    /// Gets the directory for application logs.
-    /// </summary>
-    public string LogsRoot { get; }
-
-    /// <summary>
-    /// Gets the directory for conversation history files.
-    /// </summary>
-    public string HistoryRoot { get; }
-
-    /// <summary>
-    /// Gets the directory for runtime workspace files.
-    /// </summary>
-    public string RuntimeWorkspaceRoot { get; }
-
-    /// <summary>
-    /// Gets the path to the application configuration file.
-    /// </summary>
+    /// <summary>Gets the default appsettings.json bundled with the binary.</summary>
     public string AppSettingsPath => Path.Combine(AssetRoot, "appsettings.json");
 
+    #endregion
+
+    #region Workspace root — human-owned, editable, portable
+
     /// <summary>
-    /// Gets the path to the user overlay configuration file.
+    /// Gets the root of the user-owned workspace directory.
+    /// Default: <c>%USERPROFILE%\.yai\workspace</c>.
+    /// Override: <c>YAI_WORKSPACE_ROOT</c> environment variable.
     /// </summary>
+    public string WorkspaceRoot { get; }
+
+    /// <summary>Gets the memory files directory under <see cref="WorkspaceRoot"/>.</summary>
+    public string MemoryRoot => Path.Combine(WorkspaceRoot, "memory");
+
+    /// <summary>Gets the prompt files directory under <see cref="WorkspaceRoot"/>.</summary>
+    public string PromptRoot => Path.Combine(WorkspaceRoot, "prompts");
+
+    /// <summary>Gets the regex files directory under <see cref="WorkspaceRoot"/>.</summary>
+    public string RegexRoot => Path.Combine(WorkspaceRoot, "regex");
+
+    /// <summary>Gets the episodic memory directory under <see cref="MemoryRoot"/>.</summary>
+    public string EpisodesRoot => Path.Combine(MemoryRoot, "episodes");
+
+    /// <summary>Gets the backup directory for pre-mutation file snapshots.</summary>
+    public string BackupRoot => Path.Combine(WorkspaceRoot, ".backups");
+
+    /// <summary>Gets the runtime skill markdown files directory under <see cref="WorkspaceRoot"/>.</summary>
+    public string RuntimeSkillsRoot => Path.Combine(WorkspaceRoot, "skills");
+
+    #endregion
+
+    #region Data root — runtime-generated, not user-editable
+
+    /// <summary>
+    /// Gets the root of the runtime data directory.
+    /// Default: <c>%LOCALAPPDATA%\YAi\data</c>.
+    /// Override: <c>YAI_DATA_ROOT</c> environment variable.
+    /// </summary>
+    public string DataRoot { get; }
+
+    /// <summary>Gets the directory for dream proposals and pending extraction candidates.</summary>
+    public string DreamsRoot => Path.Combine(DataRoot, "dreams");
+
+    /// <summary>Gets the directory for conversation history files.</summary>
+    public string HistoryRoot => Path.Combine(DataRoot, "history");
+
+    /// <summary>Gets the directory for application logs.</summary>
+    public string LogsRoot => Path.Combine(DataRoot, "logs");
+
+    /// <summary>Gets the path to the local SQLite database used for LLM call logging.</summary>
+    public string LlmDbPath => Path.Combine(DataRoot, "llm-calls.db");
+
+    /// <summary>Gets the directory for daily conversation log files.</summary>
+    public string DailyRoot => Path.Combine(DataRoot, "daily");
+
+    #endregion
+
+    #region Config root — application settings (separate from user memory)
+
+    /// <summary>Gets the directory for application configuration files.</summary>
+    public string ConfigRoot { get; }
+
+    /// <summary>Gets the path to the user overlay configuration file.</summary>
     public string AppConfigPath => Path.Combine(ConfigRoot, "appconfig.json");
 
-    /// <summary>
-    /// Gets the path to the cached OpenRouter model catalog.
-    /// </summary>
+    /// <summary>Gets the path to the cached OpenRouter model catalog.</summary>
     public string OpenRouterCatalogCachePath => Path.Combine(ConfigRoot, "openrouter-model-catalog.json");
 
-    /// <summary>
-    /// Gets the path to the first-run configuration file.
-    /// </summary>
+    /// <summary>Gets the path to the first-run state file.</summary>
     public string FirstRunPath => Path.Combine(ConfigRoot, "first-run.json");
 
-    /// <summary>
-    /// Gets the path to the user profile markdown file.
-    /// </summary>
-    public string UserProfilePath => Path.Combine(RuntimeWorkspaceRoot, "USER.md");
+    #endregion
 
-    /// <summary>
-    /// Gets the path to the soul profile markdown file.
-    /// </summary>
-    public string SoulProfilePath => Path.Combine(RuntimeWorkspaceRoot, "SOUL.md");
+    #region Well-known memory file paths
 
-    /// <summary>
-    /// Gets the path to the agent identity markdown file.
-    /// </summary>
-    public string IdentityProfilePath => Path.Combine(RuntimeWorkspaceRoot, "IDENTITY.md");
+    /// <summary>Gets the path to the user profile memory file.</summary>
+    public string UserProfilePath => Path.Combine(MemoryRoot, "USER.md");
 
-    /// <summary>
-    /// Gets the path to the runtime bootstrap context file.
-    /// Present only on a fresh workspace; deleted after bootstrap completes.
-    /// </summary>
-    public string BootstrapFilePath => Path.Combine(RuntimeWorkspaceRoot, "BOOTSTRAP.md");
+    /// <summary>Gets the path to the soul profile memory file.</summary>
+    public string SoulProfilePath => Path.Combine(MemoryRoot, "SOUL.md");
 
-    /// <summary>
-    /// Gets the path to the local SQLite database used for LLM call logging.
-    /// </summary>
-    public string LlmDbPath => Path.Combine(UserDataRoot, "data", "llm-calls.db");
+    /// <summary>Gets the path to the agent identity memory file.</summary>
+    public string IdentityProfilePath => Path.Combine(MemoryRoot, "IDENTITY.md");
 
-    /// <summary>
-    /// Gets the configured asset, memory, skill, and storage paths used by the application.
-    /// </summary>
-    /// <returns>The configured path inventory.</returns>
-    public IReadOnlyList<(string Category, string Label, string Path, bool IsCustom)> GetConfiguredPathEntries()
-    {
-        return
-        [
-            ("Assets", "Application root", AssetRoot, false),
-            ("Assets", "Packaged workspace root", AssetWorkspaceRoot, false),
-            ("Assets", "Bundled skills root", AssetSkillsRoot, false),
-            ("Assets", "Default appsettings.json", AppSettingsPath, false),
-            ("User data", "User data root", UserDataRoot, true),
-            ("Config", "Config root", ConfigRoot, true),
-            ("Config", "User appconfig.json", AppConfigPath, true),
-            ("Config", "OpenRouter catalog cache", OpenRouterCatalogCachePath, true),
-            ("Config", "First-run state", FirstRunPath, true),
-            ("Logs", "Logs root", LogsRoot, true),
-            ("History", "History root", HistoryRoot, true),
-            ("Workspace", "Runtime workspace root", RuntimeWorkspaceRoot, true),
-            ("Skills", "Runtime skills root", RuntimeSkillsRoot, true),
-            ("Memory", "User profile memory", UserProfilePath, true),
-            ("Memory", "Soul profile memory", SoulProfilePath, true),
-            ("Memory", "Identity profile memory", IdentityProfilePath, true),
-            ("Memory", "Bootstrap file", BootstrapFilePath, true),
-            ("Data", "LLM call SQLite database", LlmDbPath, true)
-        ];
-    }
+    /// <summary>Gets the path to the bootstrap context file (deleted after first run).</summary>
+    public string BootstrapFilePath => Path.Combine(WorkspaceRoot, "BOOTSTRAP.md");
 
-    /// <summary>
-    /// Gets the writable custom paths that belong to the user's data root.
-    /// </summary>
-    /// <returns>The writable custom path inventory.</returns>
-    public IReadOnlyList<(string Category, string Label, string Path, bool IsCustom)> GetCustomDataEntries()
-    {
-        return GetConfiguredPathEntries().Where (entry => entry.IsCustom).ToArray ();
-    }
+    /// <summary>Gets the path to the pending candidates JSONL store.</summary>
+    public string CandidatesJsonlPath => Path.Combine(DreamsRoot, "candidates.jsonl");
+
+    /// <summary>Gets the path to the human-readable dreams review file.</summary>
+    public string DreamsFilePath => Path.Combine(DreamsRoot, "DREAMS.md");
+
+    /// <summary>Gets the path to the lessons memory file.</summary>
+    public string LessonsPath => Path.Combine(MemoryRoot, "LESSONS.md");
+
+    /// <summary>Gets the path to the corrections memory file.</summary>
+    public string CorrectionsPath => Path.Combine(MemoryRoot, "CORRECTIONS.md");
+
+    /// <summary>Gets the path to the errors and failures memory file.</summary>
+    public string ErrorsPath => Path.Combine(MemoryRoot, "ERRORS.md");
+
+    /// <summary>Gets the path to the behavioral limits file (protected — never auto-promoted).</summary>
+    public string LimitsPath => Path.Combine(MemoryRoot, "LIMITS.md");
+
+    /// <summary>Gets the path to the agents configuration file (protected — never auto-promoted).</summary>
+    public string AgentsPath => Path.Combine(MemoryRoot, "AGENTS.md");
+
+    #endregion
+
+    #region Constructor
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AppPaths"/> class.
-    /// Resolves application paths for assets, configuration, logs, and workspace directories.
-    /// Allows override of user data root via the YAI_USER_DATA_ROOT environment variable.
+    /// Resolves workspace and data roots from environment variables with sensible cross-platform defaults.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when YAI_USER_DATA_ROOT is not an absolute path or is under the application install directory.
+    /// Thrown when an override environment variable is not an absolute path or points inside the install directory.
     /// </exception>
     public AppPaths()
     {
         AssetRoot = AppContext.BaseDirectory ?? Directory.GetCurrentDirectory();
-        // Asset workspace may be packaged either as a 'workspace' subfolder or as loose files at the asset root.
+
         var candidateWorkspace = Path.Combine(AssetRoot, "workspace");
         AssetWorkspaceRoot = Directory.Exists(candidateWorkspace) ? candidateWorkspace : AssetRoot;
 
-        // Allow override via env var
-        var overridePath = Environment.GetEnvironmentVariable("YAI_USER_DATA_ROOT");
-        if (!string.IsNullOrWhiteSpace(overridePath))
-        {
-            if (!Path.IsPathRooted(overridePath))
-                throw new InvalidOperationException("YAI_USER_DATA_ROOT must be an absolute path.");
+        WorkspaceRoot = ResolveRoot(
+            envVar: "YAI_WORKSPACE_ROOT",
+            defaultBase: Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            relativePath: Path.Combine(".yai", "workspace"));
 
-            var fullOverride = Path.GetFullPath(overridePath);
-            var fullAsset = Path.GetFullPath(AssetRoot);
-            if (fullOverride.StartsWith(fullAsset, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("YAI_USER_DATA_ROOT must not be under the application install directory.");
+        DataRoot = ResolveRoot(
+            envVar: "YAI_DATA_ROOT",
+            defaultBase: Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            relativePath: Path.Combine("YAi", "data"));
 
-            UserDataRoot = fullOverride;
-        }
-        else
-        {
-            var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            UserDataRoot = Path.Combine(local, "YAi");
-        }
-
-        ConfigRoot = Path.Combine(UserDataRoot, "config");
-        LogsRoot = Path.Combine(UserDataRoot, "logs");
-        HistoryRoot = Path.Combine(UserDataRoot, "history");
-        RuntimeWorkspaceRoot = Path.Combine(UserDataRoot, "workspace");
+        ConfigRoot = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "YAi",
+            "config");
     }
 
+    #endregion
+
+    #region Public methods
+
     /// <summary>
-    /// Creates all required application directories and verifies write access.
+    /// Creates all required application directories and verifies write access to the data root.
     /// </summary>
-    /// <exception cref="InvalidOperationException">
-    /// Thrown when unable to write to the user data root directory.
-    /// </exception>
+    /// <exception cref="InvalidOperationException">Thrown when unable to write to the logs directory.</exception>
     public void EnsureDirectories()
     {
-        Directory.CreateDirectory(ConfigRoot);
-        Directory.CreateDirectory(LogsRoot);
-        Directory.CreateDirectory(HistoryRoot);
-        Directory.CreateDirectory(RuntimeWorkspaceRoot);
+        // Workspace subtrees
+        Directory.CreateDirectory(WorkspaceRoot);
+        Directory.CreateDirectory(MemoryRoot);
+        Directory.CreateDirectory(EpisodesRoot);
+        Directory.CreateDirectory(PromptRoot);
+        Directory.CreateDirectory(RegexRoot);
+        Directory.CreateDirectory(BackupRoot);
         Directory.CreateDirectory(RuntimeSkillsRoot);
 
-        // simple write probe
+        // Data subtrees
+        Directory.CreateDirectory(DataRoot);
+        Directory.CreateDirectory(DreamsRoot);
+        Directory.CreateDirectory(HistoryRoot);
+        Directory.CreateDirectory(LogsRoot);
+        Directory.CreateDirectory(DailyRoot);
+
+        // Config
+        Directory.CreateDirectory(ConfigRoot);
+
         var probeFile = Path.Combine(LogsRoot, ".writeprobe");
         try
         {
@@ -222,21 +231,90 @@ public sealed class AppPaths
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException($"Cannot write to user data root: {ex.Message}", ex);
+            throw new InvalidOperationException($"Cannot write to logs root '{LogsRoot}': {ex.Message}", ex);
         }
     }
 
     /// <summary>
-    /// Generates a temporary file path within the specified target directory.
-    /// Creates the target directory if it does not exist.
+    /// Returns a temporary file path inside the same directory as <paramref name="targetPath"/>.
+    /// Creates the directory if it does not exist.
     /// </summary>
-    /// <param name="targetPath">The target file path to determine the directory for the temporary file.</param>
-    /// <returns>A temporary file path with a random filename in the target directory.</returns>
     public string GetTempPathInDirectory(string targetPath)
     {
-        var dir = Path.GetDirectoryName(targetPath) ?? RuntimeWorkspaceRoot;
+        var dir = Path.GetDirectoryName(targetPath) ?? WorkspaceRoot;
         Directory.CreateDirectory(dir);
+
         return Path.Combine(dir, Path.GetRandomFileName());
     }
+
+    /// <summary>
+    /// Returns all configured paths grouped by category for display in diagnostic screens.
+    /// </summary>
+    public IReadOnlyList<(string Category, string Label, string Path, bool IsCustom)> GetConfiguredPathEntries()
+    {
+        return
+        [
+            ("Assets", "Application root", AssetRoot, false),
+            ("Assets", "Packaged workspace root", AssetWorkspaceRoot, false),
+            ("Assets", "Bundled skills root", AssetSkillsRoot, false),
+            ("Assets", "Default appsettings.json", AppSettingsPath, false),
+            ("Workspace", "Workspace root", WorkspaceRoot, true),
+            ("Workspace", "Memory root", MemoryRoot, true),
+            ("Workspace", "Episodes root", EpisodesRoot, true),
+            ("Workspace", "Prompts root", PromptRoot, true),
+            ("Workspace", "Regex root", RegexRoot, true),
+            ("Workspace", "Skills root", RuntimeSkillsRoot, true),
+            ("Workspace", "Backup root", BackupRoot, true),
+            ("Workspace", "Bootstrap file", BootstrapFilePath, true),
+            ("Memory", "User profile", UserProfilePath, true),
+            ("Memory", "Soul profile", SoulProfilePath, true),
+            ("Memory", "Identity profile", IdentityProfilePath, true),
+            ("Data", "Data root", DataRoot, true),
+            ("Data", "Dreams root", DreamsRoot, true),
+            ("Data", "Candidates JSONL", CandidatesJsonlPath, true),
+            ("Data", "Dreams file", DreamsFilePath, true),
+            ("Data", "History root", HistoryRoot, true),
+            ("Data", "Daily root", DailyRoot, true),
+            ("Data", "LLM call database", LlmDbPath, true),
+            ("Config", "Config root", ConfigRoot, true),
+            ("Config", "User appconfig.json", AppConfigPath, true),
+            ("Config", "OpenRouter catalog cache", OpenRouterCatalogCachePath, true),
+            ("Config", "First-run state", FirstRunPath, true),
+            ("Logs", "Logs root", LogsRoot, true)
+        ];
+    }
+
+    /// <summary>
+    /// Returns only the user-writable paths from <see cref="GetConfiguredPathEntries"/>.
+    /// </summary>
+    public IReadOnlyList<(string Category, string Label, string Path, bool IsCustom)> GetCustomDataEntries()
+    {
+        return GetConfiguredPathEntries().Where(e => e.IsCustom).ToArray();
+    }
+
+    #endregion
+
+    #region Private helpers
+
+    private string ResolveRoot(string envVar, string defaultBase, string relativePath)
+    {
+        var override_ = Environment.GetEnvironmentVariable(envVar);
+        if (!string.IsNullOrWhiteSpace(override_))
+        {
+            if (!Path.IsPathRooted(override_))
+                throw new InvalidOperationException($"{envVar} must be an absolute path.");
+
+            var fullOverride = Path.GetFullPath(override_);
+            var fullAsset = Path.GetFullPath(AssetRoot);
+            if (fullOverride.StartsWith(fullAsset, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException($"{envVar} must not be under the application install directory.");
+
+            return fullOverride;
+        }
+
+        return Path.Combine(defaultBase, relativePath);
+    }
+
+    #endregion
 }
 

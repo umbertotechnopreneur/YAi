@@ -59,6 +59,15 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<MemoryFileParser>();
         services.AddSingleton<PromptAssetService>();
         services.AddSingleton<WorkspaceProfileService>();
+        services.AddSingleton<RegexRegistry>();
+        services.AddSingleton<WarmMemoryResolver>();
+        services.AddSingleton<MemoryBudgetManager>();
+        services.AddSingleton<MemoryTransactionManager>();
+        services.AddSingleton<CandidateStore>();
+        services.AddSingleton<ExtractionPipelineService>();
+        services.AddSingleton<MemoryFlushService>();
+        services.AddSingleton<DreamingService>();
+        services.AddSingleton<PromotionService>();
         services.AddSingleton<ConfigService>();
         services.AddSingleton(sp => sp.GetRequiredService<ConfigService>().LoadConfig());
         services.AddSingleton<HistoryService>();

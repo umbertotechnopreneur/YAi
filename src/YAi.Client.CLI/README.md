@@ -32,7 +32,8 @@ Environment
 
 - `YAI_OPENROUTER_API_KEY` — required API key for OpenRouter chat/bootstrap flows and the credits lookup. The CLI can still start without it so the model selector and cached catalog can load.
 - Internet access is checked at startup and the CLI now warns instead of failing fast. Remote chat flows still need connectivity.
-- `YAI_USER_DATA_ROOT` — (optional) absolute path to override user data root (where runtime workspace, logs, history, config, memory files, skills, and the local SQLite database are written). Must not be under the application install directory. The `--show-paths` and `--gonuclear` screens both resolve from this path.
+- `YAI_WORKSPACE_ROOT` — (optional) absolute path to override the runtime workspace root (where memory files, prompts, regex, and skills are stored). Defaults to `%USERPROFILE%\.yai\workspace`.
+- `YAI_DATA_ROOT` — (optional) absolute path to override the data root (where logs, history, dreams, and the local SQLite database are written). Defaults to `%LOCALAPPDATA%\YAi\data`. Both roots must not be under the application install directory.
 
 Catalog cache
 
@@ -82,7 +83,7 @@ dotnet run --project src/YAi.Client.CLI -- --talk
 Development notes
 
 - Use `dotnet build` to compile. The CLI references the `YAi.Persona` project directly to reuse services and models.
-- The app enforces atomic writes to the user data root and will refuse to write under the app install directory unless `YAI_USER_DATA_ROOT` is set to an absolute external path.
+- The app enforces atomic writes to the workspace and data roots and will refuse to write under the app install directory unless `YAI_WORKSPACE_ROOT` or `YAI_DATA_ROOT` are set to absolute external paths.
 
 Testing / Smoke checks
 

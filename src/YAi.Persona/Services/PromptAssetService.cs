@@ -19,101 +19,253 @@
  * with YAi!. If not, see <https://www.gnu.org/licenses/>.
  *
  * YAi!
- * Prompt asset loading and lookup
+ * Prompt asset loading and multilingual chain resolution
  */
 
-using System;
-using System.IO;
+#region Using directives
+
 using System.Text;
 using Microsoft.Extensions.Logging;
 
-namespace YAi.Persona.Services
+#endregion
+
+namespace YAi.Persona.Services;
+
+/// <summary>
+/// Loads prompt sections from the user's workspace prompt files using a multilingual chain.
+/// <para>
+/// Chain order for a given <paramref name="key"/> and <paramref name="language"/>:
+/// <list type="number">
+///   <item><c>prompts/system-prompts.common.md</c></item>
+///   <item><c>prompts/system-prompts.{language}.md</c></item>
+///   <item><c>prompts/categories/{key}.common.md</c></item>
+///   <item><c>prompts/categories/{key}.{language}.md</c></item>
+/// </list>
+/// Sections with the same <c>## Heading</c> key are merged in chain order; later entries
+/// append to earlier ones. When no section is found across the full chain, a
+/// <see cref="InvalidOperationException"/> is thrown.
+/// </para>
+/// <para>
+/// Legacy asset files at <see cref="AppPaths.AssetWorkspaceRoot"/> are also checked as a
+/// fallback for the top-level system prompts file.
+/// </para>
+/// </summary>
+public sealed class PromptAssetService
 {
-    public sealed class PromptAssetService
+    #region Fields
+
+    private readonly AppPaths _paths;
+    private readonly ILogger<PromptAssetService> _logger;
+
+    #endregion
+
+    #region Constructor
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PromptAssetService"/> class.
+    /// </summary>
+    /// <param name="paths">Application path provider.</param>
+    /// <param name="logger">Logger.</param>
+    public PromptAssetService(AppPaths paths, ILogger<PromptAssetService> logger)
     {
-        private readonly AppPaths _paths;
-        private readonly ILogger<PromptAssetService> _logger;
-
-        public PromptAssetService(AppPaths paths, ILogger<PromptAssetService> logger)
-        {
-            _paths = paths ?? throw new ArgumentNullException(nameof(paths));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
-
-        public string LoadFile(string name)
-        {
-            var path = Path.Combine(_paths.AssetWorkspaceRoot, name);
-            if (!File.Exists(path))
-            {
-                _logger.LogWarning("Asset file not found: {AssetPath}", path);
-                throw new FileNotFoundException($"Asset file not found: {name}", path);
-            }
-
-            _logger.LogDebug("Loading asset file {AssetPath}", path);
-
-            return File.ReadAllText(path);
-        }
-
-        public string LoadPromptSection(string key)
-        {
-            var promptsPath = Path.Combine(_paths.AssetWorkspaceRoot, "SYSTEM-PROMPTS.md");
-            if (!File.Exists(promptsPath))
-            {
-                _logger.LogError("SYSTEM-PROMPTS.md missing from asset workspace at {PromptsPath}", promptsPath);
-                throw new FileNotFoundException("SYSTEM-PROMPTS.md missing from asset workspace", promptsPath);
-            }
-
-            _logger.LogDebug("Loading prompt section {PromptKey} from {PromptsPath}", key, promptsPath);
-
-            var text = File.ReadAllText(promptsPath).Replace("\r\n", "\n");
-            var lines = text.Split('\n');
-            var sb = new StringBuilder();
-            var found = false;
-            for (int i = 0; i < lines.Length; i++)
-            {
-                var line = lines[i];
-                if (line.TrimStart().StartsWith("## ") && string.Equals(line.Trim().Substring(3).Trim(), key, StringComparison.OrdinalIgnoreCase))
-                {
-                    found = true;
-                    i++;
-                    for (; i < lines.Length; i++)
-                    {
-                        var l = lines[i];
-                        if (l.TrimStart().StartsWith("## ")) break;
-                        sb.AppendLine(l);
-                    }
-                    break;
-                }
-            }
-
-            if (!found)
-            {
-                _logger.LogWarning("Prompt section {PromptKey} not found in {PromptsPath}", key, promptsPath);
-                throw new InvalidOperationException($"Prompt section '{key}' not found in SYSTEM-PROMPTS.md");
-            }
-
-            _logger.LogInformation("Loaded prompt section {PromptKey} from {PromptsPath}", key, promptsPath);
-
-            return sb.ToString().Trim();
-        }
-
-        public void ValidateConfig()
-        {
-            var bootstrap = Path.Combine(_paths.AssetWorkspaceRoot, "BOOTSTRAP.md");
-            var prompts = Path.Combine(_paths.AssetWorkspaceRoot, "SYSTEM-PROMPTS.md");
-            if (!File.Exists(bootstrap))
-            {
-                _logger.LogError("BOOTSTRAP.md missing from asset workspace at {BootstrapPath}", bootstrap);
-                throw new FileNotFoundException("BOOTSTRAP.md missing from asset workspace", bootstrap);
-            }
-
-            if (!File.Exists(prompts))
-            {
-                _logger.LogError("SYSTEM-PROMPTS.md missing from asset workspace at {PromptsPath}", prompts);
-                throw new FileNotFoundException("SYSTEM-PROMPTS.md missing from asset workspace", prompts);
-            }
-
-            _logger.LogDebug("Validated prompt assets at {BootstrapPath} and {PromptsPath}", bootstrap, prompts);
-        }
+        _paths = paths ?? throw new ArgumentNullException(nameof(paths));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
+
+    #endregion
+
+    #region Public API
+
+    /// <summary>
+    /// Loads a named prompt section using the full multilingual chain.
+    /// </summary>
+    /// <param name="key">Section key (the <c>## Heading</c> text, case-insensitive).</param>
+    /// <param name="language">
+    /// Language code such as <c>en</c>, <c>it</c>, or <c>common</c>.
+    /// When <c>common</c> is passed, language-specific files are skipped.
+    /// </param>
+    /// <returns>Merged prompt text from all chain files that contain the section.</returns>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the section is not found in any file in the chain.
+    /// </exception>
+    public string LoadPromptSection(string key, string language = "common")
+    {
+        StringBuilder sb = new();
+        bool found = false;
+
+        // Chain: common system → language system → common category → language category
+        TryAppendSection(sb, ref found, key,
+            Path.Combine(_paths.PromptRoot, "system-prompts.common.md"), "runtime");
+
+        if (!string.Equals(language, "common", StringComparison.OrdinalIgnoreCase))
+        {
+            TryAppendSection(sb, ref found, key,
+                Path.Combine(_paths.PromptRoot, $"system-prompts.{language}.md"), "runtime");
+        }
+
+        string categoriesRoot = Path.Combine(_paths.PromptRoot, "categories");
+        TryAppendSection(sb, ref found, key,
+            Path.Combine(categoriesRoot, $"{key}.common.md"), "runtime-category");
+
+        if (!string.Equals(language, "common", StringComparison.OrdinalIgnoreCase))
+        {
+            TryAppendSection(sb, ref found, key,
+                Path.Combine(categoriesRoot, $"{key}.{language}.md"), "runtime-category");
+        }
+
+        // Fallback: legacy asset SYSTEM-PROMPTS.md
+        if (!found)
+        {
+            string legacyPath = Path.Combine(_paths.AssetWorkspaceRoot, "SYSTEM-PROMPTS.md");
+            TryAppendSection(sb, ref found, key, legacyPath, "legacy-asset");
+        }
+
+        if (!found)
+        {
+            _logger.LogWarning(
+                "Prompt section '{Key}' (language: {Language}) not found in any chain file",
+                key,
+                language);
+
+            throw new InvalidOperationException(
+                $"Prompt section '{key}' (language: {language}) not found in any chain file.");
+        }
+
+        string result = sb.ToString().Trim();
+
+        _logger.LogInformation(
+            "Loaded prompt section '{Key}' (language: {Language}), {Chars} chars",
+            key,
+            language,
+            result.Length);
+
+        return result;
+    }
+
+    /// <summary>
+    /// Loads the raw content of a named asset file from the asset workspace root.
+    /// </summary>
+    /// <param name="name">File name relative to <see cref="AppPaths.AssetWorkspaceRoot"/>.</param>
+    /// <returns>File content as text.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the file is not found.</exception>
+    public string LoadFile(string name)
+    {
+        string path = Path.Combine(_paths.AssetWorkspaceRoot, name);
+
+        if (!File.Exists(path))
+        {
+            _logger.LogWarning("Asset file not found: {AssetPath}", path);
+            throw new FileNotFoundException($"Asset file not found: {name}", path);
+        }
+
+        _logger.LogDebug("Loading asset file {AssetPath}", path);
+
+        return File.ReadAllText(path);
+    }
+
+    /// <summary>
+    /// Validates that the minimum required prompt assets are present.
+    /// </summary>
+    /// <exception cref="FileNotFoundException">Thrown when BOOTSTRAP.md is missing.</exception>
+    public void ValidateConfig()
+    {
+        string bootstrap = Path.Combine(_paths.AssetWorkspaceRoot, "BOOTSTRAP.md");
+
+        if (!File.Exists(bootstrap))
+        {
+            _logger.LogError("BOOTSTRAP.md missing from asset workspace at {BootstrapPath}", bootstrap);
+            throw new FileNotFoundException("BOOTSTRAP.md missing from asset workspace", bootstrap);
+        }
+
+        _logger.LogDebug("Validated prompt assets at {BootstrapPath}", bootstrap);
+    }
+
+    #endregion
+
+    #region Private helpers
+
+    /// <summary>
+    /// Attempts to read section <paramref name="key"/> from <paramref name="filePath"/> and
+    /// appends the content to <paramref name="sb"/>. Sets <paramref name="found"/> to
+    /// <c>true</c> when any content is appended.
+    /// </summary>
+    private void TryAppendSection(
+        StringBuilder sb,
+        ref bool found,
+        string key,
+        string filePath,
+        string fileRole)
+    {
+        if (!File.Exists(filePath))
+        {
+            _logger.LogDebug(
+                "PromptAssetService: chain file not found at {FilePath} (role: {Role}); skipping",
+                filePath,
+                fileRole);
+
+            return;
+        }
+
+        string section = ExtractSection(filePath, key);
+
+        if (string.IsNullOrWhiteSpace(section))
+        {
+            _logger.LogDebug(
+                "PromptAssetService: section '{Key}' not found in {FilePath} (role: {Role})",
+                key,
+                filePath,
+                fileRole);
+
+            return;
+        }
+
+        if (sb.Length > 0)
+            sb.AppendLine();
+
+        sb.AppendLine(section);
+        found = true;
+
+        _logger.LogDebug(
+            "PromptAssetService: appended section '{Key}' from {FilePath} (role: {Role})",
+            key,
+            filePath,
+            fileRole);
+    }
+
+    private static string ExtractSection(string filePath, string key)
+    {
+        string text = File.ReadAllText(filePath).Replace("\r\n", "\n");
+        string[] lines = text.Split('\n');
+        StringBuilder sb = new();
+        bool capturing = false;
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            string line = lines[i];
+
+            if (line.TrimStart().StartsWith("## ", StringComparison.Ordinal))
+            {
+                string heading = line.Trim()[3..].Trim();
+
+                if (string.Equals(heading, key, StringComparison.OrdinalIgnoreCase))
+                {
+                    capturing = true;
+                    continue;
+                }
+
+                if (capturing)
+                    break;
+
+                continue;
+            }
+
+            if (capturing)
+                sb.AppendLine(line);
+        }
+
+        return sb.ToString().Trim();
+    }
+
+    #endregion
 }
+

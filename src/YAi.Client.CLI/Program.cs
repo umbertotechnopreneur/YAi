@@ -154,8 +154,8 @@ try
 	Log.Information("Starting YAi! CLI");
 	Log.Information("Asset root: {AssetRoot}", appPaths.AssetRoot);
 	Log.Information("Asset workspace root: {AssetWorkspaceRoot}", appPaths.AssetWorkspaceRoot);
-	Log.Information("User data root: {UserDataRoot}", appPaths.UserDataRoot);
-	Log.Information("Runtime workspace root: {RuntimeWorkspaceRoot}", appPaths.RuntimeWorkspaceRoot);
+	Log.Information("Workspace root: {WorkspaceRoot}", appPaths.WorkspaceRoot);
+	Log.Information("Data root: {DataRoot}", appPaths.DataRoot);
 
 	await ShowOpenRouterBalanceAsync(openRouterBalance, true, false);
 	await new Banner().RunAsync();
@@ -248,6 +248,26 @@ try
 			await ShowOpenRouterBalanceAsync(openRouterBalance);
 			await DoTalkAsync(promptBuilder, openRouterClient, toolRegistry, history, appConfig);
 			Log.Information("Talk workflow completed");
+		}
+		else if (cmd == "--dream")
+		{
+			Log.Information("Starting dreaming reflection pass");
+			DreamingService dreamingSvc = sp.GetRequiredService<DreamingService>();
+			await DoDreamAsync(dreamingSvc);
+			Log.Information("Dream pass completed");
+		}
+		else if (cmd == "--knowledge")
+		{
+			Log.Information("Opening Knowledge Hub");
+			await new KnowledgeHubScreen(appPaths).RunAsync();
+			Log.Information("Knowledge Hub closed");
+		}
+		else if (cmd == "--dreams-review")
+		{
+			Log.Information("Opening Dreams Review");
+			PromotionService promotionSvc = sp.GetRequiredService<PromotionService>();
+			await new DreamsReviewScreen(promotionSvc).RunAsync();
+			Log.Information("Dreams Review closed");
 		}
 		else
 		{
@@ -687,6 +707,27 @@ static async Task DoBootstrapAsync(
 	catch (Exception ex)
 	{
 		ReportRecoverableException(ex, "Bootstrap workflow failed", "Bootstrap workflow failed");
+	}
+}
+
+static async Task DoDreamAsync(DreamingService dreamingService)
+{
+	AnsiConsole.MarkupLine("[bold magenta]Dreaming...[/] [grey]Analyzing recent activity for cross-session patterns.[/]");
+	AnsiConsole.WriteLine();
+
+	try
+	{
+		int count = await dreamingService.DreamAsync();
+
+		if (count == 0)
+			AnsiConsole.MarkupLine("[grey]No new proposals generated — no strong cross-session patterns found.[/]");
+		else
+			AnsiConsole.MarkupLine($"[springgreen2]✔ {count} proposal(s) written to DREAMS.md.[/] Run [bold]--dreams-review[/] to review them.");
+	}
+	catch (Exception ex)
+	{
+		AnsiConsole.MarkupLine($"[red]✖ Dreaming failed:[/] {Markup.Escape(ex.Message)}");
+		Log.Warning(ex, "Dreaming pass failed");
 	}
 }
 

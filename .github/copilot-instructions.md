@@ -248,25 +248,35 @@ Use the following banner standard when creating a new source or documentation fi
 1. Apply the header only to newly created files. Do not retroactively add it to existing files unless requested.
 2. Keep the first line as the project, module, or product name.
 3. Keep the second line as a short description of the file.
-4. Do not expand the header with internal metadata unless explicitly required.
-5. Keep the wording consistent across repositories unless a stricter legal notice is required.
+4. Leave two trailing comment lines available for the file-specific name and short purpose when using the longer YAi! header.
+5. Do not expand the header with internal metadata unless explicitly required.
+6. Keep the wording consistent across repositories unless a stricter legal notice is required.
 
 ### C# Header
 
 ```csharp
 /*
- * [Project or Module Name]
- * [Short file purpose or description]
+ * YAi!
  *
- * Copyright © 2026 UmbertoGiacobbiDotBiz. All rights reserved.
+ * Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.
  * Website: https://umbertogiacobbi.biz
  * Email: hello@umbertogiacobbi.biz
  *
- * This file may include content generated, refined, or reviewed
- * with the assistance of one or more AI models. It should be
- * reviewed and validated before external distribution or
- * operational use. Final responsibility remains with the
- * author(s) and the organization.
+ * This file is part of YAi!.
+ *
+ * YAi! is free software: you can redistribute it and/or modify it under the terms
+ * of the GNU Affero General Public License version 3 as published by the Free
+ * Software Foundation.
+ *
+ * YAi! is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+ * PURPOSE. See the GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License along
+ * with YAi!. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * [Project or Module Name]
+ * [Short file purpose or description]
  */
 ```
 
@@ -274,18 +284,27 @@ Use the following banner standard when creating a new source or documentation fi
 
 ```javascript
 /*
- * [Project or Module Name]
- * [Short file purpose or description]
+ * YAi!
  *
- * Copyright © 2026 UmbertoGiacobbiDotBiz. All rights reserved.
+ * Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.
  * Website: https://umbertogiacobbi.biz
  * Email: hello@umbertogiacobbi.biz
  *
- * This file may include content generated, refined, or reviewed
- * with the assistance of one or more AI models. It should be
- * reviewed and validated before external distribution or
- * operational use. Final responsibility remains with the
- * author(s) and the organization.
+ * This file is part of YAi!.
+ *
+ * YAi! is free software: you can redistribute it and/or modify it under the terms
+ * of the GNU Affero General Public License version 3 as published by the Free
+ * Software Foundation.
+ *
+ * YAi! is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+ * PURPOSE. See the GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License along
+ * with YAi!. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * [Project or Module Name]
+ * [Short file purpose or description]
  */
 ```
 
@@ -293,18 +312,27 @@ Use the following banner standard when creating a new source or documentation fi
 
 ```html
 <!--
-	[Project or Module Name]
-	[Short file purpose or description]
+	YAi!
 
-	Copyright © 2026 UmbertoGiacobbiDotBiz. All rights reserved.
+	Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.
 	Website: https://umbertogiacobbi.biz
 	Email: hello@umbertogiacobbi.biz
 
-	This file may include content generated, refined, or reviewed
-	with the assistance of one or more AI models. It should be
-	reviewed and validated before external distribution or
-	operational use. Final responsibility remains with the
-	author(s) and the organization.
+	This file is part of YAi!.
+
+	YAi! is free software: you can redistribute it and/or modify it under the terms
+	of the GNU Affero General Public License version 3 as published by the Free
+	Software Foundation.
+
+	YAi! is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+	without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+	PURPOSE. See the GNU Affero General Public License for more details.
+
+	You should have received a copy of the GNU Affero General Public License along
+	with YAi!. If not, see <https://www.gnu.org/licenses/>.
+
+	[Project or Module Name]
+	[Short file purpose or description]
 -->
 ```
 

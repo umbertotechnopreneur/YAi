@@ -62,6 +62,17 @@ public sealed class AppPaths
     public string SoulProfilePath => Path.Combine(RuntimeWorkspaceRoot, "SOUL.md");
 
     /// <summary>
+    /// Gets the path to the agent identity markdown file.
+    /// </summary>
+    public string IdentityProfilePath => Path.Combine(RuntimeWorkspaceRoot, "IDENTITY.md");
+
+    /// <summary>
+    /// Gets the path to the runtime bootstrap context file.
+    /// Present only on a fresh workspace; deleted after bootstrap completes.
+    /// </summary>
+    public string BootstrapFilePath => Path.Combine(RuntimeWorkspaceRoot, "BOOTSTRAP.md");
+
+    /// <summary>
     /// Gets the path to the local SQLite database used for LLM call logging.
     /// </summary>
     public string LlmDbPath => Path.Combine(UserDataRoot, "data", "llm-calls.db");

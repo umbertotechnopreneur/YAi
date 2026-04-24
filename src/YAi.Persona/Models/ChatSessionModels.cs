@@ -16,5 +16,11 @@ namespace YAi.Persona.Models
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public List<HistoryEntry> Entries { get; set; } = new List<HistoryEntry>();
+
+        /// <summary>
+        /// Optional mode tag for this session (e.g. "talk", "bootstrap").
+        /// Used to distinguish bootstrap transcripts from normal conversations.
+        /// </summary>
+        public string? Mode { get; set; }
     }
 }

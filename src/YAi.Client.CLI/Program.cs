@@ -67,18 +67,43 @@ try
 		Console.WriteLine($"Workspace init error: {ex.Message}");
 	}
 
+	// ── Auto first-run bootstrap ──────────────────────────────────────────────
+	// Check bootstrap completion state before dispatching any command.
+	// When no completed state exists the bootstrap ritual runs automatically.
+	// --bootstrap can still be passed explicitly to re-run the ritual.
+	var bootstrapState = config.LoadBootstrapState();
+	var isExplicitBootstrap = cliArgs.Length > 0
+		&& string.Equals(cliArgs[0], "--bootstrap", StringComparison.OrdinalIgnoreCase);
+
+	if (isExplicitBootstrap || bootstrapState?.IsCompleted != true)
+	{
+		Log.Information("Starting bootstrap workflow (explicit={Explicit}, hasCompletedState={HasState})",
+			isExplicitBootstrap, bootstrapState?.IsCompleted == true);
+		await DoBootstrapAsync(config, runtime, workspace, bootstrapSvc, history, appConfig);
+		Log.Information("Bootstrap workflow completed");
+
+		// After automatic bootstrap on first run, fall through to normal use
+		// rather than exiting so the user can immediately start chatting.
+		if (!isExplicitBootstrap && cliArgs.Length == 0)
+		{
+			PrintUsage();
+			if (sp is IDisposable d0) d0.Dispose();
+			return;
+		}
+
+		if (isExplicitBootstrap)
+		{
+			if (sp is IDisposable d1) d1.Dispose();
+			return;
+		}
+	}
+
 	// Basic command dispatch
 	if (cliArgs.Length > 0)
 	{
 		var cmd = cliArgs[0].ToLowerInvariant();
 		Log.Information("Dispatching command {Command}", cmd);
-		if (cmd == "--bootstrap")
-		{
-			Log.Information("Starting bootstrap workflow");
-			await DoBootstrapAsync(config, runtime, workspace, bootstrapSvc);
-			Log.Information("Bootstrap workflow completed");
-		}
-		else if (cmd == "--ask")
+		if (cmd == "--ask")
 		{
 			Log.Information("Starting ask workflow");
 			var prompt = cliArgs.Length > 1 ? string.Join(' ', cliArgs.Skip(1)) : string.Empty;
@@ -129,6 +154,7 @@ finally
 static void PrintUsage()
 {
 	Console.WriteLine("Usage: yai [--bootstrap|--ask <text>|--translate <text>|--talk|-talk]");
+	Console.WriteLine("       --bootstrap  Re-run the first-run setup ritual");
 }
 
 static void PrintBanner()
@@ -163,57 +189,136 @@ static async Task DoBootstrapAsync(
 	ConfigService config,
 	RuntimeState runtime,
 	WorkspaceProfileService workspace,
-	BootstrapInterviewService bootstrapSvc)
+	BootstrapInterviewService bootstrapSvc,
+	HistoryService history,
+	AppConfig appConfig)
 {
 	try
 	{
-		workspace.EnsureInitializedFromTemplates();
+		AnsiConsole.Clear();
+		PrintBanner();
+		AnsiConsole.WriteLine();
+		AnsiConsole.MarkupLine("[bold cyan]First-run setup[/]");
+		AnsiConsole.MarkupLine("[grey70]Your AI assistant is waking up for the first time. Type [bold]done[/] or [bold]exit[/] when you are ready to finish.[/]");
+		AnsiConsole.WriteLine();
 
-		if (bootstrapSvc.NeedsBootstrap ())
+		// Build the initial system context from BOOTSTRAP.md + workspace files
+		var systemMessages = bootstrapSvc.BuildBootstrapSystemMessages();
+
+		// Kick off the conversation: send an initial user nudge so the model produces the opening greeting
+		var kickoffMessages = new List<OpenRouterChatMessage>(systemMessages)
 		{
-			AnsiConsole.WriteLine ();
-			AnsiConsole.MarkupLine ("[bold cyan]First-run setup — let's personalise your AI assistant.[/]");
-			AnsiConsole.MarkupLine ("[grey70]Answer each question and press Enter. Type a dash [-] to skip.[/]");
-			AnsiConsole.WriteLine ();
+			new() { Role = "user", Content = "(Begin)" }
+		};
 
-			var qa = new List<(string Question, string Answer)> ();
+		var conversation = new List<OpenRouterChatMessage>();
+		var sessionEntries = new List<HistoryEntry>();
 
-			foreach (var (key, question) in BootstrapInterviewService.Questions)
+		// Get the model's opening message
+		try
+		{
+			var opening = await bootstrapSvc.GetOpeningMessageAsync(kickoffMessages, CancellationToken.None);
+			if (!string.IsNullOrWhiteSpace(opening))
 			{
-				AnsiConsole.MarkupLine ($"[yellow]{question}[/]");
-				var answer = AnsiConsole.Ask<string> ("[grey50]>[/] ").Trim ();
+				AnsiConsole.MarkupLine($"[bold]{runtime.AgentName ?? "Agent"}:[/] {Markup.Escape(opening)}");
+				AnsiConsole.WriteLine();
 
-				if (answer == "-")
-				{
-					continue;
-				}
-
-				qa.Add ((question, answer));
+				conversation.Add(new OpenRouterChatMessage { Role = "assistant", Content = opening });
+				sessionEntries.Add(new HistoryEntry { Prompt = "(Begin)", Response = opening, Mode = "bootstrap" });
 			}
-
-			AnsiConsole.WriteLine ();
-			AnsiConsole.MarkupLine ("[grey70]Updating your profiles — this may take a moment...[/]");
-
-			await bootstrapSvc.ExtractAndPersistAsync (qa, CancellationToken.None);
-
-			AnsiConsole.MarkupLine ("[green]Profiles updated.[/]");
-			AnsiConsole.WriteLine ();
+		}
+		catch (Exception ex)
+		{
+			Log.Warning(ex, "Bootstrap: failed to get opening message — continuing to input loop");
 		}
 
+		// Conversational loop
+		while (true)
+		{
+			Console.Write($"{runtime.UserName ?? "You"}: ");
+			var line = Console.ReadLine();
+
+			if (line == null)
+			{
+				break;
+			}
+
+			var trimmed = line.Trim();
+
+			if (string.IsNullOrEmpty(trimmed))
+			{
+				continue;
+			}
+
+			if (trimmed.Equals("done", StringComparison.OrdinalIgnoreCase)
+				|| trimmed.Equals("exit", StringComparison.OrdinalIgnoreCase))
+			{
+				break;
+			}
+
+			// Build messages: system context + conversation so far + new user turn
+			var messages = new List<OpenRouterChatMessage>(systemMessages);
+			messages.AddRange(conversation);
+			messages.Add(new OpenRouterChatMessage { Role = "user", Content = trimmed });
+
+			try
+			{
+				var resp = await bootstrapSvc.SendBootstrapTurnAsync(messages, CancellationToken.None);
+				var reply = resp ?? string.Empty;
+
+				AnsiConsole.MarkupLine($"[bold]{runtime.AgentName ?? "Agent"}:[/] {Markup.Escape(reply)}");
+				AnsiConsole.WriteLine();
+
+				conversation.Add(new OpenRouterChatMessage { Role = "user", Content = trimmed });
+				conversation.Add(new OpenRouterChatMessage { Role = "assistant", Content = reply });
+
+				sessionEntries.Add(new HistoryEntry { Prompt = trimmed, Response = reply, Mode = "bootstrap" });
+			}
+			catch (Exception ex)
+			{
+				AnsiConsole.MarkupLine($"[red]Error: {Markup.Escape(ex.Message)}[/]");
+				Log.Error(ex, "Bootstrap: turn failed");
+			}
+		}
+
+		AnsiConsole.WriteLine();
+		AnsiConsole.MarkupLine("[grey70]Saving your profiles — this may take a moment...[/]");
+
+		// Extract and persist IDENTITY.md, USER.md, SOUL.md from the full conversation
+		var allMessages = new List<OpenRouterChatMessage>(systemMessages);
+		allMessages.AddRange(conversation);
+
+		await bootstrapSvc.ExtractAndPersistFromConversationAsync(allMessages, CancellationToken.None);
+
+		// Delete the one-time BOOTSTRAP.md from the runtime workspace
+		workspace.DeleteRuntimeBootstrapFile();
+
+		// Save the bootstrap transcript to history
+		if (appConfig.App.HistoryEnabled && sessionEntries.Count > 0)
+		{
+			history.SaveChatSession(new ChatSession { Entries = sessionEntries, Mode = "bootstrap" });
+		}
+
+		// Mark bootstrap as complete
 		var state = new BootstrapState
 		{
 			BootstrapTimestampUtc = DateTimeOffset.UtcNow,
+			CompletedAtUtc = DateTimeOffset.UtcNow,
+			IsCompleted = true,
 			AgentName = runtime.AgentName ?? "YAi",
 			UserName = runtime.UserName ?? Environment.UserName
 		};
 
 		config.SaveBootstrapState(state);
 		runtime.IsBootstrapped = true;
-		AnsiConsole.MarkupLine ("[green]Bootstrap completed.[/]");
+
+		AnsiConsole.MarkupLine("[green]Bootstrap complete. Your profiles are saved.[/]");
+		AnsiConsole.WriteLine();
 	}
 	catch (Exception ex)
 	{
-		AnsiConsole.MarkupLine ($"[red]Bootstrap error: {ex.Message}[/]");
+		AnsiConsole.MarkupLine($"[red]Bootstrap error: {Markup.Escape(ex.Message)}[/]");
+		Log.Error(ex, "Bootstrap workflow failed");
 	}
 }
 

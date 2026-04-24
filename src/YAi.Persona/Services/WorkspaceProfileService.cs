@@ -75,6 +75,57 @@ public sealed class WorkspaceProfileService
         AtomicFileWriter.WriteAtomic(_paths.SoulProfilePath, bytes);
     }
 
+    /// <summary>
+    /// Loads the agent identity profile (IDENTITY.md) from the runtime workspace.
+    /// Returns an empty string when the file does not yet exist.
+    /// </summary>
+    public string LoadIdentityProfile()
+    {
+        return File.Exists(_paths.IdentityProfilePath) ? File.ReadAllText(_paths.IdentityProfilePath) : string.Empty;
+    }
+
+    /// <summary>
+    /// Saves updated identity profile content to IDENTITY.md in the runtime workspace.
+    /// </summary>
+    public void SaveIdentityProfile(string content)
+    {
+        var bytes = System.Text.Encoding.UTF8.GetBytes(content ?? string.Empty);
+        AtomicFileWriter.WriteAtomic(_paths.IdentityProfilePath, bytes);
+    }
+
+    /// <summary>
+    /// Loads an arbitrary file from the runtime workspace by name.
+    /// Returns an empty string when the file does not exist.
+    /// </summary>
+    public string LoadRuntimeFile(string name)
+    {
+        var path = Path.Combine(_paths.RuntimeWorkspaceRoot, name);
+        return File.Exists(path) ? File.ReadAllText(path) : string.Empty;
+    }
+
+    /// <summary>
+    /// Deletes BOOTSTRAP.md from the runtime workspace.
+    /// Called after a successful bootstrap ritual so the file is not re-injected on future sessions.
+    /// </summary>
+    public void DeleteRuntimeBootstrapFile()
+    {
+        if (!File.Exists(_paths.BootstrapFilePath))
+        {
+            _logger.LogDebug("BOOTSTRAP.md not present in runtime workspace — nothing to delete");
+            return;
+        }
+
+        try
+        {
+            File.Delete(_paths.BootstrapFilePath);
+            _logger.LogInformation("Deleted BOOTSTRAP.md from runtime workspace after successful bootstrap");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to delete BOOTSTRAP.md from runtime workspace");
+        }
+    }
+
     public void UpdateUserFrontMatter(IReadOnlyDictionary<string, string> updates)
     {
         var content = LoadUserProfile();
@@ -95,8 +146,8 @@ public sealed class WorkspaceProfileService
         if (workspaceFiles.Length == 0)
             throw new FileNotFoundException("No markdown templates were found in the asset workspace", _paths.AssetWorkspaceRoot);
 
-        RequireTemplate("USER.template.md");
-        RequireTemplate("SOUL.template.md");
+        RequireTemplate("USER.md");
+        RequireTemplate("SOUL.md");
     }
 
     private void RequireTemplate(string fileName)

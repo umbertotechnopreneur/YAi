@@ -1,1 +1,0 @@
-Fatal error: Handle non valido.

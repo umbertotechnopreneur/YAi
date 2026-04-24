@@ -26,6 +26,17 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Remove="..\YAi.Resources\reference\templates\AGENTS.dev.md" />
+    <Content Remove="..\YAi.Resources\reference\templates\BOOT.md" />
+    <Content Remove="..\YAi.Resources\reference\templates\HEARTBEAT.md" />
+    <Content Remove="..\YAi.Resources\reference\templates\IDENTITY.dev.md" />
+    <Content Remove="..\YAi.Resources\reference\templates\SOUL.dev.md" />
+    <Content Remove="..\YAi.Resources\reference\templates\TOOLS.dev.md" />
+    <Content Remove="..\YAi.Resources\reference\templates\TOOLS.md" />
+    <Content Remove="..\YAi.Resources\reference\templates\USER.dev.md" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\YAi.Persona\YAi.Persona.csproj" />
   </ItemGroup>
 

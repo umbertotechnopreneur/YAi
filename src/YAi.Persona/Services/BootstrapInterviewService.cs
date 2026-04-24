@@ -1,7 +1,7 @@
 /*
  * YAi! — Persona
- * First-run bootstrap interview: collects user identity and preferences via guided Q&A,
- * then uses the LLM to populate USER.md and SOUL.md from the conversation.
+ * First-run bootstrap service: injects BOOTSTRAP.md and workspace files as LLM context,
+ * then conducts a conversational ritual that writes IDENTITY.md, USER.md, and SOUL.md.
  *
  * Copyright © 2026 UmbertoGiacobbiDotBiz. All rights reserved.
  * Website: https://umbertogiacobbi.biz
@@ -24,9 +24,13 @@ using YAi.Persona.Models;
 namespace YAi.Persona.Services;
 
 /// <summary>
-/// Orchestrates the first-run bootstrap interview.
-/// Determines whether a profile interview is needed, then accepts the collected Q&amp;A
-/// and uses the LLM to produce and persist updated USER.md and SOUL.md content.
+/// Orchestrates the first-run bootstrap ritual.
+/// <para>
+/// Builds the initial LLM context by injecting <c>BOOTSTRAP.md</c> and the other runtime
+/// workspace files (AGENTS.md, SOUL.md, IDENTITY.md, USER.md) as system messages.
+/// The caller drives the conversational loop; when complete this service extracts and
+/// persists the durable profile files (IDENTITY.md, USER.md, SOUL.md) from the transcript.
+/// </para>
 /// </summary>
 public sealed class BootstrapInterviewService
 {
@@ -35,28 +39,6 @@ public sealed class BootstrapInterviewService
     private readonly WorkspaceProfileService _workspace;
     private readonly OpenRouterClient _openRouter;
     private readonly ILogger<BootstrapInterviewService> _logger;
-
-    #endregion
-
-    #region Properties
-
-    /// <summary>
-    /// The ordered list of interview questions shown during first-run setup.
-    /// Each entry is a (key, question) pair where key is a short identifier used in logging.
-    /// </summary>
-    public static IReadOnlyList<(string Key, string Question)> Questions { get; } =
-    [
-        ("name",       "What is your preferred name?"),
-        ("role",       "What is your primary role or profession?"),
-        ("seniority",  "How would you describe your seniority or experience level?"),
-        ("location",   "Where are you based? (city / country)"),
-        ("timezone",   "What is your timezone? (e.g. Asia/Ho_Chi_Minh, Europe/Rome)"),
-        ("language",   "What language do you prefer for responses?"),
-        ("shell",      "What shell do you use most often? (e.g. PowerShell, Bash, Zsh)"),
-        ("os",         "What operating system do you work on primarily? (Windows / Linux / macOS)"),
-        ("interests",  "What are your main technical interests, domains, or tools?"),
-        ("style",      "How do you prefer responses? (concise / detailed / bullet points)"),
-    ];
 
     #endregion
 
@@ -81,56 +63,143 @@ public sealed class BootstrapInterviewService
     #endregion
 
     /// <summary>
-    /// Returns <see langword="true"/> when the user profile looks like an untouched template
-    /// and the bootstrap interview should be presented to the user.
+    /// Sends the initial kickoff messages and returns the agent's opening greeting.
     /// </summary>
-    public bool NeedsBootstrap ()
+    /// <param name="kickoffMessages">System messages plus the silent kickoff user turn.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The model's opening message text.</returns>
+    public async Task<string> GetOpeningMessageAsync (
+        IReadOnlyList<OpenRouterChatMessage> kickoffMessages,
+        CancellationToken cancellationToken = default)
     {
-        var content = _workspace.LoadUserProfile ();
+        var response = await _openRouter.SendChatAsync (kickoffMessages.ToList (), cancellationToken, "Bootstrap-Open");
 
-        if (string.IsNullOrWhiteSpace (content))
-        {
-            return true;
-        }
-
-        // If the profile still contains the placeholder tokens from the template it has not been
-        // filled in yet.  The templates ship with "Unknown" placeholders for every field.
-        var hasRealContent = content.Contains ("Preferred name:", StringComparison.OrdinalIgnoreCase)
-            && !content.Contains ("Preferred name: Unknown", StringComparison.OrdinalIgnoreCase);
-
-        return !hasRealContent;
+        return response.Text ?? string.Empty;
     }
 
     /// <summary>
-    /// Sends the collected Q&amp;A transcript to the LLM and persists the resulting profiles.
-    /// Writes updated content into both USER.md and SOUL.md.
-    /// Safe to call even when <see cref="NeedsBootstrap"/> returns <see langword="false"/>; it will
-    /// overwrite with a refreshed version of the profiles.
+    /// Sends a single conversational turn during the bootstrap ritual and returns the reply.
     /// </summary>
-    /// <param name="qa">
-    /// Ordered list of question/answer pairs collected during the interview.
-    /// </param>
+    /// <param name="messages">Full message list (system + prior turns + new user turn).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    public async Task ExtractAndPersistAsync (
-        IReadOnlyList<(string Question, string Answer)> qa,
+    /// <returns>The assistant reply text.</returns>
+    public async Task<string> SendBootstrapTurnAsync (
+        IReadOnlyList<OpenRouterChatMessage> messages,
         CancellationToken cancellationToken = default)
     {
-        if (qa is null || qa.Count == 0)
+        var response = await _openRouter.SendChatAsync (messages.ToList (), cancellationToken, "Bootstrap-Turn");
+
+        return response.Text ?? string.Empty;
+    }
+
+    /// <summary>
+    /// Builds the initial system messages for the bootstrap conversation.
+    /// Loads <c>BOOTSTRAP.md</c> plus any existing workspace files
+    /// (AGENTS.md, SOUL.md, IDENTITY.md, USER.md) from the runtime workspace.
+    /// </summary>
+    /// <returns>
+    /// Ordered list of system-role messages ready to pass to the LLM before the first user turn.
+    /// </returns>
+    public List<OpenRouterChatMessage> BuildBootstrapSystemMessages ()
+    {
+        var messages = new List<OpenRouterChatMessage> ();
+
+        AppendRuntimeFile (messages, "BOOTSTRAP.md", "Bootstrap instructions");
+        AppendRuntimeFile (messages, "AGENTS.md", "Workspace guide");
+        AppendRuntimeFile (messages, "SOUL.md", "Soul template");
+        AppendRuntimeFile (messages, "IDENTITY.md", "Identity template");
+        AppendRuntimeFile (messages, "USER.md", "User profile template");
+
+        _logger.LogInformation ("Built {Count} bootstrap system messages from runtime workspace", messages.Count);
+
+        return messages;
+    }
+
+    /// <summary>
+    /// Extracts and persists durable profile files from a completed bootstrap conversation.
+    /// Writes IDENTITY.md, USER.md, and SOUL.md into the runtime workspace.
+    /// </summary>
+    /// <param name="conversation">
+    /// The full bootstrap conversation: user and assistant turns collected during the ritual.
+    /// </param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public async Task ExtractAndPersistFromConversationAsync (
+        IReadOnlyList<OpenRouterChatMessage> conversation,
+        CancellationToken cancellationToken = default)
+    {
+        if (conversation is null || conversation.Count == 0)
         {
-            _logger.LogWarning ("BootstrapInterviewService: no Q&A pairs provided — skipping profile update");
+            _logger.LogWarning ("Bootstrap: no conversation provided — skipping profile extraction");
             return;
         }
 
-        var transcript = BuildTranscript (qa);
-        _logger.LogInformation ("BootstrapInterviewService: starting profile extraction from {Count} answers", qa.Count);
+        var transcript = BuildTranscriptFromConversation (conversation);
+        _logger.LogInformation ("Bootstrap: starting profile extraction from {TurnCount} conversation turns", conversation.Count);
 
+        await PersistIdentityProfileAsync (transcript, cancellationToken);
         await PersistUserProfileAsync (transcript, cancellationToken);
         await PersistSoulProfileAsync (transcript, cancellationToken);
 
-        _logger.LogInformation ("BootstrapInterviewService: profile extraction complete");
+        _logger.LogInformation ("Bootstrap: profile extraction complete");
     }
 
     #region Private helpers
+
+    private void AppendRuntimeFile (List<OpenRouterChatMessage> messages, string fileName, string label)
+    {
+        var content = _workspace.LoadRuntimeFile (fileName);
+
+        if (string.IsNullOrWhiteSpace (content))
+        {
+            _logger.LogDebug ("Bootstrap context: {Label} ({FileName}) not found in runtime workspace — skipped", label, fileName);
+            return;
+        }
+
+        messages.Add (new OpenRouterChatMessage
+        {
+            Role = "system",
+            Content = $"## {label} ({fileName})\n\n{content}"
+        });
+
+        _logger.LogDebug ("Bootstrap context: appended {Label} ({FileName})", label, fileName);
+    }
+
+    private async Task PersistIdentityProfileAsync (string transcript, CancellationToken ct)
+    {
+        var template = _workspace.LoadIdentityProfile ();
+
+        var messages = new List<OpenRouterChatMessage>
+        {
+            new ()
+            {
+                Role = "system",
+                Content = BuildIdentityExtractionPrompt (template)
+            },
+            new ()
+            {
+                Role = "user",
+                Content = $"## Bootstrap Conversation Transcript\n\n{transcript}"
+            }
+        };
+
+        try
+        {
+            var response = await _openRouter.SendChatAsync (messages, ct, "Bootstrap-Identity");
+
+            if (string.IsNullOrWhiteSpace (response.Text))
+            {
+                _logger.LogWarning ("Bootstrap: LLM returned empty IDENTITY.md content — file not updated");
+                return;
+            }
+
+            _workspace.SaveIdentityProfile (response.Text.Trim ());
+            _logger.LogInformation ("Bootstrap: IDENTITY.md written successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError (ex, "Bootstrap: IDENTITY.md extraction failed");
+        }
+    }
 
     private async Task PersistUserProfileAsync (string transcript, CancellationToken ct)
     {
@@ -138,15 +207,15 @@ public sealed class BootstrapInterviewService
 
         var messages = new List<OpenRouterChatMessage>
         {
-            new()
+            new ()
             {
                 Role = "system",
                 Content = BuildUserExtractionPrompt (template)
             },
-            new()
+            new ()
             {
                 Role = "user",
-                Content = $"## Interview Transcript\n\n{transcript}"
+                Content = $"## Bootstrap Conversation Transcript\n\n{transcript}"
             }
         };
 
@@ -156,16 +225,16 @@ public sealed class BootstrapInterviewService
 
             if (string.IsNullOrWhiteSpace (response.Text))
             {
-                _logger.LogWarning ("BootstrapInterviewService: LLM returned empty USER.md content — profile not updated");
+                _logger.LogWarning ("Bootstrap: LLM returned empty USER.md content — file not updated");
                 return;
             }
 
             _workspace.SaveUserProfile (response.Text.Trim ());
-            _logger.LogInformation ("BootstrapInterviewService: USER.md updated successfully");
+            _logger.LogInformation ("Bootstrap: USER.md written successfully");
         }
         catch (Exception ex)
         {
-            _logger.LogError (ex, "BootstrapInterviewService: USER.md extraction failed");
+            _logger.LogError (ex, "Bootstrap: USER.md extraction failed");
         }
     }
 
@@ -175,15 +244,15 @@ public sealed class BootstrapInterviewService
 
         var messages = new List<OpenRouterChatMessage>
         {
-            new()
+            new ()
             {
                 Role = "system",
                 Content = BuildSoulExtractionPrompt (template)
             },
-            new()
+            new ()
             {
                 Role = "user",
-                Content = $"## Interview Transcript\n\n{transcript}"
+                Content = $"## Bootstrap Conversation Transcript\n\n{transcript}"
             }
         };
 
@@ -193,47 +262,76 @@ public sealed class BootstrapInterviewService
 
             if (string.IsNullOrWhiteSpace (response.Text))
             {
-                _logger.LogWarning ("BootstrapInterviewService: LLM returned empty SOUL.md content — profile not updated");
+                _logger.LogWarning ("Bootstrap: LLM returned empty SOUL.md content — file not updated");
                 return;
             }
 
             _workspace.SaveSoulProfile (response.Text.Trim ());
-            _logger.LogInformation ("BootstrapInterviewService: SOUL.md updated successfully");
+            _logger.LogInformation ("Bootstrap: SOUL.md written successfully");
         }
         catch (Exception ex)
         {
-            _logger.LogError (ex, "BootstrapInterviewService: SOUL.md extraction failed");
+            _logger.LogError (ex, "Bootstrap: SOUL.md extraction failed");
         }
     }
 
-    private static string BuildTranscript (IReadOnlyList<(string Question, string Answer)> qa)
+    private static string BuildTranscriptFromConversation (IReadOnlyList<OpenRouterChatMessage> conversation)
     {
-        var lines = new System.Text.StringBuilder ();
+        var sb = new System.Text.StringBuilder ();
 
-        foreach (var (question, answer) in qa)
+        foreach (var message in conversation)
         {
-            lines.AppendLine ($"Q: {question}");
-            lines.AppendLine ($"A: {answer}");
-            lines.AppendLine ();
+            if (string.Equals (message.Role, "system", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var speaker = string.Equals (message.Role, "assistant", StringComparison.OrdinalIgnoreCase)
+                ? "Agent"
+                : "User";
+
+            sb.AppendLine ($"{speaker}: {message.Content}");
+            sb.AppendLine ();
         }
 
-        return lines.ToString ().TrimEnd ();
+        return sb.ToString ().TrimEnd ();
+    }
+
+    private static string BuildIdentityExtractionPrompt (string identityTemplate)
+    {
+        var templateSection = string.IsNullOrWhiteSpace (identityTemplate)
+            ? "(no existing template — create IDENTITY.md with these fields: Name, Creature, Vibe, Emoji, Avatar)"
+            : $"The current IDENTITY.md template is:\n\n{identityTemplate}";
+
+        return $"""
+            You are writing an identity record for a personal AI assistant.
+            A user and the AI just completed a first-run bootstrap conversation.
+            Your task is to populate IDENTITY.md from what was decided in that conversation.
+
+            Rules:
+            - Return ONLY the complete updated markdown file content. No explanation, no code fences.
+            - Fill in the fields the conversation established (Name, Creature, Vibe, Emoji, Avatar).
+            - Leave fields empty or with a placeholder when the conversation did not resolve them.
+            - Preserve all markdown headings and structure.
+
+            {templateSection}
+            """;
     }
 
     private static string BuildUserExtractionPrompt (string userTemplate)
     {
         var templateSection = string.IsNullOrWhiteSpace (userTemplate)
-            ? "(no existing template — create a standard USER.md with the sections: User Summary, Identity and Background, Communication, Work Profile, Online Presence, Collaboration Preferences, Environment, Communication Style, Projects, Domains)"
+            ? "(no existing template — create a standard USER.md with sections: User Summary, Identity and Background, Communication, Work Profile, Online Presence, Collaboration Preferences, Environment, Communication Style, Projects, Domains)"
             : $"The current USER.md template is:\n\n{userTemplate}";
 
         return $"""
             You are a user profile writer for a personal AI assistant.
-            A new user has just answered setup questions. Your task is to populate the USER.md profile
-            file from their answers.
+            A new user just completed a first-run bootstrap conversation with their AI. Your task is to
+            populate the USER.md profile file from what was shared during that conversation.
 
             Rules:
             - Return ONLY the complete updated markdown file content. No explanation, no code fences.
-            - Fill in every section you can derive from the answers.
+            - Fill in every section you can derive from the conversation.
             - Do NOT invent information that was not provided.
             - Leave placeholder markers like "Unknown" or empty for fields with no answer.
             - Preserve all existing markdown headings, YAML front matter, and structure.
@@ -251,13 +349,13 @@ public sealed class BootstrapInterviewService
 
         return $"""
             You are a personality and tone profile writer for a personal AI assistant.
-            A new user has just answered setup questions. Your task is to populate the SOUL.md file
+            A new user just completed a first-run bootstrap conversation. Your task is to populate SOUL.md
             which controls the assistant's personality, tone, and communication style toward this user.
 
             Rules:
             - Return ONLY the complete updated markdown file content. No explanation, no code fences.
-            - Derive tone, language preference, communication style, and personality traits from the answers.
-            - Do NOT invent traits not implied by the answers.
+            - Derive tone, language preference, communication style, and personality traits from the conversation.
+            - Do NOT invent traits not implied by the conversation.
             - Preserve all existing markdown headings, YAML front matter, and structure.
             - Update the `last_updated` front-matter field to today: {DateTime.UtcNow:yyyy-MM-dd}.
 

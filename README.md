@@ -1,12 +1,27 @@
-# YAi
+# YAi!
 
 Local-first agent runtime inspired by OpenClaw, built for high-control environments where security, auditability, and deterministic execution are paramount. Compatible with OpenClaw skills and flow, while enforcing stricter local governance and execution boundaries.
 
 This project is a local-first agent system designed for environments where security and control cannot be delegated. It follows an OpenClaw-like model for skills and workflow compatibility, but runs under tighter local constraints, with stronger permission boundaries, improved auditability, and a more predictable execution model. The goal is to preserve interoperability with the OpenClaw ecosystem while making local trust, safety, and operational control the default.
 
+> YAi!
+>
+> Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.
+>
+> Website: https://umbertogiacobbi.biz
+> Email: hello@umbertogiacobbi.biz
+>
+> This file is part of YAi!.
+>
+> YAi! is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License version 3 as published by the Free Software Foundation.
+>
+> YAi! is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+>
+> You should have received a copy of the GNU Affero General Public License along with YAi!. If not, see <https://www.gnu.org/licenses/>.
+
 ## What this repository is for
 
-- A C# and .NET-based local companion for assistant workflows, controlled automation, and task execution.
+- A C# and .NET-based local companion for assistant workflows, controlled automation, and task execution via CLI.
 - A system that keeps the user in charge of decisions instead of hiding behavior behind background automation.
 - A codebase that stays close to portable skill and workflow ideas so features can move between ecosystems with minimal friction.
 
@@ -63,4 +78,8 @@ This project is under active development. Public-facing APIs, workflows, and con
 
 ## License
 
-A license file has not been added yet. Add one before publishing if you want to clarify reuse and contribution rights.
+YAi! is licensed under the GNU Affero General Public License v3.0 only.
+
+Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.
+
+See [LICENSE](./LICENSE) and [NOTICE.md](./NOTICE.md) for details.

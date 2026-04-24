@@ -10,7 +10,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\YAi.Services.Core\YAi.Services.Core.csproj" />
-    <ProjectReference Include="..\YAi.Services.Defaults\YAi.Services.Defaults.csproj" />
+    <ProjectReference Include="..\YAi.Services.Defaults\YAi.Services.Defaults.csproj"
+      IsAspireProjectResource="false" />
   </ItemGroup>
 
 </Project>

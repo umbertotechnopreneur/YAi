@@ -56,6 +56,6 @@ public sealed class CommandPlanOverviewScreenHost : RazorScreen<CommandPlanOverv
         services.AddSingleton (_plan);
 
         if (_validationError is not null)
-            services.AddSingleton<string?> (_ => _validationError);
+            services.AddSingleton<string>(_ => _validationError);
     }
 }

@@ -14,8 +14,7 @@
 @using Spectre.Console
 @using YAi.Persona.Services.Operations.Models
 
-<Panel>
-    <Header>Progress — @_doneCount of @Steps.Count step(s) completed</Header>
+<Panel Title="@($"Progress — {_doneCount} of {Steps.Count} step(s) completed")">
     <Rows>
         @foreach (IOperationStep step in Steps)
         {

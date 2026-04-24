@@ -13,6 +13,7 @@
 @using Microsoft.Extensions.Hosting
 @using RazorConsole.Components
 @using Spectre.Console
+@using YAi.Client.CLI.Components.Components.Dialogs
 @using YAi.Client.CLI.Components.Screens
 @using YAi.Persona.Services.Operations.Models
 
@@ -28,8 +29,7 @@
     }
     else
     {
-        <Panel>
-            <Header>Plan: @Plan.Title</Header>
+        <Panel Title="@($"Plan: {Plan.Title}")">
             <Rows>
                 <Columns>
                     <Markup Content="Overall risk: " />

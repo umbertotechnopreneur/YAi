@@ -13,6 +13,7 @@
 @using Microsoft.AspNetCore.Components.Web
 @using RazorConsole.Components
 @using Spectre.Console
+@using YAi.Client.CLI.Components.Components.Dialogs
 @using YAi.Persona.Services.Operations.Models
 
 <Rows>
@@ -24,8 +25,7 @@
     }
     else
     {
-        <Panel>
-            <Header>@Card.Title</Header>
+        <Panel Title="@Card.Title">
             <Rows>
                 <Columns>
                     <Markup Content="Action: " />

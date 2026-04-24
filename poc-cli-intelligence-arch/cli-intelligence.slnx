@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/.github/">
+    <File Path=".github/copilot-instructions.md" />
+    <File Path=".github/copilot-lessons.md" />
+    <File Path=".github/copilot-memory.md" />
+    <File Path=".github/copilot-prompt-history.md" />
+  </Folder>
+  <Folder Name="/docs/">
+    <File Path="CONTRIBUTING.md" />
+    <File Path="README.md" />
+  </Folder>
+  <Project Path="cli-intelligence/cli-intelligence.csproj" />
+</Solution>

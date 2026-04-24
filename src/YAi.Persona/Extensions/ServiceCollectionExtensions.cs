@@ -28,6 +28,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using YAi.Persona.Models;
 using YAi.Persona.Services;
+using YAi.Persona.Services.Skills;
+using YAi.Persona.Services.Tools;
+using YAi.Persona.Services.Tools.SystemInfo;
 
 #endregion
 
@@ -57,6 +60,14 @@ public static class ServiceCollectionExtensions
         services.AddSingleton(sp => sp.GetRequiredService<ConfigService>().LoadConfig());
         services.AddSingleton<HistoryService>();
         services.AddSingleton<RuntimeState>();
+        services.AddSingleton<SkillLoader>();
+        services.AddSingleton<SystemInfoTool>();
+        services.AddSingleton<ToolRegistry>(sp =>
+        {
+            var registry = new ToolRegistry();
+            registry.Register(sp.GetRequiredService<SystemInfoTool>());
+            return registry;
+        });
         services.AddSingleton<PromptBuilder>();
 
         services.AddSingleton<ILlmCallLogRepository, LlmCallLogRepository>();
@@ -70,6 +81,9 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<IHttpClientFactory>().CreateClient("OpenRouter"),
             sp.GetRequiredService<AppConfig>(),
             sp.GetRequiredService<ILlmCallLogRepository>()));
+
+        services.AddSingleton<OpenRouterCatalogService>();
+        services.AddSingleton<OpenRouterBalanceService>();
 
         services.AddSingleton<BootstrapInterviewService>();
 

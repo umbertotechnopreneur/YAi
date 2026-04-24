@@ -75,7 +75,48 @@ public sealed class WorkspaceProfileService
             }
         }
 
+        CopySkillMarkdownFiles();
+
         _logger.LogInformation("Workspace template seeding complete. Copied {CopiedCount} files into {TargetWorkspace}", copiedCount, _paths.RuntimeWorkspaceRoot);
+    }
+
+    private void CopySkillMarkdownFiles()
+    {
+        if (!Directory.Exists(_paths.AssetSkillsRoot))
+        {
+            _logger.LogDebug("Bundled skill directory not found at {SkillRoot}; skipping skill seeding", _paths.AssetSkillsRoot);
+            return;
+        }
+
+        var skillFiles = Directory.EnumerateFiles(_paths.AssetSkillsRoot, "SKILL.md", SearchOption.AllDirectories);
+        foreach (var skillFile in skillFiles)
+        {
+            var relativePath = Path.GetRelativePath(_paths.AssetSkillsRoot, skillFile);
+            var targetPath = Path.Combine(_paths.RuntimeSkillsRoot, relativePath);
+            if (File.Exists(targetPath))
+            {
+                _logger.LogDebug("Skipping existing skill file {TargetPath}", targetPath);
+                continue;
+            }
+
+            try
+            {
+                var targetDirectory = Path.GetDirectoryName(targetPath);
+                if (!string.IsNullOrWhiteSpace(targetDirectory))
+                {
+                    Directory.CreateDirectory(targetDirectory);
+                }
+
+                var data = File.ReadAllBytes(skillFile);
+                AtomicFileWriter.WriteAtomic(targetPath, data);
+                _logger.LogInformation("Copied skill {SourcePath} to {TargetPath}", skillFile, targetPath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to copy skill {SourcePath} to {TargetPath}", skillFile, targetPath);
+                throw;
+            }
+        }
     }
 
     public string LoadUserProfile()

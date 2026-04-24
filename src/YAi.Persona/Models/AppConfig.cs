@@ -45,7 +45,7 @@ namespace YAi.Persona.Models
 
     public sealed class OpenRouterSection
     {
-        public string Model { get; set; } = "openai/gpt-4o-mini";
+        public string Model { get; set; } = string.Empty;
         public string? Verbosity { get; set; }
         public bool CacheEnabled { get; set; } = false;
     }

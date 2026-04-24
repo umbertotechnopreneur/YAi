@@ -31,9 +31,9 @@ The diagram below is intentionally detailed because the startup path touches bot
 
 ## Notes on the current implementation
 
-The current CLI is command-driven. It always performs the filesystem bootstrap and template seeding on launch, then dispatches based on the first command-line argument. The persisted `first-run.json` file is written only by the explicit `--bootstrap` command. That means the "already bootstrapped" path in this document represents the steady-state startup path after the workspace and first-run data already exist, not a separate code branch in `Program.cs` that gates startup.
+The current CLI is command-driven. It now performs a lightweight bootstrap-state check before the preflight and model-selection work begins. Chat-style commands (`--ask`, `--translate`, and `--talk`) require a completed bootstrap and exit early with a local warning if `config/first-run.json` is missing or incomplete. Maintenance commands such as `--show-paths` and `--gonuclear` also return before the normal bootstrap path.
 
-The repository also contains a `LoadBootstrapState()` helper in `ConfigService`, but `Program.cs` does not currently call it during process start. This diagram documents the lifecycle the code is already supporting, while making the steady-state and first-run cases easy to compare.
+After that early gate, the process runs the filesystem and logging bootstrap, builds the service provider, loads the persisted bootstrap state again through `ConfigService`, shows the balance and banner, selects an OpenRouter model if one is not already configured, seeds the runtime workspace, and then either dispatches the requested command or runs the explicit `--bootstrap` ritual. The earlier note that `Program.cs` does not call `LoadBootstrapState()` during startup is stale.
 
 ## Boot Responsibilities
 
@@ -41,27 +41,31 @@ The repository also contains a `LoadBootstrapState()` helper in `ConfigService`,
 
 - `Environment.GetCommandLineArgs()` captures the user intent for the current launch.
 - `AppPaths` resolves all roots before any other application service is created.
+- Chat-style commands are gated on the persisted `first-run.json` marker before the preflight runs.
+- `PreflightCheck.Validate()` emits key and connectivity warnings, but only after the bootstrap gate has passed.
 - `EnsureDirectories()` creates the persistent directories and probes write access early so the process fails fast if the user data root is not writable.
 - Serilog is configured before any of the application services are resolved so startup failures are captured in `yai.log`.
-- The banner prints immediately after logging is initialized so the operator can visually confirm the CLI is alive.
+- The banner prints after the service provider is built and the startup context is logged.
 
 ### Runtime service setup
 
 - `ServiceCollection` is used as a minimal container so the CLI can stay lightweight.
 - The repository-specific services are registered through `AddYAiPersonaServices()`.
-- `WorkspaceProfileService`, `ConfigService`, and `RuntimeState` are resolved from the container and reused for the rest of the launch.
+- `WorkspaceProfileService`, `ConfigService`, `RuntimeState`, and the OpenRouter services are resolved from the container and reused for the rest of the launch.
+- `ConfigService.LoadBootstrapState()` is called during startup so the bootstrap state can drive the steady-state branch and the explicit bootstrap branch.
 
 ### Workspace seeding
 
 - `EnsureInitializedFromTemplates()` copies packaged markdown templates into the runtime workspace.
 - Existing files are not overwritten, so repeated launches are safe.
-- The workspace seed step is invoked both during normal startup and during the explicit bootstrap command.
+- The workspace seed step is invoked during normal startup before command dispatch and again during the explicit bootstrap command.
 
 ### First-run bootstrap
 
 - `DoBootstrapAsync()` writes a `BootstrapState` payload to `config/first-run.json`.
 - The payload records the current time and the resolved agent and user names.
 - `RuntimeState.IsBootstrapped` is flipped in memory for the current process after the first-run record is saved.
+- The explicit `--bootstrap` command and the auto-bootstrap path both use the same persisted marker to decide whether the ritual should run.
 
 ## Sequence Diagram
 
@@ -69,83 +73,93 @@ The repository also contains a `LoadBootstrapState()` helper in `ConfigService`,
 sequenceDiagram
     autonumber
 
-    %% The CLI is launched by the shell, then immediately prepares
-    %% filesystem state, logging, dependency injection, and workspace files.
     participant Shell as User / shell
     participant Program as YAi.Client.CLI<br/>Program.cs
     participant Paths as AppPaths
     participant Disk as File system
+    participant Preflight as PreflightCheck
     participant Log as Serilog
     participant DI as ServiceCollection<br/>+ service provider
+    participant Balance as OpenRouter balance screen
     participant Workspace as WorkspaceProfileService
     participant Config as ConfigService
+    participant Banner as Banner
+    participant Model as OpenRouter model selector
+    participant Bootstrap as BootstrapInterviewService
     participant Runtime as RuntimeState
 
     Shell->>Program: start yai [args]
     Note right of Program: Entry point in src/YAi.Client.CLI/Program.cs
 
     Program->>Paths: new AppPaths()
-    Program->>Paths: EnsureDirectories()
-    Paths->>Disk: create config/
-    Paths->>Disk: create logs/
-    Paths->>Disk: create history/
-    Paths->>Disk: create workspace/
-    Paths->>Disk: write / delete probe file
-    Paths-->>Program: runtime roots ready
+    Program->>Disk: check config/first-run.json
 
-    Note over Paths,Disk: This is the earliest failure point for permissions or path issues.<br/>If the user data root is not writable, the process stops before any higher-level work begins.
+    alt --help or --lenna
+        Program-->>Shell: print help or run Lenna and exit
+    else --show-paths or --gonuclear
+        Program->>Program: run maintenance screen
+        Program-->>Shell: return
+    else chat-style command and bootstrap incomplete
+        Disk-->>Program: missing or incomplete first-run state
+        Program-->>Shell: warn "Run --bootstrap first"
+    else normal startup or completed bootstrap
+        Disk-->>Program: bootstrap state present or command does not require it
 
-    Program->>Log: configure file sink at logs/yai.log
-    Program->>Log: log startup context
-    Program->>Program: PrintBanner()
+        Program->>Preflight: Validate()
+        Preflight-->>Program: key and connectivity warnings only
 
-    Program->>DI: create minimal container
-    Program->>DI: register AppPaths, Persona services, and logging
-    DI-->>Program: service provider ready
+        Program->>Paths: EnsureDirectories()
+        Paths->>Disk: create config/
+        Paths->>Disk: create logs/
+        Paths->>Disk: create history/
+        Paths->>Disk: create workspace/
+        Paths->>Disk: create workspace/skills/
+        Paths->>Disk: write / delete probe file
+        Paths-->>Program: runtime roots ready
 
-    Program->>Workspace: resolve WorkspaceProfileService
-    Program->>Config: resolve ConfigService
-    Program->>Runtime: resolve RuntimeState
+        Program->>Log: configure file sink at logs/yai.log
+        Program->>Log: log startup context
 
-    Note over Workspace,Config: The CLI prepares both the runtime workspace and the persisted configuration layer before command dispatch begins.
+        Program->>DI: create minimal container
+        Program->>DI: register AppPaths, Persona services, and logging
+        DI-->>Program: service provider ready
 
-    Program->>Workspace: EnsureInitializedFromTemplates()
-    Workspace->>Disk: enumerate packaged markdown templates
-    Workspace->>Disk: copy missing templates into runtime workspace
-    Workspace-->>Program: workspace seeded or already up to date
+        Program->>Workspace: resolve WorkspaceProfileService
+        Program->>Config: resolve ConfigService
+        Program->>Runtime: resolve RuntimeState
+        Program->>Config: LoadBootstrapState()
+        Config->>Disk: read config/first-run.json
+        Config-->>Program: persisted bootstrap state or null
 
-    alt Already bootstrapped / steady-state startup
-        Note over Program,Runtime: The workspace and first-run files already exist.<br/>Startup still performs the same seeding step, but existing files are preserved.
+        Program->>Program: set runtime agent and user names
+        Program->>Balance: ShowOpenRouterBalanceAsync()
+        Program->>Banner: render banner
 
-        Program->>Program: inspect command line arguments
+        Program->>Model: select OpenRouter model if needed
+        alt no cached catalog and remote load fails
+            Model-->>Program: localized catalog error
+            Program-->>Shell: print error and exit
+        else model ready
+            Program->>Workspace: EnsureInitializedFromTemplates()
+            Workspace->>Disk: copy missing templates into runtime workspace
+            Workspace->>Disk: copy missing skills into runtime workspace
+            Workspace-->>Program: workspace seeded or already up to date
 
-        alt --ask / --translate / --talk
-            Program->>Program: dispatch the requested non-bootstrap command
-            Note right of Program: These commands reuse the services built during startup.<br/>They are outside the bootstrap lifecycle itself.
-        else no recognized command
-            Program-->>Shell: print usage
-            Note right of Program: Usage output is the default fallback when no command is supplied.
+            alt first run or explicit --bootstrap
+                Program->>Bootstrap: DoBootstrapAsync()
+                Bootstrap->>Workspace: build bootstrap messages
+                Bootstrap->>Disk: persist profiles
+                Program->>Config: SaveBootstrapState()
+                Config->>Disk: atomically write config/first-run.json
+                Program->>Runtime: IsBootstrapped = true
+            end
+
+            alt --ask / --translate / --talk
+                Program->>Program: dispatch the requested command
+            else no recognized command
+                Program-->>Shell: print usage
+            end
         end
-
-    else First-run bootstrap requested
-        Note over Program,Config: This path is entered when the user explicitly runs the bootstrap command.<br/>It is the only path that persists a first-run marker.
-
-        Program->>Program: DoBootstrapAsync()
-        Program->>Workspace: EnsureInitializedFromTemplates()
-        Workspace->>Disk: seed missing templates if needed
-        Workspace-->>Program: bootstrap workspace ready
-
-        Program->>Config: SaveBootstrapState(BootstrapState)
-        Config->>Disk: atomically write config/first-run.json
-        Config-->>Program: bootstrap state persisted
-
-        Program->>Runtime: IsBootstrapped = true
-        Runtime-->>Program: current process marked bootstrapped
-
-        Note right of Config: The persisted payload records the bootstrap timestamp,<br/>agent name, user name, and any future metadata added to `BootstrapState`.
-        Note right of Runtime: This flag only affects the in-memory process state.<br/>The persisted source of truth is `config/first-run.json`.
-
-        Program-->>Shell: Bootstrap completed.
     end
 
     Program->>Log: close and flush
@@ -154,15 +168,16 @@ sequenceDiagram
 
 ## What the diagram is showing
 
-The diagram separates the startup work into two human-level cases:
+The diagram separates the startup work into the same branches the current CLI uses:
 
-1. Already bootstrapped or steady state. The runtime workspace already exists, the templates are already seeded, and the process simply completes startup and dispatches the requested command.
-2. First-run bootstrap. The operator explicitly invokes `--bootstrap`, causing the CLI to seed the workspace again if needed, persist `first-run.json`, and mark the current process as bootstrapped.
+1. Help and maintenance commands exit before the normal startup path.
+2. Chat-style commands that do not have a completed bootstrap stop early with a local warning.
+3. Normal startup continues through preflight, logging, DI, model selection, workspace seeding, and then the requested command or explicit bootstrap ritual.
 
 The sequence is deliberately ordered the same way the code executes it:
 
-- filesystem preparation first,
-- logging second,
+- bootstrap gating and preflight first,
+- filesystem and logging bootstrap second,
 - DI container creation third,
 - workspace seeding fourth,
 - command dispatch last.
@@ -173,7 +188,13 @@ That ordering matters because it keeps the application predictable when the user
 
 - [src/YAi.Client.CLI/Program.cs](../../src/YAi.Client.CLI/Program.cs)
 - [src/YAi.Persona/Services/AppPaths.cs](../../src/YAi.Persona/Services/AppPaths.cs)
+- [src/YAi.Client.CLI/Services/PreflightCheck.cs](../../src/YAi.Client.CLI/Services/PreflightCheck.cs)
 - [src/YAi.Persona/Services/WorkspaceProfileService.cs](../../src/YAi.Persona/Services/WorkspaceProfileService.cs)
 - [src/YAi.Persona/Services/ConfigService.cs](../../src/YAi.Persona/Services/ConfigService.cs)
+- [src/YAi.Persona/Services/OpenRouterCatalogService.cs](../../src/YAi.Persona/Services/OpenRouterCatalogService.cs)
+- [src/YAi.Client.CLI/Screens/OpenRouterBalanceScreen.cs](../../src/YAi.Client.CLI/Screens/OpenRouterBalanceScreen.cs)
+- [src/YAi.Client.CLI/Screens/OpenRouterModelSelectionScreen.cs](../../src/YAi.Client.CLI/Screens/OpenRouterModelSelectionScreen.cs)
+- [src/YAi.Persona/Services/OpenRouterBalanceService.cs](../../src/YAi.Persona/Services/OpenRouterBalanceService.cs)
+- [src/YAi.Persona/Services/BootstrapInterviewService.cs](../../src/YAi.Persona/Services/BootstrapInterviewService.cs)
 - [src/YAi.Persona/Models/BootstrapState.cs](../../src/YAi.Persona/Models/BootstrapState.cs)
 - [src/YAi.Persona/Models/RuntimeState.cs](../../src/YAi.Persona/Models/RuntimeState.cs)

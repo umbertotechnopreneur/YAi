@@ -12,4 +12,10 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="reference\skills\**\*.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

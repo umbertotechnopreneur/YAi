@@ -3,7 +3,7 @@
 Command-line client for interacting with the YAi Persona services (bootstrap, ask, translate, talk).
 
 Prerequisites
-- .NET 10 SDK
+- .NET 10 SDK on Windows, macOS, or Linux
 
 Build
 
@@ -14,24 +14,43 @@ dotnet build src/YAi.Client.CLI/YAi.Client.CLI.csproj -c Debug
 Run (development)
 
 ```bash
-dotnet run --project src/YAi.Client.CLI -- - -help
+dotnet run --project src/YAi.Client.CLI -- --help
 ```
 
 Quick usage
 
-- `--bootstrap` — initialize runtime workspace and copy identity templates into the user data root.
-- `--ask "text"` — single-shot prompt; requires `OPENROUTER_API_KEY` in environment.
-- `--translate "text"` — translation-style prompt using persona prompts; requires `OPENROUTER_API_KEY`.
-- `--talk` — interactive REPL (type `exit` to quit).
+- `--help` — show the colored Spectre.Console help screen.
+- `--bootstrap` — initialize runtime workspace and copy identity templates into the user data root. If no OpenRouter model is configured, the CLI prompts you to choose one first. After preflight passes at startup, the CLI shows the current OpenRouter balance first, then continues into the boot flow.
+- `--show-paths` — show the resolved asset, config, memory, skill, history, and storage paths.
+- `--gonuclear` — show the custom data wipe screen, confirm interactively, and delete the user data root and all custom runtime state.
+- `--lenna` — run the Lenna citation script and exit. This does not require an OpenRouter key.
+- `--ask "text"` — single-shot prompt; requires a completed bootstrap, `YAI_OPENROUTER_API_KEY` in environment, and a selected OpenRouter model. The CLI shows the cached OpenRouter balance before sending the prompt.
+- `--translate "text"` — translation-style prompt using persona prompts; requires a completed bootstrap, `YAI_OPENROUTER_API_KEY`, and a selected OpenRouter model. The CLI shows the cached OpenRouter balance before sending the prompt.
+- `--talk` — interactive REPL (type `exit` to quit); requires a completed bootstrap, `YAI_OPENROUTER_API_KEY`, and a selected OpenRouter model. The CLI shows the cached OpenRouter balance before entering the loop.
 
 Environment
 
-- `OPENROUTER_API_KEY` — (optional) API key for OpenRouter. If not set, network calls will be disabled and the CLI will report missing configuration.
-- `YAI_USER_DATA_ROOT` — (optional) absolute path to override user data root (where runtime workspace, logs, history, and config are written). Must not be under the application install directory.
+- `YAI_OPENROUTER_API_KEY` — required API key for OpenRouter chat/bootstrap flows and the credits lookup. The CLI can still start without it so the model selector and cached catalog can load.
+- Internet access is checked at startup and the CLI now warns instead of failing fast. Remote chat flows still need connectivity.
+- `YAI_USER_DATA_ROOT` — (optional) absolute path to override user data root (where runtime workspace, logs, history, config, memory files, skills, and the local SQLite database are written). Must not be under the application install directory. The `--show-paths` and `--gonuclear` screens both resolve from this path.
+
+Catalog cache
+
+- The OpenRouter model list is cached under the user data root at `config/openrouter-model-catalog.json`.
+- The cache includes the catalog retrieval timestamp and is refreshed every 7 days when the CLI needs model data.
+- If refresh fails but a cache already exists, the selector can still use the stale cache.
+
+Balance cache
+
+- The OpenRouter credits endpoint is queried before bootstrap and before chat-style flows, then cached in memory for 10 minutes.
+- The balance screen shows the remaining balance and total spent, together with the last balance check timestamp.
+- If the credits endpoint cannot be reached, the last cached balance is reused when available so repeated checks do not flood OpenRouter.
 
 Assets
 
-The shipped markdown templates live in `src/YAi.Resources/reference/templates` and are copied into the CLI output as `workspace/` during build. On first run, the CLI seeds `%LOCALAPPDATA%\YAi\workspace` from that packaged workspace without overwriting existing files.
+The shipped markdown templates live in `src/YAi.Resources/reference/templates` and are copied into the CLI output as `workspace/` during build. The bundled built-in skills live in `src/YAi.Resources/reference/skills` and are copied into `workspace/skills/` during build. On first run, the CLI seeds `%LOCALAPPDATA%\YAi\workspace` from that packaged workspace without overwriting existing files.
+
+The first built-in skill is `system_info`. When `--ask`, `--translate`, or `--talk` runs after bootstrap, the prompt includes the available skills and tools, and the CLI can execute `[TOOL: system_info ...]` calls before producing the final answer.
 
 Examples
 
@@ -41,10 +60,16 @@ Initialize the runtime workspace (creates the user workspace under `%LOCALAPPDAT
 dotnet run --project src/YAi.Client.CLI -- --bootstrap
 ```
 
-Ask a one-shot question (requires `OPENROUTER_API_KEY`):
+Run the Lenna citation splash screen and exit:
 
 ```powershell
-$env:OPENROUTER_API_KEY = "<your-key>"
+dotnet run --project src/YAi.Client.CLI -- --lenna
+```
+
+Ask a one-shot question (requires `YAI_OPENROUTER_API_KEY`):
+
+```powershell
+$env:YAI_OPENROUTER_API_KEY = "<your-key>"
 dotnet run --project src/YAi.Client.CLI -- --ask "What's the weather in Milan?"
 ```
 
@@ -67,7 +92,9 @@ Run the bootstrap command to verify templates are copied and the app can write t
 dotnet run --project src/YAi.Client.CLI -- --bootstrap
 ```
 
-If you want to exercise network flows, set a valid `OPENROUTER_API_KEY`. The CLI will report clear errors when network keys are missing.
+If you want to exercise network flows, set a valid `YAI_OPENROUTER_API_KEY`. The CLI now warns during preflight instead of failing fast, but chat/bootstrap flows still need a working key and connectivity.
+
+If the runtime `appsettings.json` does not yet contain a model, the CLI opens the model selector before bootstrap or chat flows and writes the selected model back to that runtime config file. After preflight passes, the CLI shows the current balance first at boot and still respects the 10-minute in-memory cache.
 
 License / Contact
 

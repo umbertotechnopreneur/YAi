@@ -2,7 +2,7 @@
 
 Thank you for taking the time to improve this project.
 
-YAi is intended to stay local-first, explicit, and safe by default. Contributions are welcome, but they should support those goals rather than weaken them.
+YAi is intended to stay local-first, explicit, safe by default, and multiplatform across Windows, macOS, and Linux. Contributions are welcome, but they should support those goals rather than weaken them. When you add, rename, or remove configuration files, memory files, skill files, workspace files, or the SQLite storage path, keep the path inventory used by `--show-paths` and `--gonuclear` in sync with the code and docs.
 
 > YAi!
 >

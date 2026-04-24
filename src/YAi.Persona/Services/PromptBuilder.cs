@@ -22,8 +22,11 @@
  * Prompt assembly and context composition
  */
 
+using System.Text;
 using Microsoft.Extensions.Logging;
 using YAi.Persona.Models;
+using YAi.Persona.Services.Skills;
+using YAi.Persona.Services.Tools;
 
 namespace YAi.Persona.Services;
 
@@ -31,12 +34,16 @@ public sealed class PromptBuilder
 {
     private readonly PromptAssetService _assets;
     private readonly RuntimeState _runtime;
+    private readonly SkillLoader _skillLoader;
+    private readonly ToolRegistry _toolRegistry;
     private readonly ILogger<PromptBuilder> _logger;
 
-    public PromptBuilder(PromptAssetService assets, RuntimeState runtime, ILogger<PromptBuilder> logger)
+    public PromptBuilder(PromptAssetService assets, RuntimeState runtime, SkillLoader skillLoader, ToolRegistry toolRegistry, ILogger<PromptBuilder> logger)
     {
         _assets = assets ?? throw new ArgumentNullException(nameof(assets));
         _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
+        _skillLoader = skillLoader ?? throw new ArgumentNullException(nameof(skillLoader));
+        _toolRegistry = toolRegistry ?? throw new ArgumentNullException(nameof(toolRegistry));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -53,6 +60,15 @@ public sealed class PromptBuilder
         var identity = $"Agent: {_runtime.AgentName ?? "Agent"}, User: {_runtime.UserName ?? "User"}";
         messages.Add(new OpenRouterChatMessage { Role = "system", Content = identity });
 
+        if (ShouldIncludeSkillContext(promptKey))
+        {
+            var skillContext = BuildSkillContext();
+            if (!string.IsNullOrWhiteSpace(skillContext))
+            {
+                messages.Add(new OpenRouterChatMessage { Role = "system", Content = skillContext });
+            }
+        }
+
         // existing conversation turns
         if (conversation != null)
         {
@@ -65,6 +81,49 @@ public sealed class PromptBuilder
         _logger.LogInformation("Built {MessageCount} chat messages for prompt key {PromptKey}", messages.Count, promptKey);
 
         return messages;
+    }
+
+    private bool ShouldIncludeSkillContext(string promptKey)
+    {
+        return string.Equals(promptKey, "ask", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(promptKey, "talk", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string BuildSkillContext()
+    {
+        try
+        {
+            var skillSection = _skillLoader.FormatSkillsForPrompt();
+            var toolSection = _toolRegistry.FormatToolListForPrompt();
+
+            if (string.IsNullOrWhiteSpace(skillSection) && string.IsNullOrWhiteSpace(toolSection))
+            {
+                return string.Empty;
+            }
+
+            var sb = new StringBuilder();
+            if (!string.IsNullOrWhiteSpace(skillSection))
+            {
+                sb.AppendLine(skillSection.TrimEnd());
+            }
+
+            if (!string.IsNullOrWhiteSpace(toolSection))
+            {
+                if (sb.Length > 0)
+                {
+                    sb.AppendLine();
+                }
+
+                sb.AppendLine(toolSection.TrimEnd());
+            }
+
+            return sb.ToString().Trim();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Skill or tool context was unavailable for prompt composition");
+            return string.Empty;
+        }
     }
 
     private void AddFirstAvailableSection(List<OpenRouterChatMessage> messages, params string?[] keys)

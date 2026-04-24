@@ -1,12 +1,12 @@
 # YAi.Persona
 
-The `YAi.Persona` project provides the path model, bootstrap state, workspace seeding, and prompt composition used by the YAi! CLI.
+The `YAi.Persona` project provides the path model, bootstrap state, workspace seeding, prompt composition, and built-in skill/tool registry used by the YAi! CLI.
 
 ## What is this project / folder
 
 - **Project name:** YAi.Persona
-- **Purpose:** Provide the runtime workspace layout and prompt-loading helpers used by the CLI.
-- **Contents:** `Models/`, `Services/`, and the empty `workspace/` source folder that is populated at build/runtime through the CLI packaging rules.
+- **Purpose:** Provide the runtime workspace layout, skill loader, tool registry, and prompt-loading helpers used by the CLI.
+- **Contents:** `Models/`, `Services/`, and the packaged `workspace/` source folder that is populated at build/runtime through the CLI packaging rules.
 
 ## Quick Start (placeholders)
 
@@ -28,6 +28,8 @@ dotnet run --project YAi.Persona.csproj
 - Consumed by `src/YAi.Client.CLI` through project reference.
 - `AppPaths` resolves the packaged asset workspace from the CLI output and the user workspace from `%LOCALAPPDATA%\YAi\workspace` unless `YAI_USER_DATA_ROOT` overrides it.
 - `WorkspaceProfileService` copies the shipped markdown templates into the user workspace on first run and preserves existing files.
+- `SkillLoader` reads bundled and runtime `SKILL.md` files from `workspace/skills/` and exposes the available built-in skills for prompt injection.
+- `ToolRegistry` exposes the registered built-in tools, starting with `system_info`.
 
 ## Development Notes
 

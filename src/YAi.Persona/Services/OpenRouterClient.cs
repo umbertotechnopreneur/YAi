@@ -38,6 +38,8 @@ namespace YAi.Persona.Services;
 
 public sealed class OpenRouterClient
 {
+    private const string ApiKeyEnvironmentVariable = "YAI_OPENROUTER_API_KEY";
+
     private static readonly JsonSerializerOptions RequestSerializerOptions = new()
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
@@ -71,13 +73,10 @@ public sealed class OpenRouterClient
 
         _logRepository = logRepository;
 
-        _apiKey = Environment.GetEnvironmentVariable("OPENROUTER_API_KEY") ?? string.Empty;
-
-        if (string.IsNullOrWhiteSpace(_apiKey))
-            throw new InvalidOperationException("OPENROUTER_API_KEY is not set. Set the environment variable or provide an API key.");
+        _apiKey = Environment.GetEnvironmentVariable(ApiKeyEnvironmentVariable) ?? string.Empty;
 
         _model = string.IsNullOrWhiteSpace(config.OpenRouter.Model)
-            ? "openai/gpt-4o-mini"
+            ? string.Empty
             : config.OpenRouter.Model;
 
         _verbosity = string.IsNullOrWhiteSpace(config.OpenRouter.Verbosity) ||
@@ -93,6 +92,8 @@ public sealed class OpenRouterClient
     public string CurrentVerbosity => _verbosity ?? "medium";
 
     public bool CacheEnabled => _cacheEnabled;
+
+    public bool HasApiKey => !string.IsNullOrWhiteSpace(_apiKey);
 
     public void SetModel(string model)
     {
@@ -131,10 +132,10 @@ public sealed class OpenRouterClient
         string promptType = "Chat")
     {
         if (string.IsNullOrWhiteSpace(_apiKey))
-            throw new InvalidOperationException("OPENROUTER_API_KEY is not set. Set the environment variable or provide an API key.");
+            throw new InvalidOperationException("YAI_OPENROUTER_API_KEY is not set. Set the environment variable before using chat or bootstrap flows.");
 
         if (string.IsNullOrWhiteSpace(_model))
-            throw new InvalidOperationException("No OpenRouter model is selected.");
+            throw new InvalidOperationException("No OpenRouter model is selected. Use the model selector before using chat or bootstrap flows.");
 
         Uri url = new(new Uri(_baseUrl), "/api/v1/chat/completions");
         OpenRouterChatRequest payload = new()
@@ -286,6 +287,11 @@ public sealed class OpenRouterClient
 
     public async Task<string?> GetCreditsAsync(CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(_apiKey))
+        {
+            return null;
+        }
+
         try
         {
             var url = new Uri(new Uri(_baseUrl), "/api/v1/credits");
@@ -299,6 +305,28 @@ public sealed class OpenRouterClient
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Downloads the OpenRouter model catalog.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The downloaded model catalog.</returns>
+    public async Task<OpenRouterModelCatalog> GetModelCatalogAsync(CancellationToken cancellationToken = default)
+    {
+        Uri url = new(new Uri(_baseUrl), "/api/v1/models");
+        using HttpResponseMessage response = await _http.GetAsync(url, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+
+        await using Stream responseStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        OpenRouterModelCatalog? catalog = await JsonSerializer.DeserializeAsync<OpenRouterModelCatalog>(responseStream, ResponseSerializerOptions, cancellationToken).ConfigureAwait(false);
+
+        if (catalog is null)
+        {
+            throw new InvalidOperationException("The OpenRouter model catalog could not be read.");
+        }
+
+        return catalog;
     }
 }
 

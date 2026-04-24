@@ -15,7 +15,7 @@ Use this file as the primary repository-specific instruction set for AI coding a
 ## Important Scope Note
 
 - Treat the CLI-Intelligence project and the OpenClaw code and docs as read-only inspiration sources.
-- Do not change anything under `openclaw/` or `YAi!/cli-intelligence/` unless the user explicitly asks for it.
+- Do not change anything under `openclaw/` or `poc-cli-intelligence-arch/cli-intelligence/` unless the user explicitly asks for it.
 - Put all implementation, documentation, and code changes in the `YAi!/*` projects or code.
 
 ---
@@ -158,6 +158,7 @@ Apply these rules to C# code unless the user explicitly asks for a different sty
 8. For unused lambda parameters, use `_`. Example: `(_, _) => { }`.
 9. Prefer early return and guard clauses. Invert conditions and return or continue early. Do not wrap the happy path in a conditional.
 10. Keep one type per file. Public and internal types each get their own file.
+11. Do not use the namespace Example.Namespace { } syntax in the source prefere namespace Example.Namespace;
 
 File organization and regions
 

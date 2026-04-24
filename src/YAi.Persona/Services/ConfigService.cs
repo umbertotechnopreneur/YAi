@@ -51,7 +51,7 @@ namespace YAi.Persona.Services
         {
             // Load defaults from appsettings.json in asset root if present
             AppConfig result = new AppConfig();
-            var appsettings = Path.Combine(_paths.AssetRoot, "appsettings.json");
+            string appsettings = _paths.AppSettingsPath;
             _logger.LogDebug("Loading config from {AppSettingsPath}", appsettings);
 
             if (File.Exists(appsettings))
@@ -82,13 +82,16 @@ namespace YAi.Persona.Services
             {
                 try
                 {
-                    var json = File.ReadAllText(_paths.AppConfigPath);
-                    var overlay = JsonSerializer.Deserialize<AppConfig>(json, _jsonOptions);
+                    string json = File.ReadAllText(_paths.AppConfigPath);
+                    AppConfig? overlay = JsonSerializer.Deserialize<AppConfig>(json, _jsonOptions);
                     if (overlay != null)
                     {
-                        // simple overlay: prefer overlay's non-null properties
                         if (overlay.App != null) result.App = overlay.App;
-                        if (overlay.OpenRouter != null) result.OpenRouter = overlay.OpenRouter;
+                        if (overlay.OpenRouter != null)
+                        {
+                            result.OpenRouter.Verbosity = overlay.OpenRouter.Verbosity;
+                            result.OpenRouter.CacheEnabled = overlay.OpenRouter.CacheEnabled;
+                        }
 
                         _logger.LogInformation("Loaded user config overlay from {AppConfigPath}", _paths.AppConfigPath);
                     }
@@ -108,11 +111,11 @@ namespace YAi.Persona.Services
 
         public void SaveAppConfig(AppConfig config)
         {
-            var json = JsonSerializer.Serialize(config, _jsonOptions);
-            var bytes = System.Text.Encoding.UTF8.GetBytes(json);
-            AtomicFileWriter.WriteAtomic(_paths.AppConfigPath, bytes);
+            string json = JsonSerializer.Serialize(config, _jsonOptions);
+            byte[] bytes = System.Text.Encoding.UTF8.GetBytes(json);
+            AtomicFileWriter.WriteAtomic(_paths.AppSettingsPath, bytes);
 
-            _logger.LogInformation("Saved app config to {AppConfigPath}", _paths.AppConfigPath);
+            _logger.LogInformation("Saved app config to {AppSettingsPath}", _paths.AppSettingsPath);
         }
 
         public BootstrapState? LoadBootstrapState()
@@ -151,7 +154,7 @@ namespace YAi.Persona.Services
         public void ValidateConfig()
         {
             // Ensure asset appsettings exists
-            var appsettings = Path.Combine(_paths.AssetRoot, "appsettings.json");
+            string appsettings = _paths.AppSettingsPath;
             if (!File.Exists(appsettings))
             {
                 _logger.LogWarning("Missing default config at {AppSettingsPath}", appsettings);

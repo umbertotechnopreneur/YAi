@@ -30,6 +30,16 @@ namespace YAi.Persona.Services;
 public sealed class AppPaths
 {
     /// <summary>
+
+    /// <summary>
+    /// Gets the root directory for bundled skill markdown files.
+    /// </summary>
+    public string AssetSkillsRoot => Path.Combine(AssetWorkspaceRoot, "skills");
+
+    /// <summary>
+    /// Gets the root directory for runtime skill markdown files.
+    /// </summary>
+    public string RuntimeSkillsRoot => Path.Combine(RuntimeWorkspaceRoot, "skills");
     /// Gets the root directory for application assets.
     /// </summary>
     public string AssetRoot { get; }
@@ -67,7 +77,17 @@ public sealed class AppPaths
     /// <summary>
     /// Gets the path to the application configuration file.
     /// </summary>
+    public string AppSettingsPath => Path.Combine(AssetRoot, "appsettings.json");
+
+    /// <summary>
+    /// Gets the path to the user overlay configuration file.
+    /// </summary>
     public string AppConfigPath => Path.Combine(ConfigRoot, "appconfig.json");
+
+    /// <summary>
+    /// Gets the path to the cached OpenRouter model catalog.
+    /// </summary>
+    public string OpenRouterCatalogCachePath => Path.Combine(ConfigRoot, "openrouter-model-catalog.json");
 
     /// <summary>
     /// Gets the path to the first-run configuration file.
@@ -99,6 +119,44 @@ public sealed class AppPaths
     /// Gets the path to the local SQLite database used for LLM call logging.
     /// </summary>
     public string LlmDbPath => Path.Combine(UserDataRoot, "data", "llm-calls.db");
+
+    /// <summary>
+    /// Gets the configured asset, memory, skill, and storage paths used by the application.
+    /// </summary>
+    /// <returns>The configured path inventory.</returns>
+    public IReadOnlyList<(string Category, string Label, string Path, bool IsCustom)> GetConfiguredPathEntries()
+    {
+        return
+        [
+            ("Assets", "Application root", AssetRoot, false),
+            ("Assets", "Packaged workspace root", AssetWorkspaceRoot, false),
+            ("Assets", "Bundled skills root", AssetSkillsRoot, false),
+            ("Assets", "Default appsettings.json", AppSettingsPath, false),
+            ("User data", "User data root", UserDataRoot, true),
+            ("Config", "Config root", ConfigRoot, true),
+            ("Config", "User appconfig.json", AppConfigPath, true),
+            ("Config", "OpenRouter catalog cache", OpenRouterCatalogCachePath, true),
+            ("Config", "First-run state", FirstRunPath, true),
+            ("Logs", "Logs root", LogsRoot, true),
+            ("History", "History root", HistoryRoot, true),
+            ("Workspace", "Runtime workspace root", RuntimeWorkspaceRoot, true),
+            ("Skills", "Runtime skills root", RuntimeSkillsRoot, true),
+            ("Memory", "User profile memory", UserProfilePath, true),
+            ("Memory", "Soul profile memory", SoulProfilePath, true),
+            ("Memory", "Identity profile memory", IdentityProfilePath, true),
+            ("Memory", "Bootstrap file", BootstrapFilePath, true),
+            ("Data", "LLM call SQLite database", LlmDbPath, true)
+        ];
+    }
+
+    /// <summary>
+    /// Gets the writable custom paths that belong to the user's data root.
+    /// </summary>
+    /// <returns>The writable custom path inventory.</returns>
+    public IReadOnlyList<(string Category, string Label, string Path, bool IsCustom)> GetCustomDataEntries()
+    {
+        return GetConfiguredPathEntries().Where (entry => entry.IsCustom).ToArray ();
+    }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AppPaths"/> class.
@@ -153,6 +211,7 @@ public sealed class AppPaths
         Directory.CreateDirectory(LogsRoot);
         Directory.CreateDirectory(HistoryRoot);
         Directory.CreateDirectory(RuntimeWorkspaceRoot);
+        Directory.CreateDirectory(RuntimeSkillsRoot);
 
         // simple write probe
         var probeFile = Path.Combine(LogsRoot, ".writeprobe");

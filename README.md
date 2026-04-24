@@ -4,6 +4,8 @@ Local-first agent runtime inspired by OpenClaw, built for high-control environme
 
 This project is a local-first agent system designed for environments where security and control cannot be delegated. It follows an OpenClaw-like model for skills and workflow compatibility, but runs under tighter local constraints, with stronger permission boundaries, improved auditability, and a more predictable execution model. The goal is to preserve interoperability with the OpenClaw ecosystem while making local trust, safety, and operational control the default.
 
+YAi! is intended to remain multiplatform across Windows, macOS, and Linux. When you add, rename, or remove configuration files, memory files, skill files, workspace files, or the local SQLite storage path, keep the path inventory used by `--show-paths` and `--gonuclear` in sync with the code and documentation.
+
 > YAi!
 >
 > Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.
@@ -24,6 +26,7 @@ This project is a local-first agent system designed for environments where secur
 - A C# and .NET-based local companion for assistant workflows, controlled automation, and task execution via CLI.
 - A system that keeps the user in charge of decisions instead of hiding behavior behind background automation.
 - A codebase that stays close to portable skill and workflow ideas so features can move between ecosystems with minimal friction.
+- A built-in skill system that starts with `system_info`, seeds bundled `SKILL.md` files into the runtime workspace, and keeps the first tool loop fully local and auditable.
 
 ## Design Goals
 
@@ -37,16 +40,17 @@ This project is a local-first agent system designed for environments where secur
 ## Repository Layout
 
 - `src/` - main .NET solutions, services, and application projects
-- `cli-intelligence/` - companion CLI/runtime experiments, docs, and skill-related assets
+- `poc-cli-intelligence-arch/cli-intelligence/` - companion CLI/runtime experiments, docs, and skill-related assets
 - `docs/` - design notes, guides, and supporting documentation
 - `workspace/` - packaged markdown templates copied into the CLI output and then seeded into the user workspace on first run
+- `workspace/skills/` - packaged built-in skills copied into the CLI output and then seeded into the user workspace on first run
 
 ## Getting Started
 
 ### Prerequisites
 
-- .NET 10 SDK
-- PowerShell on Windows for local scripts and workflows
+- .NET 10 SDK on Windows, macOS, or Linux
+- PowerShell 7 (`pwsh`) or another compatible shell for local scripts and workflows
 
 ### Build the main solution
 
@@ -60,7 +64,7 @@ dotnet build src/YAi.Services.slnx
 dotnet build src/YAi.Client.CLI/YAi.Client.CLI.csproj
 ```
 
-If you are exploring the CLI-focused runtime, also check the `cli-intelligence/` folder for its own solution and documentation.
+If you are exploring the CLI-focused runtime, also check the `poc-cli-intelligence-arch/cli-intelligence/` folder for its own solution and documentation.
 
 ## Contributing
 

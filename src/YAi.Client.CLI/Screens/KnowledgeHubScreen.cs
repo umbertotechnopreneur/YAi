@@ -78,15 +78,36 @@ public sealed class KnowledgeHubScreen : Screen
                 new SelectionPrompt<string> ()
                     .Title ("[grey]Select a knowledge store to open:[/]")
                     .AddChoices (
-                        "Memory (USER.md)",
-                        "Lessons",
-                        "Corrections",
-                        "Errors",
+                        "USER.md",
+                        "SOUL.md",
+                        "IDENTITY.md",
+                        "MEMORIES.md",
+                        "LESSONS.md",
+                        "LIMITS.md",
+                        "AGENTS.md",
+                        "Episodes",
                         "Dreams",
                         "Back"));
 
             if (choice == "Back")
                 return;
+
+            // Episodes is a directory — open it in the file manager
+            if (choice == "Episodes")
+            {
+                if (!Directory.Exists(_paths.EpisodesRoot))
+                {
+                    AnsiConsole.MarkupLine($"[yellow]⚠ Episodes directory not found:[/] {Markup.Escape(_paths.EpisodesRoot)}");
+                    AnsiConsole.MarkupLine("[grey]Press any key to continue...[/]");
+                    Console.ReadKey(intercept: true);
+
+                    continue;
+                }
+
+                OpenInEditor(_paths.EpisodesRoot);
+
+                continue;
+            }
 
             string filePath = ResolveFilePath (choice);
 
@@ -133,11 +154,14 @@ public sealed class KnowledgeHubScreen : Screen
 
     private string ResolveFilePath (string choice) => choice switch
     {
-        "Memory (USER.md)" => Path.Combine (_paths.MemoryRoot, "USER.md"),
-        "Lessons" => _paths.LessonsPath,
-        "Corrections" => _paths.CorrectionsPath,
-        "Errors" => _paths.ErrorsPath,
-        "Dreams" => Path.Combine (_paths.DreamsRoot, "DREAMS.md"),
+        "USER.md" => _paths.UserProfilePath,
+        "SOUL.md" => _paths.SoulProfilePath,
+        "IDENTITY.md" => _paths.IdentityProfilePath,
+        "MEMORIES.md" => _paths.MemoriesPath,
+        "LESSONS.md" => _paths.LessonsPath,
+        "LIMITS.md" => _paths.LimitsPath,
+        "AGENTS.md" => _paths.AgentsPath,
+        "Dreams" => _paths.DreamsFilePath,
         _ => string.Empty
     };
 

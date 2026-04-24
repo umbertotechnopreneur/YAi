@@ -160,6 +160,9 @@ public sealed class AppPaths
     /// <summary>Gets the path to the agents configuration file (protected — never auto-promoted).</summary>
     public string AgentsPath => Path.Combine(MemoryRoot, "AGENTS.md");
 
+    /// <summary>Gets the path to the general memories file.</summary>
+    public string MemoriesPath => Path.Combine(MemoryRoot, "MEMORIES.md");
+
     #endregion
 
     #region Constructor

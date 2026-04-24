@@ -68,6 +68,7 @@ Console.InputEncoding = Encoding.UTF8;
 if (IsHelpRequest(cliArgs))
 {
 PrintHelp();
+	return;
 }
 
 if (IsLennaRequest(cliArgs))
@@ -480,7 +481,7 @@ static void PrintHelp()
 
 	table.AddRow("[green]--bootstrap[/]", "🧭 Rebuild the first-run workspace and refresh identity files.");
 	table.AddRow("[cyan1]--show-paths[/]", "📍 Show the resolved config, memory, skill, and storage paths.");
-	table.AddRow("[red1]--gonuclear[/]", "☢️ Show the custom data wipe screen, confirm, and delete the user data root.");
+	table.AddRow("[red1]--gonuclear[/]", "☢️ Confirm and permanently delete the workspace, data, and config roots. Cannot be undone.");
 	table.AddRow("[orchid1]--lenna[/]", "🖼️ Run the Lenna citation script and exit.");
 	table.AddRow("[deepskyblue1]--ask <text>[/]", "💬 Send a single prompt to the model. Requires a completed bootstrap.");
 	table.AddRow("[orange1]--translate <text>[/]", "🌍 Translate or rewrite text with persona prompts. Requires a completed bootstrap.");

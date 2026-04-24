@@ -80,57 +80,29 @@ public sealed class PromotionService
     #region Public API
 
     /// <summary>
-    /// Returns all pending proposals from the candidate store, mapped to
-    /// <see cref="DreamProposal"/> objects for display in the review screen.
+    /// Returns all pending candidates from the candidate store.
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
-    public async Task<IReadOnlyList<DreamProposal>> GetPendingProposalsAsync (
+    public async Task<IReadOnlyList<ExtractionCandidate>> GetPendingProposalsAsync(
         CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<ExtractionCandidate> pending = await _store
-            .GetPendingAsync (cancellationToken)
-            .ConfigureAwait (false);
-
-        return pending
-            .Select (c => new DreamProposal (
-                c.EventType,
-                c.Content,
-                c.Metadata.GetValueOrDefault ("rationale", string.Empty),
-                c.Confidence))
-            .ToList ();
+        return await _store.GetPendingAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
-    /// Promotes a pending proposal to permanent memory via <see cref="MemoryTransactionManager"/>.
+    /// Promotes a pending candidate to permanent memory via <see cref="MemoryTransactionManager"/>.
     /// Updates the candidate state to <see cref="CandidateState.Promoted"/> on success and
     /// regenerates the <c>DREAMS.md</c> projection.
     /// </summary>
-    /// <param name="proposal">The proposal to promote.</param>
+    /// <param name="candidate">The candidate to promote.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A <see cref="PromotionResult"/> indicating success or the reason for failure.</returns>
     public async Task<PromotionResult> PromoteAsync (
-        DreamProposal proposal,
+        ExtractionCandidate candidate,
         CancellationToken cancellationToken = default)
     {
-        if (proposal is null)
-            return new PromotionResult (false, "Proposal is null.");
-
-        // Find matching candidate in the store
-        IReadOnlyList<ExtractionCandidate> pending = await _store
-            .GetPendingAsync (cancellationToken)
-            .ConfigureAwait (false);
-
-        ExtractionCandidate? candidate = pending.FirstOrDefault (c =>
-            string.Equals (c.Content, proposal.Content, StringComparison.OrdinalIgnoreCase));
-
         if (candidate is null)
-        {
-            _logger.LogWarning (
-                "PromotionService: no pending candidate found for '{Content}'",
-                proposal.Content.Length > 80 ? proposal.Content [..80] : proposal.Content);
-
-            return new PromotionResult (false, "Candidate not found in store.");
-        }
+            return new PromotionResult(false, "Candidate is null.");
 
         // Resolve target path from candidate
         string targetPath = ResolveTargetPath (candidate);
@@ -156,27 +128,27 @@ public sealed class PromotionService
         string existing = File.Exists (targetPath) ? File.ReadAllText (targetPath) : string.Empty;
 
         // Conflict check
-        if (HasConflict (proposal.Content, existing))
+        if (HasConflict(candidate.Content, existing))
         {
             _logger.LogWarning (
-                "PromotionService: conflict detected for '{Content}'", proposal.Content);
+                "PromotionService: conflict detected for '{Content}'", candidate.Content);
 
             return new PromotionResult (false, "Conflicts with an existing memory entry.");
         }
 
         // Duplicate check
-        if (existing.Contains (proposal.Content, StringComparison.OrdinalIgnoreCase))
+        if (existing.Contains(candidate.Content, StringComparison.OrdinalIgnoreCase))
         {
             _logger.LogDebug (
-                "PromotionService: duplicate skipped — '{Content}'", proposal.Content);
+                "PromotionService: duplicate skipped — '{Content}'", candidate.Content);
 
             return new PromotionResult (false, "An identical entry already exists.");
         }
 
         // Prepare updated file content
-        string markerSection = ResolveMarker (proposal.Type);
+        string markerSection = ResolveMarker(candidate.EventType);
         string timestamp = DateTime.UtcNow.ToString ("yyyy-MM-dd");
-        string entry = $"- [{timestamp}] {proposal.Content}";
+        string entry = $"- [{timestamp}] {candidate.Content}";
         string updated = InsertUnderMarker (existing, markerSection, entry);
 
         // Commit via MemoryTransactionManager (backup + atomic write + rollback on failure)
@@ -198,45 +170,27 @@ public sealed class PromotionService
 
         _logger.LogInformation (
             "PromotionService: promoted [{Type}] to {File} under {Marker}",
-            proposal.Type, Path.GetFileName (targetPath), markerSection);
+            candidate.EventType, Path.GetFileName(targetPath), markerSection);
 
         return new PromotionResult (true, null);
     }
 
     /// <summary>
-    /// Marks a pending proposal as rejected and refreshes the <c>DREAMS.md</c> projection.
+    /// Marks a pending candidate as rejected and refreshes the <c>DREAMS.md</c> projection.
     /// </summary>
-    /// <param name="content">The proposal content to reject.</param>
+    /// <param name="candidate">The candidate to reject.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    public async Task RejectAsync (string content, CancellationToken cancellationToken = default)
+    public async Task RejectAsync(ExtractionCandidate candidate, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace (content))
+        if (candidate is null)
             return;
 
-        IReadOnlyList<ExtractionCandidate> pending = await _store
-            .GetPendingAsync (cancellationToken)
-            .ConfigureAwait (false);
-
-        ExtractionCandidate? candidate = pending.FirstOrDefault (c =>
-            string.Equals (c.Content, content, StringComparison.OrdinalIgnoreCase));
-
-        if (candidate is not null)
-        {
-            await _store.UpdateStateAsync (candidate.Id, CandidateState.Rejected, cancellationToken)
-                .ConfigureAwait (false);
-        }
-        else
-        {
-            _logger.LogWarning (
-                "PromotionService: no pending candidate found to reject for '{Content}'",
-                content.Length > 80 ? content [..80] : content);
-        }
-
+        await _store.UpdateStateAsync(candidate.Id, CandidateState.Rejected, cancellationToken)
+            .ConfigureAwait(false);
         await _store.RegenerateDreamsProjectionAsync (cancellationToken).ConfigureAwait (false);
 
         _logger.LogInformation (
-            "PromotionService: rejected proposal '{Content}'",
-            content.Length > 80 ? content [..80] : content);
+            "PromotionService: rejected candidate {Id}", candidate.Id);
     }
 
     #endregion

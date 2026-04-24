@@ -139,22 +139,25 @@ public sealed class DreamingService
             return 0;
         }
 
-        List<DreamProposal> proposals = ParseProposals (json);
+        List<ExtractionCandidate> candidates = ParseCandidates(json);
 
-        if (proposals.Count == 0)
+        if (candidates.Count == 0)
         {
             _logger.LogInformation ("DreamingService: no proposals generated");
 
             return 0;
         }
 
-        await WriteProposalsAsync (proposals, cancellationToken).ConfigureAwait (false);
+        foreach (ExtractionCandidate candidate in candidates)
+            await _store.AppendAsync(candidate, cancellationToken).ConfigureAwait(false);
+
+        await _store.RegenerateDreamsProjectionAsync(cancellationToken).ConfigureAwait(false);
 
         _logger.LogInformation (
-            "DreamingService: staged {Count} proposals in candidates.jsonl",
-            proposals.Count);
+            "DreamingService: staged {Count} candidates in candidates.jsonl",
+            candidates.Count);
 
-        return proposals.Count;
+        return candidates.Count;
     }
 
     #endregion
@@ -203,47 +206,11 @@ public sealed class DreamingService
 
     #endregion
 
-    #region Private — proposal writing
+    #region Private — proposal writing and parsing
 
-    private async Task WriteProposalsAsync (
-        IReadOnlyList<DreamProposal> proposals,
-        CancellationToken cancellationToken)
+    private List<ExtractionCandidate> ParseCandidates(string json)
     {
-        // Stage each proposal in the candidate store
-        foreach (DreamProposal p in proposals)
-        {
-            string targetFile = p.Type.ToLowerInvariant () switch
-            {
-                "lesson"     => _paths.LessonsPath,
-                "correction" => _paths.CorrectionsPath,
-                _            => _paths.UserProfilePath
-            };
-
-            ExtractionCandidate candidate = new ()
-            {
-                EventType  = p.Type,
-                Source     = ExtractionSource.Ai,
-                State      = CandidateState.Pending,
-                Content    = p.Content,
-                TargetFile = targetFile,
-                Confidence = p.Confidence,
-                Metadata   = new () { ["rationale"] = p.Rationale },
-            };
-
-            await _store.AppendAsync (candidate, cancellationToken).ConfigureAwait (false);
-        }
-
-        // Regenerate DREAMS.md as a projection from all pending candidates
-        await _store.RegenerateDreamsProjectionAsync (cancellationToken).ConfigureAwait (false);
-    }
-
-    #endregion
-
-    #region Private — parsing
-
-    private List<DreamProposal> ParseProposals (string json)
-    {
-        List<DreamProposal> proposals = [];
+        List<ExtractionCandidate> candidates = [];
         string stripped = StripCodeFences (json.Trim ());
 
         try
@@ -251,7 +218,7 @@ public sealed class DreamingService
             using JsonDocument doc = JsonDocument.Parse (stripped);
 
             if (doc.RootElement.ValueKind != JsonValueKind.Array)
-                return proposals;
+                return candidates;
 
             foreach (JsonElement el in doc.RootElement.EnumerateArray ())
             {
@@ -266,16 +233,32 @@ public sealed class DreamingService
                     !string.IsNullOrWhiteSpace (content) &&
                     confidence >= MinConfidence)
                 {
-                    proposals.Add (new DreamProposal (type!, content!, rationale ?? string.Empty, confidence));
+                    string targetFile = type!.ToLowerInvariant() switch
+                    {
+                        "lesson" => _paths.LessonsPath,
+                        "correction" => _paths.CorrectionsPath,
+                        _ => _paths.UserProfilePath
+                    };
+
+                    candidates.Add(new ExtractionCandidate
+                    {
+                        EventType = type!,
+                        Source = ExtractionSource.Ai,
+                        State = CandidateState.Pending,
+                        Content = content!,
+                        TargetFile = targetFile,
+                        Confidence = confidence,
+                        Metadata = new() { ["rationale"] = rationale ?? string.Empty },
+                    });
                 }
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning (ex, "DreamingService: failed to parse proposals");
+            _logger.LogWarning(ex, "DreamingService: failed to parse candidates from LLM response");
         }
 
-        return proposals;
+        return candidates;
     }
 
     private static string StripCodeFences (string text)

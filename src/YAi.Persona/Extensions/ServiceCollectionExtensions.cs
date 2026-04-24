@@ -28,8 +28,11 @@
 using Microsoft.Extensions.DependencyInjection;
 using YAi.Persona.Models;
 using YAi.Persona.Services;
+using YAi.Persona.Services.Operations.Safety;
 using YAi.Persona.Services.Skills;
 using YAi.Persona.Services.Tools;
+using YAi.Persona.Services.Tools.Filesystem;
+using YAi.Persona.Services.Tools.Filesystem.Services;
 using YAi.Persona.Services.Tools.SystemInfo;
 
 #endregion
@@ -62,10 +65,22 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<RuntimeState>();
         services.AddSingleton<SkillLoader>();
         services.AddSingleton<SystemInfoTool>();
+
+        // Filesystem skill services
+        services.AddSingleton<WorkspaceBoundaryService>();
+        services.AddSingleton<ContextManager>();
+        services.AddSingleton<CommandPlanValidator>();
+        services.AddSingleton<FileSystemExecutor>();
+        services.AddSingleton<VerificationService>();
+        services.AddSingleton<AuditService>();
+        services.AddSingleton<FilesystemPlannerService>();
+        services.AddSingleton<FilesystemTool>();
+
         services.AddSingleton<ToolRegistry>(sp =>
         {
             var registry = new ToolRegistry();
             registry.Register(sp.GetRequiredService<SystemInfoTool>());
+            registry.Register(sp.GetRequiredService<FilesystemTool>());
             return registry;
         });
         services.AddSingleton<PromptBuilder>();

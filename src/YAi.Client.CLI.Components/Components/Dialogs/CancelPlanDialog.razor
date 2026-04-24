@@ -1,0 +1,44 @@
+@*
+    YAi!
+
+    Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.
+    Website: https://umbertogiacobbi.biz
+    Email: hello@umbertogiacobbi.biz
+
+    YAi.Client.CLI.Components
+    CancelPlanDialog — confirms cancellation of remaining plan steps
+*@
+
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Web
+@using RazorConsole.Components
+@using Spectre.Console
+
+<ConfirmationDialog Title="Cancel Plan"
+                    Message="@_message"
+                    RiskColor="@Color.OrangeRed1"
+                    OnConfirm="ConfirmClicked"
+                    OnCancel="CancelClicked" />
+
+@code {
+    /// <summary>Number of steps remaining in the plan.</summary>
+    [Parameter] public int RemainingCount { get; set; }
+
+    /// <summary>Raised when the user confirms cancellation.</summary>
+    [Parameter] public EventCallback OnConfirm { get; set; }
+
+    /// <summary>Raised when the user decides to continue the plan.</summary>
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private string _message = string.Empty;
+
+    protected override void OnParametersSet ()
+    {
+        _message = RemainingCount > 0
+            ? $"Cancel the remaining {RemainingCount} step(s)? This cannot be undone automatically."
+            : "Cancel the plan?";
+    }
+
+    private async Task ConfirmClicked () => await OnConfirm.InvokeAsync ();
+    private async Task CancelClicked () => await OnCancel.InvokeAsync ();
+}

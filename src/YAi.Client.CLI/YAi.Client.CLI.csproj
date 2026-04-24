@@ -52,6 +52,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\YAi.Persona\YAi.Persona.csproj" />
+    <ProjectReference Include="..\YAi.Client.CLI.Components\YAi.Client.CLI.Components.csproj" />
   </ItemGroup>
 
 </Project>

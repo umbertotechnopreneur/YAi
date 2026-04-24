@@ -1,0 +1,144 @@
+@*
+    YAi!
+
+    Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.
+    Website: https://umbertogiacobbi.biz
+    Email: hello@umbertogiacobbi.biz
+
+    YAi.Client.CLI.Components
+    CommandPlanOverviewScreen — root component that displays the full plan summary
+*@
+
+@using Microsoft.AspNetCore.Components
+@using Microsoft.Extensions.Hosting
+@using RazorConsole.Components
+@using Spectre.Console
+@using YAi.Client.CLI.Components.Screens
+@using YAi.Persona.Services.Operations.Models
+
+@inject IHostApplicationLifetime AppLifetime
+@inject RazorScreenResult<bool> Result
+
+<Rows>
+    @if (_showValidationError)
+    {
+        <MessageBox Severity="MessageBox.MessageSeverity.Error"
+                    Message="@_validationMessage"
+                    OnDismiss="DismissError" />
+    }
+    else
+    {
+        <Panel>
+            <Header>Plan: @Plan.Title</Header>
+            <Rows>
+                <Columns>
+                    <Markup Content="Overall risk: " />
+                    <Markup Content="@(Plan.OverallRiskLevel.ToString ())" Foreground="@_overallRiskColor" />
+                </Columns>
+                <Markup Content="@Plan.Summary" />
+
+                @if (Plan.Assumptions?.Count > 0)
+                {
+                    <Newline />
+                    <Markup Content="Assumptions:" Foreground="@Color.Yellow" />
+                    @foreach (string a in Plan.Assumptions)
+                    {
+                        <Markup Content="@($"  • {a}")" Foreground="@Color.Silver" />
+                    }
+                }
+
+                @if (Plan.KnownFacts?.Count > 0)
+                {
+                    <Newline />
+                    <Markup Content="Known facts:" Foreground="@Color.Cyan1" />
+                    @foreach (string f in Plan.KnownFacts)
+                    {
+                        <Markup Content="@($"  • {f}")" Foreground="@Color.Silver" />
+                    }
+                }
+
+                @if (Plan.Unknowns?.Count > 0)
+                {
+                    <Newline />
+                    <Markup Content="Unknowns:" Foreground="@Color.OrangeRed1" />
+                    @foreach (string u in Plan.Unknowns)
+                    {
+                        <Markup Content="@($"  • {u}")" Foreground="@Color.Silver" />
+                    }
+                }
+
+                <Newline />
+                <Markup Content="@($"Steps ({Plan.Steps.Count} total):")" />
+                @for (int i = 0; i < Plan.Steps.Count; i++)
+                {
+                    OperationStep step = Plan.Steps [i];
+                    <Markup Content="@($"  {i + 1}. {step.Title} — {step.Action} {step.Target}")" Foreground="@Color.White" />
+                }
+
+                <Newline />
+                <Columns>
+                    <TextButton Content="[Enter] Proceed"
+                                OnClick="ProceedClicked"
+                                BackgroundColor="@Color.Green"
+                                FocusedColor="@Color.Green3" />
+                    <TextButton Content="[Esc] Cancel"
+                                OnClick="CancelClicked"
+                                BackgroundColor="@Color.Grey"
+                                FocusedColor="@Color.Silver" />
+                </Columns>
+            </Rows>
+        </Panel>
+    }
+</Rows>
+
+@code {
+    /// <summary>The command plan to display.</summary>
+    [Parameter, EditorRequired] public CommandPlan Plan { get; set; } = null!;
+
+    /// <summary>Optional validation message to surface on entry (non-null triggers error screen first).</summary>
+    [Parameter] public string? ValidationError { get; set; }
+
+    private bool _showValidationError;
+    private string _validationMessage = string.Empty;
+    private Color _overallRiskColor = Color.White;
+
+    protected override void OnInitialized ()
+    {
+        if (!string.IsNullOrWhiteSpace (ValidationError))
+        {
+            _showValidationError = true;
+            _validationMessage = ValidationError;
+        }
+
+        _overallRiskColor = Plan.OverallRiskLevel switch
+        {
+            OperationRiskLevel.ReadOnly               => Color.Green,
+            OperationRiskLevel.LocalWrite             => Color.Cyan1,
+            OperationRiskLevel.OverwriteRisk          => Color.Yellow,
+            OperationRiskLevel.DestructiveRecoverable => Color.OrangeRed1,
+            OperationRiskLevel.DestructivePermanent   => Color.Red,
+            OperationRiskLevel.OutsideWorkspace       => Color.Red,
+            _                                         => Color.White
+        };
+    }
+
+    private void DismissError ()
+    {
+        _showValidationError = false;
+        // After dismissing error, cancel — plan cannot proceed if invalid.
+        Result.SetResult (false);
+        AppLifetime.StopApplication ();
+    }
+
+    private void ProceedClicked ()
+    {
+        Result.SetResult (true);
+        AppLifetime.StopApplication ();
+    }
+
+    private void CancelClicked ()
+    {
+        Result.SetResult (false);
+        AppLifetime.StopApplication ();
+    }
+}

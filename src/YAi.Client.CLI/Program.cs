@@ -116,6 +116,8 @@ try
 	ServiceCollection services = new ServiceCollection();
 	services.AddLogging(logging => logging.AddSerilog(Log.Logger, dispose: false));
 	services.AddYAiPersonaServices(appPaths);
+	services.AddSingleton<YAi.Persona.Services.Tools.Filesystem.IApprovalCardPresenter,
+		RazorConsoleApprovalCardPresenter>();
 
 	ServiceProvider sp = services.BuildServiceProvider();
 

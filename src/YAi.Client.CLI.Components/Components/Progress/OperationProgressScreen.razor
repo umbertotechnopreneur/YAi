@@ -1,0 +1,71 @@
+@*
+    YAi!
+
+    Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.
+    Website: https://umbertogiacobbi.biz
+    Email: hello@umbertogiacobbi.biz
+
+    YAi.Client.CLI.Components
+    OperationProgressScreen — displays step list with status icons and N-of-M header
+*@
+
+@using Microsoft.AspNetCore.Components
+@using RazorConsole.Components
+@using Spectre.Console
+@using YAi.Persona.Services.Operations.Models
+
+<Panel>
+    <Header>Progress — @_doneCount of @Steps.Count step(s) completed</Header>
+    <Rows>
+        @foreach (IOperationStep step in Steps)
+        {
+            <Columns>
+                <Markup Content="@(StatusIcon (step.Status))" Foreground="@(StatusColor (step.Status))" />
+                <Markup Content="@($" {step.StepId}. {step.Title}")" />
+            </Columns>
+        }
+    </Rows>
+</Panel>
+
+@code {
+    /// <summary>Ordered list of step cards to display.</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<IOperationStep> Steps { get; set; } = [];
+
+    private int _doneCount;
+
+    protected override void OnParametersSet ()
+    {
+        _doneCount = 0;
+
+        foreach (IOperationStep step in Steps)
+        {
+            if (step.Status is StepStatus.Succeeded or StepStatus.Skipped or StepStatus.Failed or StepStatus.Cancelled)
+                _doneCount++;
+        }
+    }
+
+    private static string StatusIcon (StepStatus status) => status switch
+    {
+        StepStatus.Pending    => "○",
+        StepStatus.Approved   => "►",
+        StepStatus.Running    => "⟳",
+        StepStatus.Succeeded  => "✓",
+        StepStatus.Failed     => "✗",
+        StepStatus.Skipped    => "—",
+        StepStatus.Cancelled  => "✕",
+        _                     => "?"
+    };
+
+    private static Color StatusColor (StepStatus status) => status switch
+    {
+        StepStatus.Pending    => Color.Grey,
+        StepStatus.Approved   => Color.Cyan1,
+        StepStatus.Running    => Color.Yellow,
+        StepStatus.Succeeded  => Color.Green,
+        StepStatus.Failed     => Color.Red,
+        StepStatus.Skipped    => Color.Silver,
+        StepStatus.Cancelled  => Color.OrangeRed1,
+        _                     => Color.White
+    };
+}

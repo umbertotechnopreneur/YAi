@@ -1,0 +1,155 @@
+@*
+    YAi!
+
+    Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.
+    Website: https://umbertogiacobbi.biz
+    Email: hello@umbertogiacobbi.biz
+
+    YAi.Client.CLI.Components
+    ApprovalCard — generic card driven by IOperationStep; emits an ApprovalDecision
+*@
+
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Web
+@using RazorConsole.Components
+@using Spectre.Console
+@using YAi.Persona.Services.Operations.Models
+
+<Rows>
+    @if (_showCancelDialog)
+    {
+        <CancelPlanDialog RemainingCount="@RemainingCount"
+                          OnConfirm="CancelConfirmed"
+                          OnCancel="CancelAborted" />
+    }
+    else
+    {
+        <Panel>
+            <Header>@Card.Title</Header>
+            <Rows>
+                <Columns>
+                    <Markup Content="Action: " />
+                    <Markup Content="@Card.Action" Foreground="@Color.Cyan1" />
+                </Columns>
+                <Columns>
+                    <Markup Content="Target: " />
+                    <Markup Content="@Card.Target" Foreground="@Color.White" />
+                </Columns>
+                <Columns>
+                    <Markup Content="Risk:   " />
+                    <Markup Content="@_riskBadge" Foreground="@_riskColor" />
+                </Columns>
+
+                @if (!string.IsNullOrWhiteSpace (Card.DisplayCommand))
+                {
+                    <Newline />
+                    <Markup Content="Command: " />
+                    <Markup Content="@Card.DisplayCommand" Foreground="@Color.Yellow" />
+                }
+
+                @if (!string.IsNullOrWhiteSpace (Card.RiskExplanation))
+                {
+                    <Newline />
+                    <Markup Content="@Card.RiskExplanation" Foreground="@_riskColor" />
+                }
+
+                @if (!string.IsNullOrWhiteSpace (Card.MitigationNote))
+                {
+                    <Markup Content="@($"Mitigation: {Card.MitigationNote}")" Foreground="@Color.Green" />
+                }
+
+                @if (Card.RollbackAvailable)
+                {
+                    <Markup Content="@($"Rollback:   {Card.RollbackExplanation}")" Foreground="@Color.Green3" />
+                }
+
+                @if (Card.VerificationDescriptions?.Count > 0)
+                {
+                    <Newline />
+                    <Markup Content="Verification criteria:" />
+                    @foreach (string description in Card.VerificationDescriptions)
+                    {
+                        <Markup Content="@($"  • {description}")" Foreground="@Color.Silver" />
+                    }
+                }
+
+                @if (_blocked)
+                {
+                    <Newline />
+                    <Markup Content="⛔ This step is blocked and cannot be executed." Foreground="@Color.Red" />
+                    <Newline />
+                    <TextButton Content="[S] Skip"
+                                OnClick="SkipClicked"
+                                BackgroundColor="@Color.Grey"
+                                FocusedColor="@Color.Silver" />
+                }
+                else
+                {
+                    <Newline />
+                    <Columns>
+                        <TextButton Content="[R] Run"
+                                    OnClick="RunClicked"
+                                    BackgroundColor="@Color.Green"
+                                    FocusedColor="@Color.Green3" />
+                        <TextButton Content="[S] Skip"
+                                    OnClick="SkipClicked"
+                                    BackgroundColor="@Color.Grey"
+                                    FocusedColor="@Color.Silver" />
+                        <TextButton Content="[C] Cancel plan"
+                                    OnClick="CancelPlanClicked"
+                                    BackgroundColor="@Color.DarkRed"
+                                    FocusedColor="@Color.OrangeRed1" />
+                    </Columns>
+                }
+            </Rows>
+        </Panel>
+    }
+</Rows>
+
+@code {
+    /// <summary>The step to display. Must not be null.</summary>
+    [Parameter, EditorRequired] public IOperationStep Card { get; set; } = null!;
+
+    /// <summary>Number of steps remaining after the current one (used by CancelPlanDialog).</summary>
+    [Parameter] public int RemainingCount { get; set; }
+
+    /// <summary>Raised with the user's decision.</summary>
+    [Parameter] public EventCallback<ApprovalDecision> OnDecision { get; set; }
+
+    private bool _showCancelDialog;
+    private bool _blocked;
+    private string _riskBadge = string.Empty;
+    private Color _riskColor = Color.White;
+
+    protected override void OnParametersSet ()
+    {
+        _blocked = Card.RiskLevel is OperationRiskLevel.DestructivePermanent or OperationRiskLevel.OutsideWorkspace;
+
+        (_riskBadge, _riskColor) = Card.RiskLevel switch
+        {
+            OperationRiskLevel.ReadOnly                => ("● ReadOnly",               Color.Green),
+            OperationRiskLevel.LocalWrite              => ("● LocalWrite",             Color.Cyan1),
+            OperationRiskLevel.OverwriteRisk           => ("● OverwriteRisk",          Color.Yellow),
+            OperationRiskLevel.DestructiveRecoverable  => ("● DestructiveRecoverable", Color.OrangeRed1),
+            OperationRiskLevel.DestructivePermanent    => ("⛔ DestructivePermanent",   Color.Red),
+            OperationRiskLevel.OutsideWorkspace        => ("⛔ OutsideWorkspace",       Color.Red),
+            _                                          => ("● Unknown",                Color.Grey)
+        };
+    }
+
+    private async Task RunClicked () =>
+        await OnDecision.InvokeAsync (ApprovalDecision.Run);
+
+    private async Task SkipClicked () =>
+        await OnDecision.InvokeAsync (ApprovalDecision.Skip);
+
+    private void CancelPlanClicked () => _showCancelDialog = true;
+
+    private async Task CancelConfirmed ()
+    {
+        _showCancelDialog = false;
+        await OnDecision.InvokeAsync (ApprovalDecision.CancelPlan);
+    }
+
+    private void CancelAborted () => _showCancelDialog = false;
+}

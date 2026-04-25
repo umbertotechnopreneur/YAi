@@ -31,17 +31,17 @@
             {
                 <Columns>
                     <RawMarkup Content="Remaining balance:" />
-                    <RawMarkup Content="@_remainingBalance" Foreground="@Color.Green" />
+                    <RawMarkup Content="@Spectre.Console.Markup.Escape(_remainingBalance)" Foreground="@Color.Green" />
                 </Columns>
 
                 <Columns>
                     <RawMarkup Content="Total spent:" />
-                    <RawMarkup Content="@_totalSpent" Foreground="@Color.Yellow" />
+                    <RawMarkup Content="@Spectre.Console.Markup.Escape(_totalSpent)" Foreground="@Color.Yellow" />
                 </Columns>
 
                 <Columns>
                     <RawMarkup Content="Total credits:" />
-                    <RawMarkup Content="@_totalCredits" />
+                    <RawMarkup Content="@Spectre.Console.Markup.Escape(_totalCredits)" />
                 </Columns>
             }
             else
@@ -52,18 +52,18 @@
 
             <Columns>
                 <RawMarkup Content="Last balance check:" />
-                <RawMarkup Content="@_lastBalanceCheck" />
+                <RawMarkup Content="@Spectre.Console.Markup.Escape(_lastBalanceCheck)" />
             </Columns>
 
             <Columns>
                 <RawMarkup Content="Source:" />
-                <RawMarkup Content="@_sourceLabel" Foreground="@Color.Cyan1" />
+                <RawMarkup Content="@Spectre.Console.Markup.Escape(_sourceLabel)" Foreground="@Color.Cyan1" />
             </Columns>
 
             @if (!string.IsNullOrWhiteSpace (Snapshot.ErrorMessage))
             {
                 <Newline />
-                <RawMarkup Content="@Snapshot.ErrorMessage" Foreground="@Color.Yellow" />
+                <RawMarkup Content="@Spectre.Console.Markup.Escape(Snapshot.ErrorMessage)" Foreground="@Color.Yellow" />
             }
         </Rows>
     </Panel>

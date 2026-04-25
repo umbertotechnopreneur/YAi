@@ -537,32 +537,32 @@ static async Task ShowOpenRouterBalanceAsync(
 			.StartAsync("[cyan]Checking OpenRouter balance...[/]", _ => openRouterBalance.GetBalanceAsync(cancellationToken: default))
 			.ConfigureAwait(false);
 
-			// Show the configured API key (masked) so users can confirm which key is used.
-			string apiKey = Environment.GetEnvironmentVariable("YAI_OPENROUTER_API_KEY") ?? string.Empty;
-			if (!string.IsNullOrWhiteSpace(apiKey))
-			{
-				string masked = apiKey.Length <= 8 ? new string('*', apiKey.Length) : string.Concat(apiKey.AsSpan(0, 4), "...", apiKey.AsSpan(apiKey.Length - 4));
-				AnsiConsole.MarkupLine($"[green]Using OpenRouter API key:[/] {Markup.Escape(masked)}");
-			}
-			else
-			{
-				AnsiConsole.MarkupLine("[red]✖ No OpenRouter API key configured (YAI_OPENROUTER_API_KEY).[/]");
-			}
+		// Show the configured API key (masked) so users can confirm which key is used.
+		string apiKey = Environment.GetEnvironmentVariable("YAI_OPENROUTER_API_KEY") ?? string.Empty;
+		if (!string.IsNullOrWhiteSpace(apiKey))
+		{
+			string masked = apiKey.Length <= 8 ? new string('*', apiKey.Length) : string.Concat(apiKey.AsSpan(0, 4), "...", apiKey.AsSpan(apiKey.Length - 4));
+			AnsiConsole.MarkupLine($"[green]Using OpenRouter API key:[/] {Markup.Escape(masked)}");
+		}
+		else
+		{
+			AnsiConsole.MarkupLine("[red]✖ No OpenRouter API key configured (YAI_OPENROUTER_API_KEY).[/]");
+		}
 
-			if (!string.IsNullOrWhiteSpace(snapshot.ErrorMessage))
-			{
-				AnsiConsole.MarkupLine ($"[yellow]⚠ {Markup.Escape(snapshot.ErrorMessage)}[/]");
-			}
+		if (!string.IsNullOrWhiteSpace(snapshot.ErrorMessage))
+		{
+			AnsiConsole.MarkupLine($"[yellow]⚠ {Markup.Escape(snapshot.ErrorMessage)}[/]");
+		}
 
-			// If raw JSON is available, print a short preview to the console for debugging.
-			if (!string.IsNullOrWhiteSpace(snapshot.RawJson))
-			{
-				string preview = snapshot.RawJson.Length > 500 ? snapshot.RawJson.Substring(0, 500) + "..." : snapshot.RawJson;
-				AnsiConsole.MarkupLine("[grey70]OpenRouter credits (preview):[/]");
-				AnsiConsole.WriteLine(preview);
-			}
+		// If raw JSON is available, print a short preview to the console for debugging.
+		if (!string.IsNullOrWhiteSpace(snapshot.RawJson))
+		{
+			string preview = snapshot.RawJson.Length > 500 ? snapshot.RawJson.Substring(0, 500) + "..." : snapshot.RawJson;
+			AnsiConsole.MarkupLine("[grey70]OpenRouter credits (preview):[/]");
+			AnsiConsole.WriteLine(preview);
+		}
 
-			await new OpenRouterBalanceScreenHost(snapshot).RunAsync().ConfigureAwait(false);
+		await new OpenRouterBalanceScreenHost(snapshot).RunAsync().ConfigureAwait(false);
 	}
 	catch (Exception ex)
 	{

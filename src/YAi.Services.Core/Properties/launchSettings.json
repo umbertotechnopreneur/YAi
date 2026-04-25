@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "YAi.Services.Core": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:52739;http://localhost:52740"
+    }
+  }
+}

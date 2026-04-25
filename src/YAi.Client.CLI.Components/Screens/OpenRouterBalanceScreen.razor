@@ -23,46 +23,47 @@
 <Rows>
     <Panel Title="OpenRouter balance">
         <Rows>
-            <Markup Content="This screen is cached for 10 minutes to avoid unnecessary credits API calls." Foreground="@Color.Silver" />
+            <RawMarkup Content="This screen is cached for 10 minutes to avoid unnecessary credits API calls."
+                       Foreground="@Color.Silver" />
             <Newline />
 
             @if (Snapshot.HasBalance)
             {
                 <Columns>
-                    <Markup Content="Remaining balance:" />
-                    <Markup Content="@_remainingBalance" Foreground="@Color.Green" />
+                    <RawMarkup Content="Remaining balance:" />
+                    <RawMarkup Content="@_remainingBalance" Foreground="@Color.Green" />
                 </Columns>
 
                 <Columns>
-                    <Markup Content="Total spent:" />
-                    <Markup Content="@_totalSpent" Foreground="@Color.Yellow" />
+                    <RawMarkup Content="Total spent:" />
+                    <RawMarkup Content="@_totalSpent" Foreground="@Color.Yellow" />
                 </Columns>
 
                 <Columns>
-                    <Markup Content="Total credits:" />
-                    <Markup Content="@_totalCredits" />
+                    <RawMarkup Content="Total credits:" />
+                    <RawMarkup Content="@_totalCredits" />
                 </Columns>
             }
             else
             {
-                <Markup Content="Remaining balance unavailable" Foreground="@Color.Red" />
-                <Markup Content="Total spent unavailable" Foreground="@Color.Red" />
+                <RawMarkup Content="Remaining balance unavailable" Foreground="@Color.Red" />
+                <RawMarkup Content="Total spent unavailable" Foreground="@Color.Red" />
             }
 
             <Columns>
-                <Markup Content="Last balance check:" />
-                <Markup Content="@_lastBalanceCheck" />
+                <RawMarkup Content="Last balance check:" />
+                <RawMarkup Content="@_lastBalanceCheck" />
             </Columns>
 
             <Columns>
-                <Markup Content="Source:" />
-                <Markup Content="@_sourceLabel" Foreground="@Color.Cyan1" />
+                <RawMarkup Content="Source:" />
+                <RawMarkup Content="@_sourceLabel" Foreground="@Color.Cyan1" />
             </Columns>
 
             @if (!string.IsNullOrWhiteSpace (Snapshot.ErrorMessage))
             {
                 <Newline />
-                <Markup Content="@Snapshot.ErrorMessage" Foreground="@Color.Yellow" />
+                <RawMarkup Content="@Snapshot.ErrorMessage" Foreground="@Color.Yellow" />
             }
         </Rows>
     </Panel>

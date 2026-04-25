@@ -19,6 +19,8 @@
 
 @inject IHostApplicationLifetime AppLifetime
 @inject RazorScreenResult<bool> Result
+@inject CommandPlan Plan
+@inject CommandPlanOverviewScreenParams ScreenParams
 
 <Rows>
     @if (_showValidationError)
@@ -32,47 +34,48 @@
         <Panel Title="@($"Plan: {Plan.Title}")">
             <Rows>
                 <Columns>
-                    <Markup Content="Overall risk: " />
-                    <Markup Content="@(Plan.OverallRiskLevel.ToString ())" Foreground="@_overallRiskColor" />
+                    <RawMarkup Content="Overall risk: " />
+                    <RawMarkup Content="@(Plan.OverallRiskLevel.ToString())" Foreground="@_overallRiskColor" />
                 </Columns>
-                <Markup Content="@Plan.Summary" />
+                <RawMarkup Content="@Spectre.Console.Markup.Escape(Plan.Summary)" />
 
                 @if (Plan.Assumptions?.Count > 0)
                 {
                     <Newline />
-                    <Markup Content="Assumptions:" Foreground="@Color.Yellow" />
+                    <RawMarkup Content="Assumptions:" Foreground="@Color.Yellow" />
                     @foreach (string a in Plan.Assumptions)
                     {
-                        <Markup Content="@($"  • {a}")" Foreground="@Color.Silver" />
+                        <RawMarkup Content="@Spectre.Console.Markup.Escape($"  • {a}")" Foreground="@Color.Silver" />
                     }
                 }
 
                 @if (Plan.KnownFacts?.Count > 0)
                 {
                     <Newline />
-                    <Markup Content="Known facts:" Foreground="@Color.Cyan1" />
+                    <RawMarkup Content="Known facts:" Foreground="@Color.Cyan1" />
                     @foreach (string f in Plan.KnownFacts)
                     {
-                        <Markup Content="@($"  • {f}")" Foreground="@Color.Silver" />
+                        <RawMarkup Content="@Spectre.Console.Markup.Escape($"  • {f}")" Foreground="@Color.Silver" />
                     }
                 }
 
                 @if (Plan.Unknowns?.Count > 0)
                 {
                     <Newline />
-                    <Markup Content="Unknowns:" Foreground="@Color.OrangeRed1" />
+                    <RawMarkup Content="Unknowns:" Foreground="@Color.OrangeRed1" />
                     @foreach (string u in Plan.Unknowns)
                     {
-                        <Markup Content="@($"  • {u}")" Foreground="@Color.Silver" />
+                        <RawMarkup Content="@Spectre.Console.Markup.Escape($"  • {u}")" Foreground="@Color.Silver" />
                     }
                 }
 
                 <Newline />
-                <Markup Content="@($"Steps ({Plan.Steps.Count} total):")" />
+                <RawMarkup Content="@Spectre.Console.Markup.Escape($"Steps ({Plan.Steps.Count} total):")" />
                 @for (int i = 0; i < Plan.Steps.Count; i++)
                 {
                     OperationStep step = Plan.Steps [i];
-                    <Markup Content="@($"  {i + 1}. {step.Title} — {step.Action} {step.Target}")" Foreground="@Color.White" />
+                    <RawMarkup Content="@Spectre.Console.Markup.Escape($"  {i + 1}. {step.Title} — {step.Action} {step.Target}")"
+                               Foreground="@Color.White" />
                 }
 
                 <Newline />
@@ -92,22 +95,16 @@
 </Rows>
 
 @code {
-    /// <summary>The command plan to display.</summary>
-    [Parameter, EditorRequired] public CommandPlan Plan { get; set; } = null!;
-
-    /// <summary>Optional validation message to surface on entry (non-null triggers error screen first).</summary>
-    [Parameter] public string? ValidationError { get; set; }
-
     private bool _showValidationError;
     private string _validationMessage = string.Empty;
     private Color _overallRiskColor = Color.White;
 
     protected override void OnInitialized ()
     {
-        if (!string.IsNullOrWhiteSpace (ValidationError))
+        if (!string.IsNullOrWhiteSpace(ScreenParams.ValidationError))
         {
             _showValidationError = true;
-            _validationMessage = ValidationError;
+            _validationMessage = ScreenParams.ValidationError;
         }
 
         _overallRiskColor = Plan.OverallRiskLevel switch

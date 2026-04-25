@@ -84,7 +84,15 @@ public abstract class RazorScreen<TComponent, TResult>
 
         using IHost host = builder.Build ();
 
-        await host.RunAsync (ct);
+        try
+        {
+            await host.RunAsync(ct);
+        }
+        catch (OperationCanceledException) when (resultHolder.HasValue)
+        {
+            // The component requested the host to stop (e.g. via IHostApplicationLifetime.StopApplication)
+            // after setting the result. Treat this as a successful shutdown and continue.
+        }
 
         if (!resultHolder.HasValue)
             throw new InvalidOperationException (

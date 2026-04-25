@@ -9,8 +9,6 @@
     OpenRouterModelSelectionScreen — RazorConsole rendering of the OpenRouter model selector
 *@
 
-@using System.Globalization
-@using System.Text
 @using Microsoft.AspNetCore.Components
 @using Microsoft.Extensions.Hosting
 @using RazorConsole.Components
@@ -28,29 +26,29 @@
         <Rows>
             @if (_isLoading)
             {
-                <Markup Content="@LoadingMessageMarkup" />
+                <RawMarkup Content="@LoadingMessageMarkup" />
             }
             else
             {
                 @if (!string.IsNullOrWhiteSpace (_subtitleMarkup))
                 {
-                    <Markup Content="@_subtitleMarkup" />
+                    <RawMarkup Content="@_subtitleMarkup" />
                 }
 
-                <Markup Content="@_searchStateMarkup" />
-                <Markup Content="@_matchCountMarkup" />
-                <Markup Content="@PromptHintMarkup" />
+                <RawMarkup Content="@_searchStateMarkup" />
+                <RawMarkup Content="@_matchCountMarkup" />
+                <RawMarkup Content="@PromptHintMarkup" />
                 <Newline />
 
-                @if (_pageCards.Count == 0)
+                if (_pageCards.Count == 0)
                 {
-                    <Markup Content="[red]No matches found.[/]" />
+                    <RawMarkup Content="[red]No matches found.[/]" />
                 }
                 else
                 {
                     @if (!string.IsNullOrWhiteSpace (_pageSummaryMarkup))
                     {
-                        <Markup Content="@_pageSummaryMarkup" />
+                        <RawMarkup Content="@_pageSummaryMarkup" />
                     }
 
                     @for (int row = 0; row < _pageCards.Count; row += 2)
@@ -63,12 +61,12 @@
                         <Columns>
                             <Panel Title="@left.Title">
                                 <Rows>
-                                    <Markup Content="@left.SelectionBadge" />
-                                    <Markup Content="@left.ProviderMarkup" />
-                                    <Markup Content="@left.KeyMarkup" />
-                                    <Markup Content="@left.NameMarkup" />
-                                    <Markup Content="@left.CostMarkup" />
-                                    <Markup Content="@left.DescriptionMarkup" />
+                                    <RawMarkup Content="@left.SelectionBadge" />
+                                    <RawMarkup Content="@left.ProviderMarkup" />
+                                    <RawMarkup Content="@left.KeyMarkup" />
+                                    <RawMarkup Content="@left.NameMarkup" />
+                                    <RawMarkup Content="@left.CostMarkup" />
+                                    <RawMarkup Content="@left.DescriptionMarkup" />
                                 </Rows>
                             </Panel>
 
@@ -76,18 +74,18 @@
                             {
                                 <Panel Title="@right.Title">
                                     <Rows>
-                                        <Markup Content="@right.SelectionBadge" />
-                                        <Markup Content="@right.ProviderMarkup" />
-                                        <Markup Content="@right.KeyMarkup" />
-                                        <Markup Content="@right.NameMarkup" />
-                                        <Markup Content="@right.CostMarkup" />
-                                        <Markup Content="@right.DescriptionMarkup" />
+                                        <RawMarkup Content="@right.SelectionBadge" />
+                                        <RawMarkup Content="@right.ProviderMarkup" />
+                                        <RawMarkup Content="@right.KeyMarkup" />
+                                        <RawMarkup Content="@right.NameMarkup" />
+                                        <RawMarkup Content="@right.CostMarkup" />
+                                        <RawMarkup Content="@right.DescriptionMarkup" />
                                     </Rows>
                                 </Panel>
                             }
                             else
                             {
-                                <Markup Content="" />
+                                <RawMarkup Content="" />
                             }
                         </Columns>
                     }
@@ -98,17 +96,6 @@
 </Rows>
 
 @code {
-    private const int VisibleRowCount = 6;
-
-    private sealed record OpenRouterModelCardViewModel (
-        string Title,
-        string SelectionBadge,
-        string ProviderMarkup,
-        string KeyMarkup,
-        string NameMarkup,
-        string CostMarkup,
-        string DescriptionMarkup);
-
     private readonly List<OpenRouterModel> _allModels = [];
     private readonly List<OpenRouterModel> _visibleModels = [];
     private readonly List<OpenRouterModelCardViewModel> _pageCards = [];
@@ -132,11 +119,7 @@
         _catalog = await CatalogService.GetCatalogAsync ().ConfigureAwait (false);
 
         _allModels.Clear ();
-        _allModels.AddRange (
-            _catalog.Data
-                .Where (model => !string.IsNullOrWhiteSpace (model.Id))
-                .OrderBy (model => GetProvider (model.Id), StringComparer.OrdinalIgnoreCase)
-                .ThenBy (model => model.Id, StringComparer.OrdinalIgnoreCase));
+        _allModels.AddRange(OpenRouterModelSelectionHelper.BuildOrderedModels(_catalog));
 
         if (_allModels.Count == 0)
         {
@@ -171,504 +154,157 @@
     {
         await Task.Yield ();
 
-        if (!IsInteractiveConsole ())
+        if (Console.IsInputRedirected || Console.IsOutputRedirected)
         {
-            CompleteSelection (PromptNumericSelection (_allModels));
-            return;
+            throw new InvalidOperationException ("OpenRouter model selection requires an interactive console.");
         }
 
         while (true)
         {
             ConsoleKeyInfo key = Console.ReadKey (intercept: true);
-            OpenRouterModel? currentSelection = GetCurrentSelection ();
+            OpenRouterModel? currentSelection = OpenRouterModelSelectionHelper.GetCurrentSelection (_visibleModels, _selectedIndex);
 
             if (_searchMode)
             {
-                if (key.Key == ConsoleKey.Escape)
+                if (await HandleSearchModeKeyAsync (key, currentSelection).ConfigureAwait (false))
                 {
-                    string? currentSelectionId = currentSelection?.Id;
-
-                    _searchQuery = string.Empty;
-                    _searchMode = false;
-                    RefreshViewState (currentSelectionId);
-                    await InvokeAsync (StateHasChanged).ConfigureAwait (false);
-                    continue;
-                }
-
-                if (key.Key == ConsoleKey.Backspace)
-                {
-                    if (_searchQuery.Length > 0)
-                    {
-                        string? currentSelectionId = currentSelection?.Id;
-
-                        _searchQuery = _searchQuery[..^1];
-                        RefreshViewState (currentSelectionId);
-                        await InvokeAsync (StateHasChanged).ConfigureAwait (false);
-                    }
-
-                    continue;
-                }
-
-                if (key.Key == ConsoleKey.Enter)
-                {
-                    if (_visibleModels.Count == 0)
-                    {
-                        continue;
-                    }
-
-                    CompleteSelection (_visibleModels[_selectedIndex]);
                     return;
                 }
 
-                if (IsCursorKey (key.Key))
-                {
-                    _selectedIndex = HandleCursorKey (_visibleModels, _selectedIndex, key.Key);
-                    RefreshViewState (_visibleModels[_selectedIndex].Id);
-                    await InvokeAsync (StateHasChanged).ConfigureAwait (false);
-                    continue;
-                }
-
-                if (IsSearchCharacter (key))
-                {
-                    string? currentSelectionId = currentSelection?.Id;
-
-                    _searchQuery += key.KeyChar;
-                    RefreshViewState (currentSelectionId);
-                    await InvokeAsync (StateHasChanged).ConfigureAwait (false);
-                    continue;
-                }
-            }
-
-            if (key.Key == ConsoleKey.Escape)
-            {
-                Result.SetResult (null!);
-                AppLifetime.StopApplication ();
-                return;
-            }
-
-            if (key.Key == ConsoleKey.Enter)
-            {
-                if (_visibleModels.Count == 0)
-                {
-                    continue;
-                }
-
-                CompleteSelection (_visibleModels[_selectedIndex]);
-                return;
-            }
-
-            if (IsCursorKey (key.Key))
-            {
-                _selectedIndex = HandleCursorKey (_visibleModels, _selectedIndex, key.Key);
-                RefreshViewState (_visibleModels[_selectedIndex].Id);
-                await InvokeAsync (StateHasChanged).ConfigureAwait (false);
                 continue;
             }
 
-            if (IsSearchCharacter (key))
+            if (await HandleBrowseModeKeyAsync (key, currentSelection).ConfigureAwait (false))
             {
-                _searchMode = true;
-                _searchQuery = key.KeyChar.ToString ();
-                RefreshViewState (currentSelection?.Id);
-                await InvokeAsync (StateHasChanged).ConfigureAwait (false);
+                return;
             }
         }
     }
 
-    private void CompleteSelection (OpenRouterModel selectedModel)
+    private async Task<bool> HandleSearchModeKeyAsync (ConsoleKeyInfo key, OpenRouterModel? currentSelection)
     {
-        Result.SetResult (selectedModel);
-        AppLifetime.StopApplication ();
+        if (key.Key == ConsoleKey.Escape)
+        {
+            string? currentSelectionId = currentSelection?.Id;
+
+            _searchQuery = string.Empty;
+            _searchMode = false;
+            await RefreshAndRenderAsync (currentSelectionId).ConfigureAwait (false);
+            return false;
+        }
+
+        if (key.Key == ConsoleKey.Backspace)
+        {
+            if (_searchQuery.Length > 0)
+            {
+                string? currentSelectionId = currentSelection?.Id;
+
+                _searchQuery = _searchQuery[..^1];
+                await RefreshAndRenderAsync (currentSelectionId).ConfigureAwait (false);
+            }
+
+            return false;
+        }
+
+        if (key.Key == ConsoleKey.Enter)
+        {
+            if (_visibleModels.Count == 0)
+            {
+                return false;
+            }
+
+            CompleteSelection (_visibleModels[_selectedIndex]);
+            return true;
+        }
+
+        if (OpenRouterModelSelectionHelper.IsCursorKey (key.Key))
+        {
+            _selectedIndex = OpenRouterModelSelectionHelper.HandleCursorKey (_visibleModels, _selectedIndex, key.Key);
+            await RefreshAndRenderAsync (_visibleModels[_selectedIndex].Id).ConfigureAwait (false);
+            return false;
+        }
+
+        if (OpenRouterModelSelectionHelper.IsSearchCharacter (key))
+        {
+            string? currentSelectionId = currentSelection?.Id;
+
+            _searchQuery += key.KeyChar;
+            await RefreshAndRenderAsync (currentSelectionId).ConfigureAwait (false);
+        }
+
+        return false;
+    }
+
+    private async Task<bool> HandleBrowseModeKeyAsync (ConsoleKeyInfo key, OpenRouterModel? currentSelection)
+    {
+        if (key.Key == ConsoleKey.Escape)
+        {
+            Result.SetResult (null!);
+            AppLifetime.StopApplication ();
+            return true;
+        }
+
+        if (key.Key == ConsoleKey.Enter)
+        {
+            if (_visibleModels.Count == 0)
+            {
+                return false;
+            }
+
+            CompleteSelection (_visibleModels[_selectedIndex]);
+            return true;
+        }
+
+        if (OpenRouterModelSelectionHelper.IsCursorKey (key.Key))
+        {
+            _selectedIndex = OpenRouterModelSelectionHelper.HandleCursorKey (_visibleModels, _selectedIndex, key.Key);
+            await RefreshAndRenderAsync (_visibleModels[_selectedIndex].Id).ConfigureAwait (false);
+            return false;
+        }
+
+        if (OpenRouterModelSelectionHelper.IsSearchCharacter (key))
+        {
+            _searchMode = true;
+            _searchQuery = key.KeyChar.ToString ();
+            await RefreshAndRenderAsync (currentSelection?.Id).ConfigureAwait (false);
+        }
+
+        return false;
     }
 
     private void RefreshViewState (string? selectedModelId = null)
     {
+        OpenRouterModelSelectionViewState viewState = OpenRouterModelSelectionHelper.BuildViewState(
+            _allModels,
+            _catalog,
+            AppConfig,
+            _searchQuery,
+            _searchMode,
+            selectedModelId);
+
         _visibleModels.Clear ();
-        _visibleModels.AddRange (FilterModels (_allModels, _searchQuery));
-        _selectedIndex = ResolveSelectedIndex (_visibleModels, selectedModelId);
+        _visibleModels.AddRange(viewState.VisibleModels);
+        _selectedIndex = viewState.SelectedIndex;
 
-        BuildPageCards ();
-        _subtitleMarkup = BuildSubtitleMarkup ();
-        _searchStateMarkup = BuildSearchStateMarkup ();
-        _matchCountMarkup = BuildMatchCountMarkup ();
-        _pageSummaryMarkup = BuildPageSummaryMarkup ();
-    }
-
-    private void BuildPageCards ()
-    {
         _pageCards.Clear ();
+        _pageCards.AddRange(viewState.PageCards);
 
-        if (_visibleModels.Count == 0)
-        {
-            return;
-        }
-
-        int totalRows = (_visibleModels.Count + 1) / 2;
-        int selectedRow = _selectedIndex / 2;
-        int startRow = GetViewportStartRow (selectedRow, totalRows);
-        int endRow = Math.Min (totalRows, startRow + VisibleRowCount);
-
-        for (int row = startRow; row < endRow; row++)
-        {
-            int leftIndex = row * 2;
-            int rightIndex = leftIndex + 1;
-
-            _pageCards.Add (
-                BuildModelCardViewModel (
-                    _visibleModels[leftIndex],
-                    leftIndex + 1,
-                    leftIndex == _selectedIndex,
-                    _searchQuery));
-
-            if (rightIndex < _visibleModels.Count)
-            {
-                _pageCards.Add (
-                    BuildModelCardViewModel (
-                        _visibleModels[rightIndex],
-                        rightIndex + 1,
-                        rightIndex == _selectedIndex,
-                        _searchQuery));
-            }
-        }
+        _subtitleMarkup = viewState.SubtitleMarkup;
+        _searchStateMarkup = viewState.SearchStateMarkup;
+        _matchCountMarkup = viewState.MatchCountMarkup;
+        _pageSummaryMarkup = viewState.PageSummaryMarkup;
     }
 
-    private static OpenRouterModelCardViewModel BuildModelCardViewModel (
-        OpenRouterModel item,
-        int number,
-        bool selected,
-        string searchQuery)
+    private Task RefreshAndRenderAsync (string? selectedModelId = null)
     {
-        string provider = GetProvider (item.Id);
-        string cost = FormatCost (item.Pricing.Prompt, item.Pricing.Completion);
-        string modelName = string.IsNullOrWhiteSpace (item.Name)
-            ? item.Id
-            : item.Name;
-        string description = string.IsNullOrWhiteSpace (item.Description)
-            ? "No description available."
-            : item.Description.Replace ("\r", string.Empty, StringComparison.Ordinal).Replace ("\n", " ", StringComparison.Ordinal).Trim ();
+        RefreshViewState (selectedModelId);
 
-        if (description.Length > 96)
-        {
-            description = $"{description[..93]}...";
-        }
-
-        string selectionBadge = selected
-            ? "[black on green bold] SELECTED [/]"
-            : $"[grey70]#{number}[/]";
-
-        string title = selected
-            ? $"#{number} SELECTED"
-            : $"#{number}";
-
-        return new OpenRouterModelCardViewModel (
-            title,
-            selectionBadge,
-            $"[bold cyan]{HighlightMatches (provider, searchQuery)}[/]",
-            $"[grey70]Key:[/] [white]{HighlightMatches (item.Id, searchQuery)}[/]",
-            $"[white]{HighlightMatches (modelName, searchQuery)}[/]",
-            $"[green]{Spectre.Console.Markup.Escape (cost)}[/]",
-            $"[grey70]{Spectre.Console.Markup.Escape (description)}[/]");
+        return InvokeAsync (StateHasChanged);
     }
 
-    private string BuildSubtitleMarkup ()
+    private void CompleteSelection(OpenRouterModel selectedModel)
     {
-        if (_catalog is not null)
-        {
-            string modelCount = _catalog.Data.Count.ToString (CultureInfo.InvariantCulture);
-            string cacheAge = DescribeCacheAge (_catalog.RetrievedAtUtc);
-            string currentModel = string.IsNullOrWhiteSpace (AppConfig.OpenRouter.Model)
-                ? "Current model: not configured"
-                : $"Current model: {AppConfig.OpenRouter.Model}";
-
-            return $"[grey70]Catalog cache: {modelCount} models, {cacheAge}. {Spectre.Console.Markup.Escape (currentModel)}[/]";
-        }
-
-        return string.IsNullOrWhiteSpace (AppConfig.OpenRouter.Model)
-            ? "[grey70]Select a model before bootstrap or chat flows.[/]"
-            : $"[grey70]Current model: {Spectre.Console.Markup.Escape (AppConfig.OpenRouter.Model)}[/]";
-    }
-
-    private string BuildSearchStateMarkup ()
-    {
-        string searchState = _searchMode ? "Searching" : "Search";
-        return $"[grey70]{searchState}: [yellow]{Spectre.Console.Markup.Escape (_searchQuery)}[/][/]";
-    }
-
-    private string BuildMatchCountMarkup ()
-    {
-        string matchSuffix = _visibleModels.Count == 1 ? string.Empty : "es";
-        return $"[grey70]{_visibleModels.Count} match{matchSuffix} of {_allModels.Count}[/]";
-    }
-
-    private string BuildPageSummaryMarkup ()
-    {
-        if (_pageCards.Count == 0)
-        {
-            return string.Empty;
-        }
-
-        int totalRows = (_visibleModels.Count + 1) / 2;
-        int selectedRow = _selectedIndex / 2;
-        int startRow = GetViewportStartRow (selectedRow, totalRows);
-
-        if (startRow <= 0)
-        {
-            return string.Empty;
-        }
-
-        int endRow = Math.Min (totalRows, startRow + VisibleRowCount);
-        return $"[grey50]... showing rows {startRow + 1}-{endRow} of {totalRows}[/]";
-    }
-
-    private static int GetViewportStartRow (int selectedRow, int totalRows)
-    {
-        if (totalRows <= VisibleRowCount)
-        {
-            return 0;
-        }
-
-        int centeredStart = selectedRow - (VisibleRowCount / 2);
-        int maxStart = totalRows - VisibleRowCount;
-
-        if (centeredStart < 0)
-        {
-            return 0;
-        }
-
-        if (centeredStart > maxStart)
-        {
-            return maxStart;
-        }
-
-        return centeredStart;
-    }
-
-    private OpenRouterModel? GetCurrentSelection ()
-    {
-        if (_visibleModels.Count == 0)
-        {
-            return null;
-        }
-
-        if (_selectedIndex < 0 || _selectedIndex >= _visibleModels.Count)
-        {
-            return _visibleModels[0];
-        }
-
-        return _visibleModels[_selectedIndex];
-    }
-
-    private static bool IsInteractiveConsole ()
-    {
-        return !Console.IsInputRedirected
-            && !Console.IsOutputRedirected;
-    }
-
-    private OpenRouterModel PromptNumericSelection (List<OpenRouterModel> models)
-    {
-        while (true)
-        {
-            Console.Write ($"Select a number (1-{models.Count}): ");
-
-            string? input = Console.ReadLine ();
-            if (input is null)
-            {
-                throw new InvalidOperationException ("No selection was provided.");
-            }
-
-            if (int.TryParse (input, NumberStyles.Integer, CultureInfo.InvariantCulture, out int number)
-                && number >= 1
-                && number <= models.Count)
-            {
-                return models[number - 1];
-            }
-
-            AnsiConsole.MarkupLine ("[yellow]Invalid selection. Try again.[/]");
-        }
-    }
-
-    private static int ResolveSelectedIndex (List<OpenRouterModel> visibleModels, string? selectedModelId)
-    {
-        if (visibleModels.Count == 0)
-        {
-            return 0;
-        }
-
-        if (!string.IsNullOrWhiteSpace (selectedModelId))
-        {
-            int matchIndex = visibleModels.FindIndex (model => string.Equals (model.Id, selectedModelId, StringComparison.OrdinalIgnoreCase));
-            if (matchIndex >= 0)
-            {
-                return matchIndex;
-            }
-        }
-
-        return 0;
-    }
-
-    private static List<OpenRouterModel> FilterModels (List<OpenRouterModel> models, string searchQuery)
-    {
-        if (string.IsNullOrWhiteSpace (searchQuery))
-        {
-            return models;
-        }
-
-        string normalizedQuery = searchQuery.Trim ();
-
-        return models
-            .Where (model => MatchesSearch (model, normalizedQuery))
-            .ToList ();
-    }
-
-    private static bool MatchesSearch (OpenRouterModel item, string searchQuery)
-    {
-        return ContainsIgnoreCase (item.Id, searchQuery)
-            || ContainsIgnoreCase (GetProvider (item.Id), searchQuery)
-            || ContainsIgnoreCase (item.Name, searchQuery);
-    }
-
-    private static bool ContainsIgnoreCase (string? value, string searchQuery)
-    {
-        return !string.IsNullOrWhiteSpace (value)
-            && value.Contains (searchQuery, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool IsSearchCharacter (ConsoleKeyInfo key)
-    {
-        return key.KeyChar != '\0' && !char.IsControl (key.KeyChar);
-    }
-
-    private static bool IsCursorKey (ConsoleKey key)
-    {
-        return key is ConsoleKey.LeftArrow or ConsoleKey.RightArrow or ConsoleKey.UpArrow or ConsoleKey.DownArrow;
-    }
-
-    private static int HandleCursorKey (List<OpenRouterModel> models, int selectedIndex, ConsoleKey key)
-    {
-        if (models.Count == 0)
-        {
-            return 0;
-        }
-
-        return key switch
-        {
-            ConsoleKey.LeftArrow => MoveLeft (models, selectedIndex),
-            ConsoleKey.RightArrow => MoveRight (models, selectedIndex),
-            ConsoleKey.UpArrow => MoveUp (selectedIndex),
-            ConsoleKey.DownArrow => MoveDown (models, selectedIndex),
-            _ => selectedIndex
-        };
-    }
-
-    private static int MoveLeft (List<OpenRouterModel> models, int selectedIndex)
-    {
-        if (selectedIndex % 2 == 1)
-        {
-            return selectedIndex - 1;
-        }
-
-        return selectedIndex + 1 < models.Count ? selectedIndex + 1 : selectedIndex;
-    }
-
-    private static int MoveRight (List<OpenRouterModel> models, int selectedIndex)
-    {
-        if (selectedIndex % 2 == 0 && selectedIndex + 1 < models.Count)
-        {
-            return selectedIndex + 1;
-        }
-
-        return selectedIndex > 0 ? selectedIndex - 1 : selectedIndex;
-    }
-
-    private static int MoveUp (int selectedIndex)
-    {
-        return selectedIndex >= 2 ? selectedIndex - 2 : selectedIndex;
-    }
-
-    private static int MoveDown (List<OpenRouterModel> models, int selectedIndex)
-    {
-        return selectedIndex + 2 < models.Count ? selectedIndex + 2 : selectedIndex;
-    }
-
-    private static string GetProvider (string modelId)
-    {
-        if (string.IsNullOrWhiteSpace (modelId))
-        {
-            return "unknown";
-        }
-
-        int slashIndex = modelId.IndexOf ('/');
-        if (slashIndex <= 0)
-        {
-            return "unknown";
-        }
-
-        return modelId[..slashIndex];
-    }
-
-    private static string FormatCost (string promptPrice, string completionPrice)
-    {
-        string prompt = FormatCostPerThousand (promptPrice);
-        string completion = FormatCostPerThousand (completionPrice);
-
-        return $"IN {prompt} / OUT {completion}";
-    }
-
-    private static string FormatCostPerThousand (string unitPrice)
-    {
-        if (!decimal.TryParse (unitPrice, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal parsedPrice))
-        {
-            return "n/a";
-        }
-
-        return $"${parsedPrice * 1000m:0.######}";
-    }
-
-    private static string HighlightMatches (string value, string searchQuery)
-    {
-        if (string.IsNullOrWhiteSpace (value))
-        {
-            return string.Empty;
-        }
-
-        if (string.IsNullOrWhiteSpace (searchQuery))
-        {
-            return Spectre.Console.Markup.Escape (value);
-        }
-
-        StringBuilder builder = new StringBuilder ();
-        int startIndex = 0;
-
-        while (true)
-        {
-            int matchIndex = value.IndexOf (searchQuery, startIndex, StringComparison.OrdinalIgnoreCase);
-            if (matchIndex < 0)
-            {
-                builder.Append (Spectre.Console.Markup.Escape (value[startIndex..]));
-                break;
-            }
-
-            builder.Append (Spectre.Console.Markup.Escape (value[startIndex..matchIndex]));
-            builder.Append ($"[black on yellow bold]{Spectre.Console.Markup.Escape (value.Substring (matchIndex, searchQuery.Length))}[/]");
-            startIndex = matchIndex + searchQuery.Length;
-        }
-
-        return builder.ToString ();
-    }
-
-    private static string DescribeCacheAge (DateTimeOffset retrievedAtUtc)
-    {
-        if (retrievedAtUtc == default)
-        {
-            return "age unknown";
-        }
-
-        TimeSpan age = DateTimeOffset.UtcNow - retrievedAtUtc;
-        if (age < TimeSpan.Zero)
-        {
-            age = TimeSpan.Zero;
-        }
-
-        return $"cached {age.Days}d {age.Hours}h ago";
+        Result.SetResult(selectedModel);
+        AppLifetime.StopApplication();
     }
 }

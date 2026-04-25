@@ -9,12 +9,9 @@
     ExceptionScreen — RazorConsole rendering of exception diagnostics
 *@
 
-@using System.Collections
-@using System.Text
 @using Microsoft.AspNetCore.Components
 @using Microsoft.Extensions.Hosting
 @using RazorConsole.Components
-@using Spectre.Console
 
 @inject IHostApplicationLifetime AppLifetime
 @inject RazorScreenResult<bool> Result
@@ -22,7 +19,7 @@
 
 <Rows>
     <Panel Title="@Parameters.Title">
-        <Markup Content="@_markup" />
+        <RawMarkup Content="@_markup" />
     </Panel>
 </Rows>
 
@@ -31,7 +28,7 @@
 
     protected override void OnInitialized ()
     {
-        _markup = BuildMarkup (Parameters.Exception);
+        _markup = ExceptionScreenMarkupBuilder.BuildMarkup(Parameters.Exception);
     }
 
     protected override Task OnAfterRenderAsync (bool firstRender)
@@ -43,57 +40,5 @@
         }
 
         return Task.CompletedTask;
-    }
-
-    private static string BuildMarkup (Exception exception)
-    {
-        StringBuilder builder = new StringBuilder ();
-        AppendException (builder, exception, 0);
-        return builder.ToString ();
-    }
-
-    private static void AppendException (StringBuilder builder, Exception exception, int depth)
-    {
-        string indent = new string (' ', depth * 2);
-        string headingColor = depth == 0 ? "red" : "orange1";
-
-        builder.AppendLine ($"{indent}[bold {headingColor}]Type:[/] {Spectre.Console.Markup.Escape (exception.GetType ().FullName ?? exception.GetType ().Name)}");
-        builder.AppendLine ($"{indent}[bold {headingColor}]Message:[/] {Spectre.Console.Markup.Escape (exception.Message)}");
-
-        string? source = exception.Source;
-        if (!string.IsNullOrWhiteSpace (source))
-        {
-            builder.AppendLine ($"{indent}[bold {headingColor}]Source:[/] {Spectre.Console.Markup.Escape (source)}");
-        }
-
-        builder.AppendLine ($"{indent}[bold {headingColor}]HResult:[/] 0x{exception.HResult:X8}");
-
-        if (exception.TargetSite is not null)
-        {
-            builder.AppendLine ($"{indent}[bold {headingColor}]Target site:[/] {Spectre.Console.Markup.Escape (exception.TargetSite.DeclaringType?.FullName ?? string.Empty)}.{Spectre.Console.Markup.Escape (exception.TargetSite.Name)}");
-        }
-
-        if (exception.Data is not null && exception.Data.Count > 0)
-        {
-            builder.AppendLine ($"{indent}[bold {headingColor}]Data:[/]");
-            foreach (DictionaryEntry entry in exception.Data)
-            {
-                builder.AppendLine ($"{indent}  [grey70]{Spectre.Console.Markup.Escape (entry.Key?.ToString () ?? string.Empty)}[/] = [white]{Spectre.Console.Markup.Escape (entry.Value?.ToString () ?? string.Empty)}[/]");
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace (exception.StackTrace))
-        {
-            builder.AppendLine ($"{indent}[bold {headingColor}]Stack trace:[/]");
-            builder.AppendLine ($"{indent}[grey70]{Spectre.Console.Markup.Escape (exception.StackTrace)}[/]");
-        }
-
-        if (exception.InnerException is null)
-        {
-            return;
-        }
-
-        builder.AppendLine ($"{indent}[bold {headingColor}]Inner exception:[/]");
-        AppendException (builder, exception.InnerException, depth + 1);
     }
 }

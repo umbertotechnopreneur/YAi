@@ -19,33 +19,26 @@
  * with YAi!. If not, see <https://www.gnu.org/licenses/>.
  *
  * YAi.Client.CLI.Components
- * ServiceCollectionExtensions — DI registration for CLI components
+ * CommandPlanOverviewScreenParams — carries non-CommandPlan parameters for the plan overview screen
  */
 
-#region Using directives
-
-using Microsoft.Extensions.DependencyInjection;
-
-#endregion
-
-namespace YAi.Client.CLI.Components;
+namespace YAi.Client.CLI.Components.Screens.Tools.Filesystem;
 
 /// <summary>
-/// Extension methods for registering YAi CLI component services.
+/// Carries primitive and optional parameters for <see cref="CommandPlanOverviewScreen"/>
+/// that cannot be registered directly in DI (e.g., nullable <c>string</c>).
 /// </summary>
-public static class ServiceCollectionExtensions
+public sealed class CommandPlanOverviewScreenParams
 {
+    /// <summary>Gets the optional validation error message shown before the plan.</summary>
+    public string? ValidationError { get; }
+
     /// <summary>
-    /// Registers CLI component services.
-    /// Call this from the CLI project's DI setup.
+    /// Initializes the params.
     /// </summary>
-    /// <param name="services">The service collection.</param>
-    /// <returns>The same collection for chaining.</returns>
-    public static IServiceCollection AddYAiCliComponents (this IServiceCollection services)
+    /// <param name="validationError">Optional validation message; <c>null</c> when the plan is valid.</param>
+    public CommandPlanOverviewScreenParams (string? validationError)
     {
-        // Screen hosts are transient — each call creates a fresh RazorConsole host.
-        // The presenter itself is registered in the CLI project to keep the dependency
-        // direction clean (CLI → Components, not Components → CLI).
-        return services;
+        ValidationError = validationError;
     }
 }

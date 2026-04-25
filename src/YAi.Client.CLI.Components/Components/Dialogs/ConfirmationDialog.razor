@@ -17,7 +17,7 @@
 <Rows>
     <Panel Title="@Title">
         <Rows>
-            <Markup Content="@Message" Foreground="@_riskColor" />
+            <RawMarkup Content="@Spectre.Console.Markup.Escape(Message)" Foreground="@_riskColor" />
             <Newline />
             <Columns>
                 <TextButton Content="[Y] Yes"

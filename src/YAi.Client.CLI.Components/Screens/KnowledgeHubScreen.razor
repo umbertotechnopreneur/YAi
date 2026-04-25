@@ -9,7 +9,6 @@
     KnowledgeHubScreen — RazorConsole knowledge hub menu and file preview
 *@
 
-@using System.Diagnostics
 @using Microsoft.AspNetCore.Components
 @using Microsoft.Extensions.Hosting
 @using RazorConsole.Components
@@ -24,12 +23,12 @@
 <Rows>
     <Panel Title="Knowledge Hub">
         <Rows>
-            <Markup Content="[grey]Browse and open your persistent memory files.[/]" />
+            <RawMarkup Content="[grey]Browse and open your persistent memory files.[/]" />
             <Newline />
 
             @if (_view is HubView.Menu)
             {
-                <Markup Content="[bold springgreen2]Select a knowledge store to open:[/]" />
+                <RawMarkup Content="[bold springgreen2]Select a knowledge store to open:[/]" />
                 <Newline />
 
                 <TextButton Content="USER.md" OnClick="SelectUserClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.SpringGreen2" />
@@ -47,8 +46,8 @@
             {
                 <Panel Title="@_selectedChoice">
                     <Rows>
-                        <Markup Content="@_selectedPathMarkup" />
-                        <Markup Content="[grey70]What would you like to do?[/]" />
+                        <RawMarkup Content="@_selectedPathMarkup" />
+                        <RawMarkup Content="[grey70]What would you like to do?[/]" />
                         <TextButton Content="Open in editor" OnClick="OpenInEditorClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.SpringGreen2" />
                         <TextButton Content="View inline" OnClick="ViewInlineClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.SpringGreen2" />
                         <TextButton Content="Back" OnClick="BackToMenuClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.Silver" />
@@ -57,16 +56,16 @@
             }
             else if (_view is HubView.Preview)
             {
-                <Markup Content="@_previewHeaderMarkup" />
-                <Markup Content="@_previewPathMarkup" />
+                <RawMarkup Content="@_previewHeaderMarkup" />
+                <RawMarkup Content="@_previewPathMarkup" />
                 <Newline />
                 <Panel Title="Preview">
-                    <Markup Content="@_previewContentMarkup" />
+                    <RawMarkup Content="@_previewContentMarkup" />
                 </Panel>
 
-                @if (!string.IsNullOrWhiteSpace (_previewFooterMarkup))
+                if (!string.IsNullOrWhiteSpace(_previewFooterMarkup))
                 {
-                    <Markup Content="@_previewFooterMarkup" />
+                    <RawMarkup Content="@_previewFooterMarkup" />
                 }
 
                 <Newline />
@@ -136,13 +135,13 @@
 
         if (string.Equals (choice, "Episodes", StringComparison.OrdinalIgnoreCase))
         {
-            if (!Directory.Exists (Paths.EpisodesRoot))
+            if (!KnowledgeHubScreenHelper.DirectoryExists(Paths.EpisodesRoot))
             {
                 ShowNotice ($"Episodes directory not found: {Paths.EpisodesRoot}", MessageBox.MessageSeverity.Warning);
                 return Task.CompletedTask;
             }
 
-            if (!TryOpenInEditor (Paths.EpisodesRoot, out string? errorMessage))
+            if (!KnowledgeHubScreenHelper.TryOpenInEditor(Paths.EpisodesRoot, out string? errorMessage))
             {
                 ShowNotice (errorMessage ?? "Could not open the episodes directory.", MessageBox.MessageSeverity.Error);
                 return Task.CompletedTask;
@@ -151,9 +150,9 @@
             return BackToMenuClicked ();
         }
 
-        string filePath = ResolveFilePath (choice);
+        string filePath = KnowledgeHubScreenHelper.ResolveFilePath(Paths, choice);
 
-        if (string.IsNullOrWhiteSpace (filePath) || !File.Exists (filePath))
+        if (string.IsNullOrWhiteSpace(filePath) || !KnowledgeHubScreenHelper.FileExists(filePath))
         {
             ShowNotice ($"File not found: {filePath}", MessageBox.MessageSeverity.Warning);
             return Task.CompletedTask;
@@ -174,7 +173,7 @@
             return BackToMenuClicked ();
         }
 
-        if (!TryOpenInEditor (_selectedPath, out string? errorMessage))
+        if (!KnowledgeHubScreenHelper.TryOpenInEditor(_selectedPath, out string? errorMessage))
         {
             ShowNotice (errorMessage ?? "Could not open the selected file.", MessageBox.MessageSeverity.Error);
             return Task.CompletedTask;
@@ -185,22 +184,17 @@
 
     private Task ViewInlineClicked ()
     {
-        if (string.IsNullOrWhiteSpace (_selectedPath) || !File.Exists (_selectedPath))
+        if (string.IsNullOrWhiteSpace(_selectedPath) || !KnowledgeHubScreenHelper.FileExists(_selectedPath))
         {
             ShowNotice ($"File not found: {_selectedPath}", MessageBox.MessageSeverity.Warning);
             return Task.CompletedTask;
         }
 
-        string content = File.ReadAllText (_selectedPath);
-        bool truncated = content.Length > 4000;
-        string preview = truncated ? content[..4000] : content;
-
-        _previewHeaderMarkup = $"[bold springgreen2]{Spectre.Console.Markup.Escape (_selectedChoice)}[/]";
-        _previewPathMarkup = $"[grey]{Spectre.Console.Markup.Escape (_selectedPath)}[/]";
-        _previewContentMarkup = Spectre.Console.Markup.Escape (preview);
-        _previewFooterMarkup = truncated
-            ? "[grey][truncated - open in editor to see the full file][/]"
-            : string.Empty;
+        (
+            _previewHeaderMarkup,
+            _previewPathMarkup,
+            _previewContentMarkup,
+            _previewFooterMarkup) = KnowledgeHubScreenHelper.BuildInlinePreview(_selectedChoice, _selectedPath);
         _view = HubView.Preview;
 
         return Task.CompletedTask;
@@ -235,31 +229,4 @@
         _view = HubView.Notice;
     }
 
-    private bool TryOpenInEditor (string filePath, out string? errorMessage)
-    {
-        try
-        {
-            Process.Start (new ProcessStartInfo (filePath) { UseShellExecute = true });
-            errorMessage = null;
-            return true;
-        }
-        catch (Exception ex)
-        {
-            errorMessage = ex.Message;
-            return false;
-        }
-    }
-
-    private string ResolveFilePath (string choice) => choice switch
-    {
-        "USER.md" => Paths.UserProfilePath,
-        "SOUL.md" => Paths.SoulProfilePath,
-        "IDENTITY.md" => Paths.IdentityProfilePath,
-        "MEMORIES.md" => Paths.MemoriesPath,
-        "LESSONS.md" => Paths.LessonsPath,
-        "LIMITS.md" => Paths.LimitsPath,
-        "AGENTS.md" => Paths.AgentsPath,
-        "Dreams" => Paths.DreamsFilePath,
-        _ => string.Empty
-    };
 }

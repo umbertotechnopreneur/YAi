@@ -85,6 +85,11 @@ public sealed class OpenRouterBalanceService
 		}
 
 		string? creditsJson = await _openRouterClient.GetCreditsAsync (cancellationToken).ConfigureAwait (false);
+		if (!string.IsNullOrWhiteSpace(creditsJson))
+		{
+			_logger.LogInformation("OpenRouter credits raw response: {CreditsJson}", creditsJson);
+		}
+
 		if (string.IsNullOrWhiteSpace (creditsJson))
 		{
 			return CacheFailure ("OpenRouter credits endpoint did not return data.");
@@ -104,7 +109,8 @@ public sealed class OpenRouterBalanceService
 				TotalUsage = totalUsage,
 				LastBalanceCheckUtc = DateTimeOffset.UtcNow,
 				IsFromCache = false,
-				ErrorMessage = null
+				ErrorMessage = null,
+				RawJson = creditsJson
 			};
 
 			_cachedSnapshot = snapshot;
@@ -127,7 +133,8 @@ public sealed class OpenRouterBalanceService
 			{
 				LastBalanceCheckUtc = DateTimeOffset.UtcNow,
 				IsFromCache = false,
-				ErrorMessage = message
+				ErrorMessage = message,
+				RawJson = null
 			}
 			: _cachedSnapshot with
 			{

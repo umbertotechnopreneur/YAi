@@ -63,10 +63,24 @@ public sealed class PreflightCheck
 
 		if (!string.IsNullOrWhiteSpace (openRouterApiKey))
 		{
+			string masked = MaskKey(openRouterApiKey);
+			AnsiConsole.MarkupLine($"[green]Using OpenRouter API key:[/] {Markup.Escape(masked)}");
 			return;
 		}
 
-		AnsiConsole.MarkupLine ("[yellow]⚠ YAI_OPENROUTER_API_KEY is not set. Model selection can still run, but chat and bootstrap flows will fail until the key is provided.[/]");
+		AnsiConsole.MarkupLine("[red]✖ YAI_OPENROUTER_API_KEY is not set. Exiting.[/]");
+		Environment.Exit(1);
+	}
+
+	private static string MaskKey(string key)
+	{
+		if (string.IsNullOrEmpty(key))
+			return string.Empty;
+
+		if (key.Length <= 8)
+			return new string('*', key.Length);
+
+		return string.Concat(key.AsSpan(0, 4), "...", key.AsSpan(key.Length - 4));
 	}
 
 	private static async Task WarnIfInternetConnectionIsUnavailableAsync ()

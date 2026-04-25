@@ -1,5 +1,14 @@
 # YAi!
 
+YAi! is a local-first AI agent runtime for developers and technical operators who need assistant workflows they can inspect, approve, audit, and trust.
+
+Inspired by OpenClaw-style skills and flows, YAi! keeps execution local, separates planning from enforcement, uses typed operations instead of raw shell commands, and requires explicit approval before risky changes.
+
+agent runtime for cautious builders
+agent runtime for local automation
+agent runtime for auditable AI-assisted operations
+agent runtime for developers who hate magic
+
 Local-first agent runtime inspired by OpenClaw, built for high-control environments where security, auditability, and deterministic execution are paramount. Compatible with OpenClaw skills and flow, while enforcing stricter local governance and execution boundaries.
 
 This project is a local-first agent system designed for environments where security and control cannot be delegated. It follows an OpenClaw-like model for skills and workflow compatibility, but runs under tighter local constraints, with stronger permission boundaries, improved auditability, and a more predictable execution model. The goal is to preserve interoperability with the OpenClaw ecosystem while making local trust, safety, and operational control the default.

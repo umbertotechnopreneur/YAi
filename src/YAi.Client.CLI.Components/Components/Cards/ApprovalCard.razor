@@ -23,60 +23,60 @@
             @if (Card is WorkflowApprovalStep workflowCard)
             {
                 <Columns>
-                    <Markup Content="Skill: " />
-                    <Markup Content="@workflowCard.SkillName" Foreground="@Color.Cyan1" />
+                    <RawMarkup Content="Skill: " />
+                    <RawMarkup Content="@workflowCard.SkillName" Foreground="@Color.Cyan1" />
                 </Columns>
             }
 
             <Columns>
-                <Markup Content="Action: " />
-                <Markup Content="@Card.Action" Foreground="@Color.Cyan1" />
+                <RawMarkup Content="Action: " />
+                <RawMarkup Content="@Card.Action" Foreground="@Color.Cyan1" />
             </Columns>
             <Columns>
-                <Markup Content="Target: " />
-                <Markup Content="@Card.Target" Foreground="@Color.White" />
+                <RawMarkup Content="Target: " />
+                <RawMarkup Content="@Card.Target" Foreground="@Color.White" />
             </Columns>
             <Columns>
-                <Markup Content="Risk:   " />
-                <Markup Content="@_riskBadge" Foreground="@_riskColor" />
+                <RawMarkup Content="Risk:   " />
+                <RawMarkup Content="@_riskBadge" Foreground="@_riskColor" />
             </Columns>
 
             @if (Card is WorkflowApprovalStep workflowCard2 && workflowCard2.ResolvedInput is not null)
             {
                 <Newline />
-                <Markup Content="Resolved input:" />
-                <Markup Content="@_resolvedInput" Foreground="@Color.Yellow" />
+                <RawMarkup Content="Resolved input:" />
+                <RawMarkup Content="@_resolvedInput" Foreground="@Color.Yellow" />
             }
             else if (!string.IsNullOrWhiteSpace (Card.DisplayCommand))
             {
                 <Newline />
-                <Markup Content="Command: " />
-                <Markup Content="@Card.DisplayCommand" Foreground="@Color.Yellow" />
+                <RawMarkup Content="Command: " />
+                <RawMarkup Content="@Card.DisplayCommand" Foreground="@Color.Yellow" />
             }
 
             @if (!string.IsNullOrWhiteSpace (Card.RiskExplanation))
             {
                 <Newline />
-                <Markup Content="@Card.RiskExplanation" Foreground="@_riskColor" />
+                <RawMarkup Content="@Card.RiskExplanation" Foreground="@_riskColor" />
             }
 
             @if (!string.IsNullOrWhiteSpace (Card.MitigationNote))
             {
-                <Markup Content="@($"Mitigation: {Card.MitigationNote}")" Foreground="@Color.Green" />
+                <RawMarkup Content="@($"Mitigation: {Card.MitigationNote}")" Foreground="@Color.Green" />
             }
 
             @if (Card.RollbackAvailable)
             {
-                <Markup Content="@($"Rollback:   {Card.RollbackExplanation}")" Foreground="@Color.Green3" />
+                <RawMarkup Content="@($"Rollback:   {Card.RollbackExplanation}")" Foreground="@Color.Green3" />
             }
 
             @if (Card.VerificationDescriptions?.Count > 0)
             {
                 <Newline />
-                <Markup Content="Verification criteria:" />
+                <RawMarkup Content="Verification criteria:" />
                 @foreach (string description in Card.VerificationDescriptions)
                 {
-                    <Markup Content="@($"  • {description}")" Foreground="@Color.Silver" />
+                    <RawMarkup Content="@($"  • {description}")" Foreground="@Color.Silver" />
                 }
             }
 
@@ -84,7 +84,7 @@
 
             @if (_blocked)
             {
-                <Markup Content="⛔ This step is blocked and cannot be approved." Foreground="@Color.Red" />
+                <RawMarkup Content="⛔ This step is blocked and cannot be approved." Foreground="@Color.Red" />
                 <Newline />
                 <Columns>
                     <TextButton Content="[D] Deny"
@@ -122,7 +122,7 @@
     /// <summary>The step to display. Must not be null.</summary>
     [Parameter, EditorRequired] public IOperationStep Card { get; set; } = null!;
 
-    /// <summary>Number of steps remaining after the current one (used by CancelPlanDialog).</summary>
+    /// <summary>Number of steps remaining after the current one.</summary>
     [Parameter] public int RemainingCount { get; set; }
 
     /// <summary>Raised with the user's decision.</summary>

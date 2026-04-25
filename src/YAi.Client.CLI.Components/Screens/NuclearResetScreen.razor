@@ -23,17 +23,18 @@
 <Rows>
     <Panel Title="Go nuclear">
         <Rows>
-            <Markup Content="[bold red]This will delete the workspace root, data root, and config root and everything beneath them.[/]" />
-            <Markup Content="[grey70]Asset files in the application install folder are left untouched.[/]" />
+            <RawMarkup
+            Content="[bold red]This will delete the workspace root, data root, and config root and everything beneath them.[/]" />
+            <RawMarkup Content="[grey70]Asset files in the application install folder are left untouched.[/]" />
             <Newline />
 
             @if (_customEntries.Count > 0)
             {
-                <Markup Content="[bold]Custom paths that will be removed[/]" />
+                <RawMarkup Content="[bold]Custom paths that will be removed[/]" />
 
                 @foreach ((string Category, string Label, string Path, bool IsCustom) entry in _customEntries)
                 {
-                    <Markup Content="@(FormatEntry (entry))" />
+                    <RawMarkup Content="@(NuclearResetCleanupHelper.FormatEntry(entry))" />
                 }
 
                 <Newline />
@@ -49,19 +50,19 @@
             }
             else if (_view is ResetView.Deleting)
             {
-                <Markup Content="[red]Deleting workspace, data, and config roots...[/]" />
+                <RawMarkup Content="[red]Deleting workspace, data, and config roots...[/]" />
             }
             else if (_view is ResetView.Outcome)
             {
-                <Markup Content="[bold]Deletion result[/]" />
+                <RawMarkup Content="[bold]Deletion result[/]" />
 
                 @foreach ((string Category, string Label, string Path, bool IsCustom) entry in _customEntries)
                 {
-                    <Markup Content="@(FormatOutcome (entry))" />
+                    <RawMarkup Content="@(NuclearResetCleanupHelper.FormatOutcome(entry, _rootExisted))" />
                 }
 
                 <Newline />
-                <Markup Content="@_statusMarkup" />
+                <RawMarkup Content="@_statusMarkup" />
                 <Newline />
                 <TextButton Content="[Enter] OK" OnClick="CloseClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.Silver" />
             }
@@ -98,7 +99,7 @@
         AnsiConsole.Clear ();
         Console.Write ("\x1b[3J");
 
-        _customEntries.AddRange (Paths.GetCustomDataEntries ());
+        _customEntries.AddRange(NuclearResetCleanupHelper.GetCustomEntries(Paths));
 
         if (Console.IsInputRedirected)
         {
@@ -114,9 +115,8 @@
         await InvokeAsync (StateHasChanged).ConfigureAwait (false);
         await Task.Yield ();
 
-        DeleteCustomDataRoot ();
-
-        _statusMarkup = BuildOutcomeMarkup ();
+        _rootExisted = NuclearResetCleanupHelper.DeleteCustomDataRoots(Paths);
+        _statusMarkup = NuclearResetCleanupHelper.BuildOutcomeMarkup(Paths, _rootExisted);
         _view = ResetView.Outcome;
         await InvokeAsync (StateHasChanged).ConfigureAwait (false);
     }
@@ -145,71 +145,4 @@
         return Task.CompletedTask;
     }
 
-    private void DeleteCustomDataRoot ()
-    {
-        _rootExisted = Directory.Exists (Paths.WorkspaceRoot)
-            || Directory.Exists (Paths.DataRoot)
-            || Directory.Exists (Paths.ConfigRoot);
-
-        DeleteRoot (Paths.WorkspaceRoot);
-        DeleteRoot (Paths.DataRoot);
-        DeleteRoot (Paths.ConfigRoot);
-    }
-
-    private static void DeleteRoot (string root)
-    {
-        if (!Directory.Exists (root))
-        {
-            return;
-        }
-
-        ClearReadOnlyAttributes (root);
-        Directory.Delete (root, true);
-    }
-
-    private static void ClearReadOnlyAttributes (string rootPath)
-    {
-        foreach (string entryPath in Directory.EnumerateFileSystemEntries (rootPath, "*", SearchOption.AllDirectories))
-        {
-            try
-            {
-                File.SetAttributes (entryPath, FileAttributes.Normal);
-            }
-            catch
-            {
-                // Best effort only.
-            }
-        }
-
-        try
-        {
-            File.SetAttributes (rootPath, FileAttributes.Normal);
-        }
-        catch
-        {
-            // Best effort only.
-        }
-    }
-
-    private static string FormatEntry ((string Category, string Label, string Path, bool IsCustom) entry)
-    {
-        return $"[yellow]custom[/] {Spectre.Console.Markup.Escape (entry.Category)} | {Spectre.Console.Markup.Escape (entry.Label)} | {Spectre.Console.Markup.Escape (entry.Path)}";
-    }
-
-    private string FormatOutcome ((string Category, string Label, string Path, bool IsCustom) entry)
-    {
-        string status = _rootExisted ? "[green]deleted[/]" : "[grey70]already absent[/]";
-
-        return $"{status} {Spectre.Console.Markup.Escape (entry.Category)} | {Spectre.Console.Markup.Escape (entry.Label)} | {Spectre.Console.Markup.Escape (entry.Path)}";
-    }
-
-    private string BuildOutcomeMarkup ()
-    {
-        string status = _rootExisted ? "[green]deleted[/]" : "[grey70]already absent[/]";
-
-        return $"[green]Deleted workspace root:[/] {Spectre.Console.Markup.Escape (Paths.WorkspaceRoot)}\n" +
-            $"[green]Deleted data root:[/] {Spectre.Console.Markup.Escape (Paths.DataRoot)}\n" +
-            $"[green]Deleted config root:[/] {Spectre.Console.Markup.Escape (Paths.ConfigRoot)}\n" +
-            $"[grey70]Status:[/] {status}";
-    }
 }

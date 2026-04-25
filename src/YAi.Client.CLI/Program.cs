@@ -39,7 +39,6 @@
 #region Using directives
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using Spectre.Console;
@@ -85,14 +84,6 @@ try
 	string cmd = cliArgs.FirstOrDefault()?.ToLowerInvariant() ?? string.Empty;
 	AppPaths appPaths = new AppPaths();
 
-	if (RequiresCompletedBootstrap(cmd) && !HasCompletedBootstrapState(appPaths.FirstRunPath))
-	{
-		AnsiConsole.MarkupLine("[yellow]⚠ This command requires a completed bootstrap. Run [bold]--bootstrap[/] first.[/]");
-		Environment.ExitCode = 1;
-
-		return;
-	}
-
 	if (IsShowPathsRequest(cliArgs))
 	{
 		await RunShowPathsAsync();
@@ -124,37 +115,22 @@ try
 		(YAi.Persona.Services.Operations.Approval.IOperationApprovalPresenter)
 		sp.GetRequiredService<YAi.Persona.Services.Tools.Filesystem.IApprovalCardPresenter>());
 
-	ServiceProvider sp = services.BuildServiceProvider();
+	await using ServiceProvider sp = services.BuildServiceProvider();
 
-	WorkspaceProfileService workspace = sp.GetRequiredService<WorkspaceProfileService>();
-	ConfigService config = sp.GetRequiredService<ConfigService>();
-	AppConfig appConfig = sp.GetRequiredService<AppConfig>();
-	RuntimeState runtime = sp.GetRequiredService<RuntimeState>();
-	PromptBuilder promptBuilder = sp.GetRequiredService<PromptBuilder>();
-	ToolRegistry toolRegistry = sp.GetRequiredService<ToolRegistry>();
-	OpenRouterClient openRouterClient = sp.GetRequiredService<OpenRouterClient>();
-	OpenRouterCatalogService openRouterCatalog = sp.GetRequiredService<OpenRouterCatalogService>();
-	OpenRouterBalanceService openRouterBalance = sp.GetRequiredService<OpenRouterBalanceService>();
-	HistoryService history = sp.GetRequiredService<HistoryService>();
-	BootstrapInterviewService bootstrapSvc = sp.GetRequiredService<BootstrapInterviewService>();
-	BootstrapState? bootstrapState = config.LoadBootstrapState();
+	CliServices svc = ResolveCliServices(sp);
+	BootstrapState? bootstrapState = svc.Config.LoadBootstrapState();
 
 	if (RequiresCompletedBootstrap(cmd) && bootstrapState?.IsCompleted != true)
 	{
 		AnsiConsole.MarkupLine("[yellow]⚠ This command requires a completed bootstrap. Run [bold]--bootstrap[/] first.[/]");
 		Environment.ExitCode = 1;
 
-		if (sp is IDisposable d0)
-		{
-			d0.Dispose();
-		}
-
 		return;
 	}
 
 	// Get the default for now
-	runtime.AgentName = string.IsNullOrWhiteSpace(appConfig.App.Name) ? "YAi" : appConfig.App.Name;
-	runtime.UserName = string.IsNullOrWhiteSpace(appConfig.App.UserName) ? Environment.UserName : appConfig.App.UserName;
+	svc.Runtime.AgentName = string.IsNullOrWhiteSpace(svc.AppConfig.App.Name) ? "YAi" : svc.AppConfig.App.Name;
+	svc.Runtime.UserName = string.IsNullOrWhiteSpace(svc.AppConfig.App.UserName) ? Environment.UserName : svc.AppConfig.App.UserName;
 
 	Log.Information("Starting YAi! CLI");
 	Log.Information("Asset root: {AssetRoot}", appPaths.AssetRoot);
@@ -162,27 +138,22 @@ try
 	Log.Information("Workspace root: {WorkspaceRoot}", appPaths.WorkspaceRoot);
 	Log.Information("Data root: {DataRoot}", appPaths.DataRoot);
 
-	await ShowOpenRouterBalanceAsync(openRouterBalance, true, false);
+	await ShowOpenRouterBalanceAsync(svc.OpenRouterBalance, true, true);
 	await new BannerScreenHost().RunAsync();
 
-	if (!await EnsureOpenRouterModelSelectedAsync(config, appConfig, openRouterClient, openRouterCatalog).ConfigureAwait(false))
+	if (!await EnsureOpenRouterModelSelectedAsync(svc.Config, svc.AppConfig, svc.OpenRouterClient, svc.OpenRouterCatalog).ConfigureAwait(false))
 	{
-		if (sp is IDisposable d1)
-		{
-			d1.Dispose();
-		}
-
 		return;
 	}
 
-	Log.Information("OpenRouter model: {Model}", openRouterClient.CurrentModel);
-	Log.Information("OpenRouter verbosity: {Verbosity}", openRouterClient.CurrentVerbosity);
-	Log.Information("OpenRouter cache enabled: {CacheEnabled}", openRouterClient.CacheEnabled);
+	Log.Information("OpenRouter model: {Model}", svc.OpenRouterClient.CurrentModel);
+	Log.Information("OpenRouter verbosity: {Verbosity}", svc.OpenRouterClient.CurrentVerbosity);
+	Log.Information("OpenRouter cache enabled: {CacheEnabled}", svc.OpenRouterClient.CacheEnabled);
 
 	// Ensure templates and runtime workspace are ready
 	try
 	{
-		workspace.EnsureInitializedFromTemplates();
+		svc.Workspace.EnsureInitializedFromTemplates();
 	}
 	catch (Exception ex)
 	{
@@ -201,7 +172,7 @@ try
 	{
 		Log.Information("Starting bootstrap workflow (explicit={Explicit}, hasCompletedState={HasState})",
 			isExplicitBootstrap, bootstrapState?.IsCompleted == true);
-		await DoBootstrapAsync(config, runtime, workspace, bootstrapSvc, history, appConfig, openRouterBalance);
+		await DoBootstrapAsync(svc.Config, svc.Runtime, svc.Workspace, svc.BootstrapSvc, svc.History, svc.AppConfig, svc.OpenRouterBalance);
 		Log.Information("Bootstrap workflow completed");
 
 		// After automatic bootstrap on first run, fall through to normal use
@@ -209,63 +180,72 @@ try
 		if (!isExplicitBootstrap && cliArgs.Length == 0)
 		{
 			PrintHelp();
-			if (sp is IDisposable d0) d0.Dispose();
+
 			return;
 		}
 
 		if (isExplicitBootstrap)
 		{
-			if (sp is IDisposable d1) d1.Dispose();
 			return;
 		}
 	}
 
 	// Basic command dispatch
-	if (cliArgs.Length > 0)
+	if (cliArgs.Length == 0)
 	{
-		Log.Information("Dispatching command {Command}", cmd);
-		if (cmd == "--ask")
+		PrintHelp();
+	}
+	else
+	{
+		string normalizedCmd = cmd == "-talk" ? "--talk" : cmd;
+		Log.Information("Dispatching command {Command}", normalizedCmd);
+
+		Dictionary<string, Func<Task>> dispatcher = new(StringComparer.OrdinalIgnoreCase)
 		{
-			Log.Information("Starting ask workflow");
-			await ShowOpenRouterBalanceAsync(openRouterBalance);
-			string prompt = cliArgs.Length > 1 ? string.Join(' ', cliArgs.Skip(1)) : string.Empty;
-			await DoAskAsync(promptBuilder, openRouterClient, toolRegistry, history, appConfig, prompt);
-			Log.Information("Ask workflow completed");
-		}
-		else if (cmd == "--translate")
-		{
-			Log.Information("Starting translate workflow");
-			await ShowOpenRouterBalanceAsync(openRouterBalance);
-			string text = cliArgs.Length > 1 ? string.Join(' ', cliArgs.Skip(1)) : string.Empty;
-			if (string.IsNullOrWhiteSpace(text))
+			["--ask"] = async () =>
 			{
-				AnsiConsole.MarkupLine("[yellow]⚠ No text provided.[/]");
-			}
-			else
+				Log.Information("Starting ask workflow");
+				await ShowOpenRouterBalanceAsync(svc.OpenRouterBalance);
+				string prompt = cliArgs.Length > 1 ? string.Join(' ', cliArgs.Skip(1)) : string.Empty;
+				await DoAskAsync(svc.PromptBuilder, svc.OpenRouterClient, svc.ToolRegistry, svc.History, svc.AppConfig, prompt);
+				Log.Information("Ask workflow completed");
+			},
+			["--translate"] = async () =>
 			{
-				await DoTranslateAsync(promptBuilder, openRouterClient, history, appConfig, text);
+				Log.Information("Starting translate workflow");
+				await ShowOpenRouterBalanceAsync(svc.OpenRouterBalance);
+				string text = cliArgs.Length > 1 ? string.Join(' ', cliArgs.Skip(1)) : string.Empty;
+				if (string.IsNullOrWhiteSpace(text))
+					AnsiConsole.MarkupLine("[yellow]⚠ No text provided.[/]");
+				else
+					await DoTranslateAsync(svc.PromptBuilder, svc.OpenRouterClient, svc.History, svc.AppConfig, text);
+				Log.Information("Translate workflow completed");
+			},
+			["--talk"] = async () =>
+			{
+				Log.Information("Starting talk workflow");
+				await ShowOpenRouterBalanceAsync(svc.OpenRouterBalance);
+				await DoTalkAsync(svc.PromptBuilder, svc.OpenRouterClient, svc.ToolRegistry, svc.History, svc.AppConfig);
+				Log.Information("Talk workflow completed");
+			},
+			["--dream"] = async () =>
+			{
+				Log.Information("Starting dreaming reflection pass");
+				DreamingService dreamingSvc = sp.GetRequiredService<DreamingService>();
+				await DoDreamAsync(dreamingSvc);
+				Log.Information("Dream pass completed");
+			},
+			["--knowledge"] = async () =>
+			{
+				Log.Information("Opening Knowledge Hub");
+				await new KnowledgeHubScreenHost(appPaths).RunAsync().ConfigureAwait(false);
+				Log.Information("Knowledge Hub closed");
 			}
-			Log.Information("Translate workflow completed");
-		}
-		else if (cmd == "--talk" || cmd == "-talk")
+		};
+
+		if (dispatcher.TryGetValue(normalizedCmd, out Func<Task>? handler))
 		{
-			Log.Information("Starting talk workflow");
-			await ShowOpenRouterBalanceAsync(openRouterBalance);
-			await DoTalkAsync(promptBuilder, openRouterClient, toolRegistry, history, appConfig);
-			Log.Information("Talk workflow completed");
-		}
-		else if (cmd == "--dream")
-		{
-			Log.Information("Starting dreaming reflection pass");
-			DreamingService dreamingSvc = sp.GetRequiredService<DreamingService>();
-			await DoDreamAsync(dreamingSvc);
-			Log.Information("Dream pass completed");
-		}
-		else if (cmd == "--knowledge")
-		{
-			Log.Information("Opening Knowledge Hub");
-			await new KnowledgeHubScreenHost(appPaths).RunAsync().ConfigureAwait(false);
-			Log.Information("Knowledge Hub closed");
+			await handler().ConfigureAwait(false);
 		}
 		else
 		{
@@ -273,12 +253,6 @@ try
 			PrintHelp();
 		}
 	}
-	else
-	{
-		PrintHelp();
-	}
-
-	if (sp is IDisposable d) d.Dispose();
 }
 catch (Exception ex)
 {
@@ -357,29 +331,6 @@ static bool IsGoNuclearRequest(string[] args)
 static bool RequiresCompletedBootstrap(string cmd)
 {
 	return cmd is "--ask" or "--translate" or "--talk" or "-talk";
-}
-
-static bool HasCompletedBootstrapState(string firstRunPath)
-{
-	if (!File.Exists(firstRunPath))
-	{
-		return false;
-	}
-
-	try
-	{
-		string json = File.ReadAllText(firstRunPath);
-		BootstrapState? state = JsonSerializer.Deserialize<BootstrapState>(json, new JsonSerializerOptions
-		{
-			PropertyNameCaseInsensitive = true
-		});
-
-		return state?.IsCompleted == true;
-	}
-	catch
-	{
-		return false;
-	}
 }
 
 static async Task RunShowPathsAsync()
@@ -586,29 +537,38 @@ static async Task ShowOpenRouterBalanceAsync(
 			.StartAsync("[cyan]Checking OpenRouter balance...[/]", _ => openRouterBalance.GetBalanceAsync(cancellationToken: default))
 			.ConfigureAwait(false);
 
-		await new OpenRouterBalanceScreenHost(snapshot).RunAsync().ConfigureAwait(false);
+			// Show the configured API key (masked) so users can confirm which key is used.
+			string apiKey = Environment.GetEnvironmentVariable("YAI_OPENROUTER_API_KEY") ?? string.Empty;
+			if (!string.IsNullOrWhiteSpace(apiKey))
+			{
+				string masked = apiKey.Length <= 8 ? new string('*', apiKey.Length) : string.Concat(apiKey.AsSpan(0, 4), "...", apiKey.AsSpan(apiKey.Length - 4));
+				AnsiConsole.MarkupLine($"[green]Using OpenRouter API key:[/] {Markup.Escape(masked)}");
+			}
+			else
+			{
+				AnsiConsole.MarkupLine("[red]✖ No OpenRouter API key configured (YAI_OPENROUTER_API_KEY).[/]");
+			}
+
+			if (!string.IsNullOrWhiteSpace(snapshot.ErrorMessage))
+			{
+				AnsiConsole.MarkupLine ($"[yellow]⚠ {Markup.Escape(snapshot.ErrorMessage)}[/]");
+			}
+
+			// If raw JSON is available, print a short preview to the console for debugging.
+			if (!string.IsNullOrWhiteSpace(snapshot.RawJson))
+			{
+				string preview = snapshot.RawJson.Length > 500 ? snapshot.RawJson.Substring(0, 500) + "..." : snapshot.RawJson;
+				AnsiConsole.MarkupLine("[grey70]OpenRouter credits (preview):[/]");
+				AnsiConsole.WriteLine(preview);
+			}
+
+			await new OpenRouterBalanceScreenHost(snapshot).RunAsync().ConfigureAwait(false);
 	}
 	catch (Exception ex)
 	{
 		Log.Warning(ex, "Failed to render OpenRouter balance screen");
 		AnsiConsole.MarkupLine($"[yellow]⚠ Unable to show the OpenRouter balance screen:[/] {Markup.Escape(ex.Message)}");
 	}
-}
-
-static string? PromptForOpenRouterModelId()
-{
-	AnsiConsole.WriteLine();
-	AnsiConsole.MarkupLine("[bold cyan]OpenRouter model ID[/]");
-	AnsiConsole.MarkupLine("[grey70]Examples: openai/gpt-4o-mini, anthropic/claude-3.5-sonnet[/]");
-	Console.Write("Model ID: ");
-
-	string? input = Console.ReadLine();
-	if (string.IsNullOrWhiteSpace(input))
-	{
-		return null;
-	}
-
-	return input.Trim();
 }
 
 static async Task DoBootstrapAsync(
@@ -971,4 +931,38 @@ static void ReportRecoverableException(Exception exception, string panelTitle, s
 	new ExceptionScreenHost(exception, panelTitle).RunAsync().GetAwaiter().GetResult();
 	Log.Warning(exception, logMessage);
 }
+
+/// <summary>Resolves and groups all CLI service dependencies from the DI container.</summary>
+/// <param name="sp">The built service provider.</param>
+/// <returns>A <see cref="CliServices"/> record with all resolved services.</returns>
+static CliServices ResolveCliServices(ServiceProvider sp)
+{
+	return new CliServices(
+		sp.GetRequiredService<WorkspaceProfileService>(),
+		sp.GetRequiredService<ConfigService>(),
+		sp.GetRequiredService<AppConfig>(),
+		sp.GetRequiredService<RuntimeState>(),
+		sp.GetRequiredService<PromptBuilder>(),
+		sp.GetRequiredService<ToolRegistry>(),
+		sp.GetRequiredService<OpenRouterClient>(),
+		sp.GetRequiredService<OpenRouterCatalogService>(),
+		sp.GetRequiredService<OpenRouterBalanceService>(),
+		sp.GetRequiredService<HistoryService>(),
+		sp.GetRequiredService<BootstrapInterviewService>()
+	);
+}
+
+/// <summary>Resolved service dependencies used across the CLI command handlers.</summary>
+record CliServices(
+	WorkspaceProfileService Workspace,
+	ConfigService Config,
+	AppConfig AppConfig,
+	RuntimeState Runtime,
+	PromptBuilder PromptBuilder,
+	ToolRegistry ToolRegistry,
+	OpenRouterClient OpenRouterClient,
+	OpenRouterCatalogService OpenRouterCatalog,
+	OpenRouterBalanceService OpenRouterBalance,
+	HistoryService History,
+	BootstrapInterviewService BootstrapSvc);
 

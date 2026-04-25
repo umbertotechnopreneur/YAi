@@ -54,8 +54,6 @@ public sealed class CommandPlanOverviewScreenHost : RazorScreen<CommandPlanOverv
     protected override void ConfigureServices (IServiceCollection services)
     {
         services.AddSingleton (_plan);
-
-        if (_validationError is not null)
-            services.AddSingleton<string>(_ => _validationError);
+        services.AddSingleton(new CommandPlanOverviewScreenParams(_validationError));
     }
 }

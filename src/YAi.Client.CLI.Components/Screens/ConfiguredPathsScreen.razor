@@ -23,20 +23,22 @@
 <Rows>
     <Panel Title="Configured paths">
         <Rows>
-            <Markup Content="These locations are resolved from AppPaths and should stay in sync with any new configuration, memory, skill, or storage paths." Foreground="@Color.Silver" />
+            <RawMarkup
+            Content="These locations are resolved from AppPaths and should stay in sync with any new configuration, memory, skill, or storage paths."
+            Foreground="@Color.Silver" />
             <Newline />
 
             @if (_assetEntries.Count > 0)
             {
-                <Markup Content="Asset and template paths" Foreground="@Color.Cyan1" />
+                <RawMarkup Content="Asset and template paths" Foreground="@Color.Cyan1" />
 
                 @foreach (PathEntryViewModel entry in _assetEntries)
                 {
                     <Columns>
-                        <Markup Content="@entry.Scope" />
-                        <Markup Content="@entry.Category" />
-                        <Markup Content="@entry.Label" />
-                        <Markup Content="@entry.Path" />
+                        <RawMarkup Content="@entry.Scope" />
+                        <RawMarkup Content="@entry.Category" />
+                        <RawMarkup Content="@entry.Label" />
+                        <RawMarkup Content="@entry.Path" />
                     </Columns>
                 }
 
@@ -45,15 +47,15 @@
 
             @if (_customEntries.Count > 0)
             {
-                <Markup Content="Custom runtime paths" Foreground="@Color.Yellow" />
+                <RawMarkup Content="Custom runtime paths" Foreground="@Color.Yellow" />
 
                 @foreach (PathEntryViewModel entry in _customEntries)
                 {
                     <Columns>
-                        <Markup Content="@entry.Scope" />
-                        <Markup Content="@entry.Category" />
-                        <Markup Content="@entry.Label" />
-                        <Markup Content="@entry.Path" />
+                        <RawMarkup Content="@entry.Scope" />
+                        <RawMarkup Content="@entry.Category" />
+                        <RawMarkup Content="@entry.Label" />
+                        <RawMarkup Content="@entry.Path" />
                     </Columns>
                 }
             }

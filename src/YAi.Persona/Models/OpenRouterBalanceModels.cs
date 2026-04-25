@@ -69,4 +69,9 @@ public sealed record class OpenRouterBalanceSnapshot
 	/// Gets a value indicating whether the snapshot contains usable balance totals.
 	/// </summary>
 	public bool HasBalance => TotalCredits is not null && TotalUsage is not null;
+
+	/// <summary>
+	/// Gets the raw credits JSON returned from the OpenRouter credits endpoint when available.
+	/// </summary>
+	public string? RawJson { get; init; }
 }

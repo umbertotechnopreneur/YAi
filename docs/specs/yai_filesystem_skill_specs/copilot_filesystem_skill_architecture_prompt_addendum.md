@@ -349,7 +349,6 @@ Create shared components reusable by future tools:
 ```text
 Components/Dialogs/ConfirmationDialog.razor
 Components/Dialogs/MessageBox.razor
-Components/Dialogs/CancelPlanDialog.razor
 Components/Cards/ApprovalCard.razor
 Components/Progress/OperationProgressScreen.razor
 ```
@@ -469,7 +468,6 @@ src/
       Dialogs/
         ConfirmationDialog.razor
         MessageBox.razor
-        CancelPlanDialog.razor
 
       Cards/
         ApprovalCard.razor

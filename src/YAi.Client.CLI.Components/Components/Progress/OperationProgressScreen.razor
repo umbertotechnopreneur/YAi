@@ -19,8 +19,8 @@
         @foreach (IOperationStep step in Steps)
         {
             <Columns>
-                <Markup Content="@(StatusIcon (step.Status))" Foreground="@(StatusColor (step.Status))" />
-                <Markup Content="@($" {step.StepId}. {step.Title}")" />
+                <RawMarkup Content="@(StatusIcon(step.Status))" Foreground="@(StatusColor(step.Status))" />
+                <RawMarkup Content="@Spectre.Console.Markup.Escape($" {step.StepId}. {step.Title}")" />
             </Columns>
         }
     </Rows>

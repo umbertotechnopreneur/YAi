@@ -17,7 +17,7 @@
 <Rows>
     <Panel Title="@_title">
         <Rows>
-            <Markup Content="@Message" Foreground="@_foreground" />
+            <RawMarkup Content="@Spectre.Console.Markup.Escape(Message)" Foreground="@_foreground" />
             <Newline />
             <TextButton Content="[Enter] OK"
                         OnClick="DismissClicked"

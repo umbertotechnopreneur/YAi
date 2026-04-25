@@ -106,7 +106,26 @@ public sealed class WorkflowExecutor
             skill => skill,
             StringComparer.OrdinalIgnoreCase);
 
-        string auditFolder = _auditService.InitializeAuditFolder (workflow, workspaceRoot);
+        WorkflowAuditInitResult auditInit = _auditService.InitializeAuditFolder(workflow, workspaceRoot);
+
+        if (!auditInit.Success)
+        {
+            _logger.LogError("Workflow aborted: audit preflight failed. {Error}", auditInit.Error);
+
+            return new WorkflowExecutionResult
+            {
+                WorkflowId = workflow.Id,
+                Succeeded = false,
+                Cancelled = false,
+                FailedStepId = null,
+                State = new WorkflowRunState(),
+                StepRecords = [],
+                AuditFolder = null,
+                Error = auditInit.Error
+            };
+        }
+
+        string auditFolder = auditInit.Folder;
         WorkflowRunState state = new ();
         List<WorkflowStepAuditRecord> records = [];
 
@@ -119,7 +138,9 @@ public sealed class WorkflowExecutor
             {
                 cancelled = true;
                 failedStepId = step.Id;
-                records.Add (CreateCancelledRecord (step, "Workflow was cancelled.", null));
+                WorkflowStepAuditRecord cancelRecord = CreateCancelledRecord(step, "Workflow was cancelled.", null);
+                records.Add(cancelRecord);
+                _auditService.WriteStepRecord(auditFolder, cancelRecord);
                 break;
             }
 
@@ -257,6 +278,10 @@ public sealed class WorkflowExecutor
                         break;
                     }
                 }
+
+                // Pass approved=true so filesystem.create_file can enforce its own hard gate.
+                if (approvalDecision == ApprovalDecision.Approve)
+                    parameters["approved"] = "true";
 
                 SkillResult result = await _toolRegistry.ExecuteAsync (step.Skill, parameters);
 

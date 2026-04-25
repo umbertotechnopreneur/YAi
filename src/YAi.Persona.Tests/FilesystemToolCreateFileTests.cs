@@ -83,7 +83,8 @@ public sealed class FilesystemToolCreateFileTests : IDisposable
             ["action"]         = "create_file",
             ["workspace_root"] = _workspaceRoot,
             ["path"]           = Path.Combine ("output", "test.txt"),
-            ["content"]        = "hello"
+            ["content"] = "hello",
+            ["approved"] = "true"
         };
 
         SkillResult result = await _tool.ExecuteAsync (parameters);
@@ -114,7 +115,8 @@ public sealed class FilesystemToolCreateFileTests : IDisposable
             ["action"]         = "create_file",
             ["workspace_root"] = _workspaceRoot,
             ["path"]           = Path.Combine ("..", "..", "outside.txt"),
-            ["content"]        = "evil"
+            ["content"] = "evil",
+            ["approved"] = "true"
         };
 
         SkillResult result = await _tool.ExecuteAsync (parameters);
@@ -140,7 +142,8 @@ public sealed class FilesystemToolCreateFileTests : IDisposable
             ["action"]         = "create_file",
             ["workspace_root"] = _workspaceRoot,
             ["path"]           = relativePath,
-            ["content"]        = "replacement content"
+            ["content"] = "replacement content",
+            ["approved"] = "true"
             // overwrite not set — defaults to false
         };
 
@@ -149,6 +152,77 @@ public sealed class FilesystemToolCreateFileTests : IDisposable
         Assert.False (result.Success);
         Assert.NotEmpty (result.Errors);
         Assert.Equal ("original content", await File.ReadAllTextAsync (fullPath));
+    }
+
+    /// <summary>
+    /// Test 7.1 — Calling create_file directly without <c>approved=true</c> is blocked.
+    /// No file must be written and the error code must be <c>approval_required</c>.
+    /// </summary>
+    [Fact]
+    public async Task CreateFile_Blocked_WhenApprovedParameterMissing()
+    {
+        IReadOnlyDictionary<string, string> parameters = new Dictionary<string, string>
+        {
+            ["action"] = "create_file",
+            ["workspace_root"] = _workspaceRoot,
+            ["path"] = Path.Combine("output", "should_not_exist.txt"),
+            ["content"] = "sneaky"
+            // approved param intentionally absent
+        };
+
+        SkillResult result = await _tool.ExecuteAsync(parameters);
+
+        Assert.False(result.Success);
+        Assert.NotEmpty(result.Errors);
+        Assert.Equal("approval_required", result.Errors[0].Code);
+
+        string unauthorizedPath = Path.Combine(_workspaceRoot, "output", "should_not_exist.txt");
+        Assert.False(File.Exists(unauthorizedPath), "File must not be created without runtime approval.");
+    }
+
+    /// <summary>
+    /// Test 7.4 — Attempting to write outside the workspace (path traversal) is blocked even when approved=true.
+    /// </summary>
+    [Fact]
+    public async Task CreateFile_Blocked_WhenPathEscapesWorkspace()
+    {
+        IReadOnlyDictionary<string, string> parameters = new Dictionary<string, string>
+        {
+            ["action"] = "create_file",
+            ["workspace_root"] = _workspaceRoot,
+            ["path"] = Path.Combine("..", "escape.txt"),
+            ["content"] = "escaped",
+            ["approved"] = "true"
+        };
+
+        SkillResult result = await _tool.ExecuteAsync(parameters);
+
+        Assert.False(result.Success);
+        Assert.NotEmpty(result.Errors);
+        Assert.Equal("boundary_violation", result.Errors[0].Code);
+
+        string escapedPath = Path.GetFullPath(Path.Combine(_workspaceRoot, "..", "escape.txt"));
+        Assert.False(File.Exists(escapedPath), "File must not be created outside workspace boundary.");
+    }
+
+    /// <summary>
+    /// Test 7.8 — read_metadata with a path that escapes the workspace is blocked by WorkspaceBoundaryService.
+    /// </summary>
+    [Fact]
+    public async Task ReadMetadata_Blocked_WhenPathEscapesWorkspace()
+    {
+        IReadOnlyDictionary<string, string> parameters = new Dictionary<string, string>
+        {
+            ["action"] = "read_metadata",
+            ["workspace_root"] = _workspaceRoot,
+            ["path"] = Path.Combine("..", "outside.txt")
+        };
+
+        SkillResult result = await _tool.ExecuteAsync(parameters);
+
+        Assert.False(result.Success);
+        Assert.NotEmpty(result.Errors);
+        Assert.Equal("boundary_violation", result.Errors[0].Code);
     }
 
     #region IDisposable

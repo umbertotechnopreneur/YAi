@@ -1,4 +1,4 @@
-/*
+﻿/*
  * YAi!
  *
  * Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.
@@ -52,7 +52,7 @@ public sealed class OpenRouterClient
 
     private readonly HttpClient _http;
     private readonly string _apiKey;
-    private readonly string _baseUrl = "https://api.openrouter.ai";
+    private readonly string _baseUrl = "https://openrouter.ai";
     private readonly ILlmCallLogRepository? _logRepository;
     private string _model;
     private string? _verbosity;

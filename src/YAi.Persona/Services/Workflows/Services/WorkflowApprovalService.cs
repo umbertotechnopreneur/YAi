@@ -27,8 +27,8 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using YAi.Persona.Services.Operations.Approval;
 using YAi.Persona.Services.Operations.Models;
-using YAi.Persona.Services.Tools.Filesystem;
 using YAi.Persona.Services.Tools;
 using YAi.Persona.Services.Workflows.Models;
 
@@ -43,7 +43,7 @@ public sealed class WorkflowApprovalService : IApprovalService
 {
     #region Fields
 
-    private readonly IApprovalCardPresenter _presenter;
+    private readonly IOperationApprovalPresenter _presenter;
     private readonly ILogger<WorkflowApprovalService> _logger;
 
     #endregion
@@ -52,7 +52,7 @@ public sealed class WorkflowApprovalService : IApprovalService
 
     /// <summary>Initialises a new instance of the <see cref="WorkflowApprovalService"/> class.</summary>
     public WorkflowApprovalService (
-        IApprovalCardPresenter presenter,
+        IOperationApprovalPresenter presenter,
         ILogger<WorkflowApprovalService> logger)
     {
         _presenter = presenter;

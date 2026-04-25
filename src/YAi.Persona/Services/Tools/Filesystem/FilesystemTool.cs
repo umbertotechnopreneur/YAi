@@ -128,7 +128,9 @@ public sealed class FilesystemTool : ITool
 
         return action.ToLowerInvariant () switch
         {
-            "plan" => await HandlePlanAsync(parameters, workspaceRoot),
+            "plan" => SkillResult.Failure(Name, "plan", "not_supported_for_mvp",
+                "The filesystem.plan action is disabled for MVP. " +
+                "Use the workflow executor with filesystem.create_file instead."),
             "list_directory" => HandleListDirectory (parameters, workspaceRoot),
             "read_metadata" => HandleReadMetadata(parameters, workspaceRoot),
             "create_file" => await HandleCreateFileAsync(parameters, workspaceRoot),
@@ -205,13 +207,16 @@ public sealed class FilesystemTool : ITool
         if (!parameters.TryGetValue (PathParam, out string? path) || string.IsNullOrWhiteSpace (path))
             return SkillResult.Failure(Name, "list_directory", "missing_param", "Missing required parameter: path.");
 
-        if (!IsInsideWorkspace (path, workspaceRoot))
-            return SkillResult.Failure(Name, "list_directory", "boundary_violation", $"Path '{path}' is outside the workspace root.");
+        string fullPath = Path.GetFullPath(Path.Combine(workspaceRoot, path));
+        List<string> listViolations = [];
 
-        if (!System.IO.Directory.Exists (path))
-            return SkillResult.Failure(Name, "list_directory", "not_found", $"Directory not found: {path}");
+        if (!_boundary.CheckPathBoundary("list_directory", fullPath, workspaceRoot, listViolations))
+            return SkillResult.Failure(Name, "list_directory", "boundary_violation", listViolations[0]);
 
-        ContextPack pack = _contextManager.Build (workspaceRoot, path, "list_directory");
+        if (!System.IO.Directory.Exists(fullPath))
+            return SkillResult.Failure(Name, "list_directory", "not_found", $"Directory not found: {fullPath}");
+
+        ContextPack pack = _contextManager.Build(workspaceRoot, fullPath, "list_directory");
         JsonElement data = JsonSerializer.SerializeToElement(pack.ExistingItems);
 
         return new SkillResult
@@ -236,20 +241,23 @@ public sealed class FilesystemTool : ITool
         if (!parameters.TryGetValue (PathParam, out string? path) || string.IsNullOrWhiteSpace (path))
             return SkillResult.Failure(Name, "read_metadata", "missing_param", "Missing required parameter: path.");
 
-        if (!IsInsideWorkspace (path, workspaceRoot))
-            return SkillResult.Failure(Name, "read_metadata", "boundary_violation", $"Path '{path}' is outside the workspace root.");
+        string metaFullPath = Path.GetFullPath(Path.Combine(workspaceRoot, path));
+        List<string> metaViolations = [];
 
-        bool isFile = System.IO.File.Exists (path);
-        bool isDir = System.IO.Directory.Exists (path);
+        if (!_boundary.CheckPathBoundary("read_metadata", metaFullPath, workspaceRoot, metaViolations))
+            return SkillResult.Failure(Name, "read_metadata", "boundary_violation", metaViolations[0]);
+
+        bool isFile = System.IO.File.Exists(metaFullPath);
+        bool isDir = System.IO.Directory.Exists(metaFullPath);
 
         if (!isFile && !isDir)
-            return SkillResult.Failure(Name, "read_metadata", "not_found", $"Path not found: {path}");
+            return SkillResult.Failure(Name, "read_metadata", "not_found", $"Path not found: {metaFullPath}");
 
         object metadata;
 
         if (isFile)
         {
-            System.IO.FileInfo fi = new (path);
+            System.IO.FileInfo fi = new(metaFullPath);
             metadata = new
             {
                 Name = fi.Name,
@@ -262,7 +270,7 @@ public sealed class FilesystemTool : ITool
         }
         else
         {
-            System.IO.DirectoryInfo di = new (path);
+            System.IO.DirectoryInfo di = new(metaFullPath);
             metadata = new
             {
                 Name = di.Name,
@@ -293,13 +301,37 @@ public sealed class FilesystemTool : ITool
     /// </summary>
     /// <remarks>
     /// Risk level: <c>SafeWrite</c>. Requires approval: <c>true</c>.
-    /// Approval enforcement is the responsibility of the caller.
+    /// The caller must set <c>approved=true</c> in the parameters after obtaining explicit
+    /// runtime approval through the standard workflow execution path.
     /// </remarks>
     private async Task<SkillResult> HandleCreateFileAsync(
         IReadOnlyDictionary<string, string> parameters,
         string workspaceRoot)
     {
         DateTimeOffset s = DateTimeOffset.UtcNow;
+
+        bool isApproved = parameters.TryGetValue("approved", out string? approvedStr)
+            && string.Equals(approvedStr, "true", StringComparison.OrdinalIgnoreCase);
+
+        if (!isApproved)
+        {
+            _logger.LogWarning("create_file blocked: no approved runtime context.");
+
+            return new SkillResult
+            {
+                SkillName = Name,
+                Action = "create_file",
+                Success = false,
+                Status = "failed",
+                Errors = [new SkillError ("approval_required",
+                    "filesystem.create_file requires explicit runtime approval. " +
+                    "Submit a workflow request through the standard execution path.")],
+                RiskLevel = ToolRiskLevel.SafeWrite,
+                RequiresApproval = true,
+                StartedAtUtc = s,
+                CompletedAtUtc = DateTimeOffset.UtcNow
+            };
+        }
 
         if (!parameters.TryGetValue(PathParam, out string? relativePath) || string.IsNullOrWhiteSpace(relativePath))
         {

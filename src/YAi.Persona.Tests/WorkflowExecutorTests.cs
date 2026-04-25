@@ -27,6 +27,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
@@ -190,6 +191,71 @@ public sealed class WorkflowExecutorTests : IDisposable
 
         string escapedFile = Path.GetFullPath (Path.Combine (_workspaceRoot, approvalService.LastContext!.TargetPath));
         Assert.False (File.Exists (escapedFile));
+    }
+
+    /// <summary>
+    /// Test 7.3 — when the user denies approval, no file is created and the denial
+    /// is recorded in the step audit record.
+    /// </summary>
+    [Fact]
+    public async Task Execute_DeniedApproval_RecordsDenialInAudit()
+    {
+        RecordingApprovalService approvalService = new(ApprovalDecision.Deny);
+        WorkflowExecutor executor = CreateExecutor(approvalService);
+
+        WorkflowExecutionResult result = await executor.ExecuteAsync(
+            BuildWorkflow(),
+            _workspaceRoot,
+            _workspaceRoot,
+            "Create a timestamped file.",
+            CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.False(result.Cancelled);
+        Assert.Equal("file", result.FailedStepId);
+
+        // Denial must be captured in the step audit record.
+        WorkflowStepAuditRecord fileRecord = result.StepRecords.Single(r => r.StepId == "file");
+        Assert.Equal(ApprovalDecision.Deny, fileRecord.ApprovalDecision);
+        Assert.False(fileRecord.Result?.Success ?? true);
+
+        // No file must have been written.
+        string outputDir = Path.Combine(_workspaceRoot, "output");
+        Assert.False(
+            Directory.Exists(outputDir) && Directory.GetFiles(outputDir).Length > 0,
+            "No file should exist in ./output when approval is denied.");
+    }
+
+    /// <summary>
+    /// Test 7.5 — a bad variable reference in the workflow input fails before any approval
+    /// card is shown and before any file is created.
+    /// </summary>
+    [Fact]
+    public async Task Execute_Fails_Before_ApprovalCard_When_Variable_Reference_IsBad()
+    {
+        RecordingApprovalService approvalService = new(ApprovalDecision.Approve);
+        WorkflowExecutor executor = CreateExecutor(approvalService);
+
+        WorkflowDefinition workflow = BuildWorkflow("./output/${steps.bad.variables.timestamp_safe}_qualcosa.txt");
+
+        WorkflowExecutionResult result = await executor.ExecuteAsync(
+            workflow,
+            _workspaceRoot,
+            _workspaceRoot,
+            "Create a timestamped file.",
+            CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("file", result.FailedStepId);
+
+        // No approval card should have been shown.
+        Assert.Equal(0, approvalService.Calls);
+
+        // No file should have been created.
+        string outputDir = Path.Combine(_workspaceRoot, "output");
+        Assert.False(
+            Directory.Exists(outputDir) && Directory.GetFiles(outputDir).Length > 0,
+            "No file should exist when variable resolution fails.");
     }
 
     #region IDisposable

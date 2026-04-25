@@ -56,4 +56,10 @@ public sealed class WorkflowExecutionResult
 
     /// <summary>Gets or sets the audit folder created for this run.</summary>
     public string? AuditFolder { get; init; }
+
+    /// <summary>
+    /// Gets or sets a top-level error message when the workflow could not start
+    /// (for example, audit preflight failure).
+    /// </summary>
+    public string? Error { get; init; }
 }

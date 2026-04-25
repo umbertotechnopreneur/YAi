@@ -120,6 +120,9 @@ try
 	services.AddYAiPersonaServices(appPaths);
 	services.AddSingleton<YAi.Persona.Services.Tools.Filesystem.IApprovalCardPresenter,
 		RazorConsoleApprovalCardPresenter>();
+	services.AddSingleton<YAi.Persona.Services.Operations.Approval.IOperationApprovalPresenter>(sp =>
+		(YAi.Persona.Services.Operations.Approval.IOperationApprovalPresenter)
+		sp.GetRequiredService<YAi.Persona.Services.Tools.Filesystem.IApprovalCardPresenter>());
 
 	ServiceProvider sp = services.BuildServiceProvider();
 
@@ -544,8 +547,11 @@ static async Task<bool> EnsureOpenRouterModelSelectedAsync(
 	}
 	catch (InvalidOperationException ex) when (ex.Message.Contains("Unable to load the OpenRouter model catalog.", StringComparison.Ordinal))
 	{
+		Log.Warning(ex, "OpenRouter model catalog could not be loaded");
 		AnsiConsole.MarkupLine("[red]✖ Unable to load the OpenRouter model catalog.[/]");
-		AnsiConsole.MarkupLine("[yellow]Connect to the network or use a cached catalog, then run the command again.[/]");
+		if (ex.InnerException is not null)
+			AnsiConsole.MarkupLine($"[grey70]Cause: {Markup.Escape(ex.InnerException.Message)}[/]");
+		AnsiConsole.MarkupLine("[yellow]Restore network access or check YAI_OPENROUTER_API_KEY, then run the command again.[/]");
 		Environment.ExitCode = 1;
 		return false;
 	}
@@ -572,6 +578,22 @@ static async Task ShowOpenRouterBalanceAsync(
 		Log.Warning(ex, "Failed to render OpenRouter balance screen");
 		AnsiConsole.MarkupLine($"[yellow]⚠ Unable to show the OpenRouter balance screen:[/] {Markup.Escape(ex.Message)}");
 	}
+}
+
+static string? PromptForOpenRouterModelId()
+{
+	AnsiConsole.WriteLine();
+	AnsiConsole.MarkupLine("[bold cyan]OpenRouter model ID[/]");
+	AnsiConsole.MarkupLine("[grey70]Examples: openai/gpt-4o-mini, anthropic/claude-3.5-sonnet[/]");
+	Console.Write("Model ID: ");
+
+	string? input = Console.ReadLine();
+	if (string.IsNullOrWhiteSpace(input))
+	{
+		return null;
+	}
+
+	return input.Trim();
 }
 
 static async Task DoBootstrapAsync(

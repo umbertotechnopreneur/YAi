@@ -1,4 +1,4 @@
-/*
+﻿/*
  * YAi!
  *
  * Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.
@@ -106,7 +106,7 @@ public static class ServiceCollectionExtensions
 
         services.AddHttpClient("OpenRouter", client =>
         {
-            client.BaseAddress = new Uri("https://api.openrouter.ai");
+            client.BaseAddress = new Uri("https://openrouter.ai");
         });
 
         services.AddSingleton<OpenRouterClient>(sp => new OpenRouterClient(

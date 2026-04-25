@@ -59,9 +59,7 @@ string[] cliArgs = Environment.GetCommandLineArgs().Skip(1).ToArray();
 
 
 #if DEBUG
-Console.Clear();
-AnsiConsole.Clear();
-Console.Write("\x1b[3J");
+ClearConsole(clearScrollback: true);
 #endif
 
 Console.OutputEncoding = Encoding.UTF8;
@@ -411,11 +409,35 @@ static bool RequiresCompletedBootstrap(string cmd)
 	return cmd is "--ask" or "--translate" or "--talk" or "-talk";
 }
 
+static void ClearConsole(bool clearScrollback = false)
+{
+	if (Console.IsInputRedirected || Console.IsOutputRedirected)
+	{
+		return;
+	}
+
+	try
+	{
+		AnsiConsole.Clear();
+
+		if (clearScrollback)
+		{
+			Console.Write("\x1b[3J");
+		}
+	}
+	catch (IOException)
+	{
+	}
+	catch (InvalidOperationException)
+	{
+	}
+}
+
 static void RunShowPaths(AppPaths appPaths)
 {
 	IReadOnlyList<(string Category, string Label, string Path, bool IsCustom)> entries = appPaths.GetConfiguredPathEntries();
 
-	AnsiConsole.Clear();
+	ClearConsole();
 	WriteBanner();
 	AnsiConsole.WriteLine();
 	WriteConfiguredPaths(entries);
@@ -431,13 +453,13 @@ static void RunShowPaths(AppPaths appPaths)
 
 static void RunShowBanner()
 {
-	AnsiConsole.Clear();
+	ClearConsole();
 	WriteBanner();
 }
 
 static async Task RunManifestoAsync()
 {
-	AnsiConsole.Clear();
+	ClearConsole();
 	await new BannerScreenHost().RunAsync().ConfigureAwait(false);
 	AnsiConsole.WriteLine();
 	WriteManifesto();
@@ -589,7 +611,7 @@ static bool TryOpenPathWithDefaultProgram(string path, out string? errorMessage)
 
 static async Task RunUnknownCommandAsync(string command)
 {
-	AnsiConsole.Clear();
+	ClearConsole();
 	await new BannerScreenHost().RunAsync().ConfigureAwait(false);
 	AnsiConsole.WriteLine();
 	AnsiConsole.MarkupLine($"[red]✖ Unrecognized command line argument:[/] [bold]{Markup.Escape(command)}[/]");
@@ -607,7 +629,7 @@ static async Task RunGoNuclearAsync()
 
 static async Task PrintVersionAsync()
 {
-	AnsiConsole.Clear();
+	ClearConsole();
 	await new BannerScreenHost().RunAsync().ConfigureAwait(false);
 	AnsiConsole.WriteLine();
 
@@ -848,7 +870,7 @@ static async Task ShowOpenRouterBalanceAsync(
 	{
 		if (clearConsole)
 		{
-			AnsiConsole.Clear();
+			ClearConsole();
 		}
 
 		if (showBanner)
@@ -1005,13 +1027,13 @@ static async Task ShowComingAliveBannerAsync(bool useLogoSplash)
 
 		if (!rendered)
 		{
-			AnsiConsole.Clear();
+			ClearConsole(clearScrollback: true);
 			await new BannerScreenHost().RunAsync().ConfigureAwait(false);
 		}
 	}
 	else
 	{
-		AnsiConsole.Clear();
+		ClearConsole(clearScrollback: true);
 		await new BannerScreenHost().RunAsync().ConfigureAwait(false);
 	}
 
@@ -1034,7 +1056,7 @@ static async Task DoBootstrapAsync(
 {
 	try
 	{
-		AnsiConsole.Clear();
+		ClearConsole(clearScrollback: true);
 		await new BannerScreenHost().RunAsync();
 		AnsiConsole.WriteLine();
 		WriteAppHeader(BuildAppHeaderState(appPaths, openrouter));

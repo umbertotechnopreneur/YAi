@@ -12,6 +12,7 @@
 
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using YAi.Persona.Services.Execution;
 
 #endregion
 
@@ -32,9 +33,9 @@ public interface ITool
     bool IsAvailable();
 
     /// <summary>
-    /// Executes the tool with the given parameters.
+    /// Executes the tool with the given parameters and returns a structured <see cref="SkillResult"/>.
     /// </summary>
-    Task<ToolResult> ExecuteAsync(IReadOnlyDictionary<string, string> parameters);
+    Task<SkillResult> ExecuteAsync(IReadOnlyDictionary<string, string> parameters);
 
     /// <summary>
     /// Returns parameter metadata for this tool, used to generate prompts.

@@ -15,95 +15,107 @@
 @using Spectre.Console
 @using YAi.Client.CLI.Components.Components.Dialogs
 @using YAi.Persona.Services.Operations.Models
+@using YAi.Persona.Services.Workflows.Models
 
 <Rows>
-    @if (_showCancelDialog)
-    {
-        <CancelPlanDialog RemainingCount="@RemainingCount"
-                          OnConfirm="CancelConfirmed"
-                          OnCancel="CancelAborted" />
-    }
-    else
-    {
-        <Panel Title="@Card.Title">
-            <Rows>
+    <Panel Title="@Card.Title">
+        <Rows>
+            @if (Card is WorkflowApprovalStep workflowCard)
+            {
                 <Columns>
-                    <Markup Content="Action: " />
-                    <Markup Content="@Card.Action" Foreground="@Color.Cyan1" />
+                    <Markup Content="Skill: " />
+                    <Markup Content="@workflowCard.SkillName" Foreground="@Color.Cyan1" />
                 </Columns>
+            }
+
+            <Columns>
+                <Markup Content="Action: " />
+                <Markup Content="@Card.Action" Foreground="@Color.Cyan1" />
+            </Columns>
+            <Columns>
+                <Markup Content="Target: " />
+                <Markup Content="@Card.Target" Foreground="@Color.White" />
+            </Columns>
+            <Columns>
+                <Markup Content="Risk:   " />
+                <Markup Content="@_riskBadge" Foreground="@_riskColor" />
+            </Columns>
+
+            @if (Card is WorkflowApprovalStep workflowCard2 && workflowCard2.ResolvedInput is not null)
+            {
+                <Newline />
+                <Markup Content="Resolved input:" />
+                <Markup Content="@_resolvedInput" Foreground="@Color.Yellow" />
+            }
+            else if (!string.IsNullOrWhiteSpace (Card.DisplayCommand))
+            {
+                <Newline />
+                <Markup Content="Command: " />
+                <Markup Content="@Card.DisplayCommand" Foreground="@Color.Yellow" />
+            }
+
+            @if (!string.IsNullOrWhiteSpace (Card.RiskExplanation))
+            {
+                <Newline />
+                <Markup Content="@Card.RiskExplanation" Foreground="@_riskColor" />
+            }
+
+            @if (!string.IsNullOrWhiteSpace (Card.MitigationNote))
+            {
+                <Markup Content="@($"Mitigation: {Card.MitigationNote}")" Foreground="@Color.Green" />
+            }
+
+            @if (Card.RollbackAvailable)
+            {
+                <Markup Content="@($"Rollback:   {Card.RollbackExplanation}")" Foreground="@Color.Green3" />
+            }
+
+            @if (Card.VerificationDescriptions?.Count > 0)
+            {
+                <Newline />
+                <Markup Content="Verification criteria:" />
+                @foreach (string description in Card.VerificationDescriptions)
+                {
+                    <Markup Content="@($"  • {description}")" Foreground="@Color.Silver" />
+                }
+            }
+
+            <Newline />
+
+            @if (_blocked)
+            {
+                <Markup Content="⛔ This step is blocked and cannot be approved." Foreground="@Color.Red" />
+                <Newline />
                 <Columns>
-                    <Markup Content="Target: " />
-                    <Markup Content="@Card.Target" Foreground="@Color.White" />
-                </Columns>
-                <Columns>
-                    <Markup Content="Risk:   " />
-                    <Markup Content="@_riskBadge" Foreground="@_riskColor" />
-                </Columns>
-
-                @if (!string.IsNullOrWhiteSpace (Card.DisplayCommand))
-                {
-                    <Newline />
-                    <Markup Content="Command: " />
-                    <Markup Content="@Card.DisplayCommand" Foreground="@Color.Yellow" />
-                }
-
-                @if (!string.IsNullOrWhiteSpace (Card.RiskExplanation))
-                {
-                    <Newline />
-                    <Markup Content="@Card.RiskExplanation" Foreground="@_riskColor" />
-                }
-
-                @if (!string.IsNullOrWhiteSpace (Card.MitigationNote))
-                {
-                    <Markup Content="@($"Mitigation: {Card.MitigationNote}")" Foreground="@Color.Green" />
-                }
-
-                @if (Card.RollbackAvailable)
-                {
-                    <Markup Content="@($"Rollback:   {Card.RollbackExplanation}")" Foreground="@Color.Green3" />
-                }
-
-                @if (Card.VerificationDescriptions?.Count > 0)
-                {
-                    <Newline />
-                    <Markup Content="Verification criteria:" />
-                    @foreach (string description in Card.VerificationDescriptions)
-                    {
-                        <Markup Content="@($"  • {description}")" Foreground="@Color.Silver" />
-                    }
-                }
-
-                @if (_blocked)
-                {
-                    <Newline />
-                    <Markup Content="⛔ This step is blocked and cannot be executed." Foreground="@Color.Red" />
-                    <Newline />
-                    <TextButton Content="[S] Skip"
-                                OnClick="SkipClicked"
+                    <TextButton Content="[D] Deny"
+                                OnClick="DenyClicked"
+                                BackgroundColor="@Color.DarkRed"
+                                FocusedColor="@Color.OrangeRed1" />
+                    <TextButton Content="[C] Cancel workflow"
+                                OnClick="CancelWorkflowClicked"
                                 BackgroundColor="@Color.Grey"
                                 FocusedColor="@Color.Silver" />
-                }
-                else
-                {
-                    <Newline />
-                    <Columns>
-                        <TextButton Content="[R] Run"
-                                    OnClick="RunClicked"
-                                    BackgroundColor="@Color.Green"
-                                    FocusedColor="@Color.Green3" />
-                        <TextButton Content="[S] Skip"
-                                    OnClick="SkipClicked"
-                                    BackgroundColor="@Color.Grey"
-                                    FocusedColor="@Color.Silver" />
-                        <TextButton Content="[C] Cancel plan"
-                                    OnClick="CancelPlanClicked"
-                                    BackgroundColor="@Color.DarkRed"
-                                    FocusedColor="@Color.OrangeRed1" />
-                    </Columns>
-                }
-            </Rows>
-        </Panel>
-    }
+                </Columns>
+            }
+            else
+            {
+                <Columns>
+                    <TextButton Content="[A] Approve"
+                                OnClick="ApproveClicked"
+                                BackgroundColor="@Color.Green"
+                                FocusedColor="@Color.Green3" />
+                    <TextButton Content="[D] Deny"
+                                OnClick="DenyClicked"
+                                BackgroundColor="@Color.DarkRed"
+                                FocusedColor="@Color.OrangeRed1" />
+                    <TextButton Content="[C] Cancel workflow"
+                                OnClick="CancelWorkflowClicked"
+                                BackgroundColor="@Color.Grey"
+                                FocusedColor="@Color.Silver" />
+                </Columns>
+            }
+        </Rows>
+    </Panel>
 </Rows>
 
 @code {
@@ -116,10 +128,10 @@
     /// <summary>Raised with the user's decision.</summary>
     [Parameter] public EventCallback<ApprovalDecision> OnDecision { get; set; }
 
-    private bool _showCancelDialog;
     private bool _blocked;
     private string _riskBadge = string.Empty;
     private Color _riskColor = Color.White;
+    private string _resolvedInput = string.Empty;
 
     protected override void OnParametersSet ()
     {
@@ -127,29 +139,51 @@
 
         (_riskBadge, _riskColor) = Card.RiskLevel switch
         {
-            OperationRiskLevel.ReadOnly                => ("● ReadOnly",               Color.Green),
-            OperationRiskLevel.LocalWrite              => ("● LocalWrite",             Color.Cyan1),
-            OperationRiskLevel.OverwriteRisk           => ("● OverwriteRisk",          Color.Yellow),
-            OperationRiskLevel.DestructiveRecoverable  => ("● DestructiveRecoverable", Color.OrangeRed1),
-            OperationRiskLevel.DestructivePermanent    => ("⛔ DestructivePermanent",   Color.Red),
-            OperationRiskLevel.OutsideWorkspace        => ("⛔ OutsideWorkspace",       Color.Red),
-            _                                          => ("● Unknown",                Color.Grey)
+            OperationRiskLevel.ReadOnly               => ("● ReadOnly",               Color.Green),
+            OperationRiskLevel.LocalWrite             => ("● LocalWrite",             Color.Cyan1),
+            OperationRiskLevel.OverwriteRisk          => ("● OverwriteRisk",          Color.Yellow),
+            OperationRiskLevel.DestructiveRecoverable => ("● DestructiveRecoverable", Color.OrangeRed1),
+            OperationRiskLevel.DestructivePermanent   => ("⛔ DestructivePermanent",   Color.Red),
+            OperationRiskLevel.OutsideWorkspace       => ("⛔ OutsideWorkspace",       Color.Red),
+            _                                         => ("● Unknown",                Color.Grey)
         };
+
+        if (Card is WorkflowApprovalStep workflowApprovalStep)
+        {
+            _riskBadge = $"● {workflowApprovalStep.ToolRiskLevel}";
+            _riskColor = workflowApprovalStep.ToolRiskLevel switch
+            {
+                YAi.Persona.Services.Tools.ToolRiskLevel.SafeReadOnly => Color.Green,
+                YAi.Persona.Services.Tools.ToolRiskLevel.SafeWrite    => Color.Cyan1,
+                YAi.Persona.Services.Tools.ToolRiskLevel.Risky        => Color.Yellow,
+                YAi.Persona.Services.Tools.ToolRiskLevel.Destructive  => Color.Red,
+                _                                                     => Color.Grey
+            };
+
+            _resolvedInput = FormatJson (workflowApprovalStep.ResolvedInput);
+        }
+        else
+        {
+            _resolvedInput = string.Empty;
+        }
     }
 
-    private async Task RunClicked () =>
-        await OnDecision.InvokeAsync (ApprovalDecision.Run);
+    private async Task ApproveClicked () =>
+        await OnDecision.InvokeAsync (ApprovalDecision.Approve);
 
-    private async Task SkipClicked () =>
-        await OnDecision.InvokeAsync (ApprovalDecision.Skip);
+    private async Task DenyClicked () =>
+        await OnDecision.InvokeAsync (ApprovalDecision.Deny);
 
-    private void CancelPlanClicked () => _showCancelDialog = true;
+    private async Task CancelWorkflowClicked () =>
+        await OnDecision.InvokeAsync (ApprovalDecision.CancelWorkflow);
 
-    private async Task CancelConfirmed ()
+    private static string FormatJson (System.Text.Json.Nodes.JsonNode? node)
     {
-        _showCancelDialog = false;
-        await OnDecision.InvokeAsync (ApprovalDecision.CancelPlan);
-    }
+        if (node is null)
+        {
+            return string.Empty;
+        }
 
-    private void CancelAborted () => _showCancelDialog = false;
+        return node.ToJsonString (new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+    }
 }

@@ -27,7 +27,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using YAi.Client.CLI.Components.Screens;
 using YAi.Persona.Services.Operations.Models;
-using YAi.Persona.Services.Tools.Filesystem.Models;
 
 #endregion
 
@@ -38,13 +37,13 @@ namespace YAi.Client.CLI.Components.Screens.Tools.Filesystem;
 /// </summary>
 public sealed class ApprovalCardScreenHost : RazorScreen<ApprovalCardScreen, ApprovalDecision>
 {
-    private readonly FilesystemOperationStep _card;
+    private readonly OperationStep _card;
     private readonly int _remainingCount;
 
     /// <summary>Initializes a new host for the given filesystem step.</summary>
     /// <param name="card">The filesystem step to present.</param>
     /// <param name="remainingCount">Steps remaining after this one.</param>
-    public ApprovalCardScreenHost (FilesystemOperationStep card, int remainingCount)
+    public ApprovalCardScreenHost(OperationStep card, int remainingCount)
     {
         _card = card;
         _remainingCount = remainingCount;

@@ -30,10 +30,13 @@ using YAi.Persona.Models;
 using YAi.Persona.Services;
 using YAi.Persona.Services.Operations.Safety;
 using YAi.Persona.Services.Skills;
+using YAi.Persona.Services.Skills.Validation;
 using YAi.Persona.Services.Tools;
 using YAi.Persona.Services.Tools.Filesystem;
 using YAi.Persona.Services.Tools.Filesystem.Services;
 using YAi.Persona.Services.Tools.SystemInfo;
+using YAi.Persona.Services.Workflows;
+using YAi.Persona.Services.Workflows.Services;
 
 #endregion
 
@@ -73,6 +76,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<HistoryService>();
         services.AddSingleton<RuntimeState>();
         services.AddSingleton<SkillLoader>();
+        services.AddSingleton<ISkillSchemaValidator, MinimalSkillSchemaValidator>();
         services.AddSingleton<SystemInfoTool>();
 
         // Filesystem skill services
@@ -84,6 +88,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<AuditService>();
         services.AddSingleton<FilesystemPlannerService>();
         services.AddSingleton<FilesystemTool>();
+        services.AddSingleton<WorkflowVariableResolver>();
+        services.AddSingleton<WorkflowAuditService>();
+        services.AddSingleton<IApprovalService, WorkflowApprovalService>();
+        services.AddSingleton<WorkflowExecutor>();
 
         services.AddSingleton<ToolRegistry>(sp =>
         {

@@ -27,6 +27,7 @@ YAi! is intended to remain multiplatform across Windows, macOS, and Linux. When 
 - A system that keeps the user in charge of decisions instead of hiding behavior behind background automation.
 - A codebase that stays close to portable skill and workflow ideas so features can move between ecosystems with minimal friction.
 - A built-in skill system that starts with `system_info`, seeds bundled `SKILL.md` files into the runtime workspace, and keeps the first tool loop fully local and auditable.
+- A linear workflow runtime that resolves step outputs into later steps, gates write-capable actions behind explicit approval, and records structured audit output for each run.
 
 ## Design Goals
 

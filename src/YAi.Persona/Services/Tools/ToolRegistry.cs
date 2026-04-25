@@ -11,6 +11,7 @@
 #region Using directives
 
 using System.Text;
+using YAi.Persona.Services.Execution;
 
 #endregion
 
@@ -67,13 +68,14 @@ public sealed class ToolRegistry
     /// </summary>
     /// <param name="name">The tool name.</param>
     /// <param name="parameters">Optional parameters for the tool.</param>
-    /// <returns>The tool execution result.</returns>
-    public async Task<ToolResult> ExecuteAsync(string name, IReadOnlyDictionary<string, string>? parameters = null)
+    /// <returns>The structured skill result.</returns>
+    public async Task<SkillResult> ExecuteAsync(string name, IReadOnlyDictionary<string, string>? parameters = null)
     {
         ITool? tool = FindByName(name);
         if (tool is null)
         {
-            return new ToolResult(false, $"Tool '{name}' not found or not available on this platform.");
+            return SkillResult.Failure(string.Empty, string.Empty, "tool_not_found",
+                $"Tool '{name}' not found or not available on this platform.");
         }
 
         return await tool.ExecuteAsync(parameters ?? new Dictionary<string, string>());

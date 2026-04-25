@@ -29,15 +29,12 @@ namespace YAi.Persona.Services.Operations.Models;
 /// </summary>
 public enum ApprovalDecision
 {
-    /// <summary>Run the step as proposed.</summary>
-    Run,
+    /// <summary>Approve the step as proposed.</summary>
+    Approve,
 
-    /// <summary>Edit the step before running (not yet implemented in v1).</summary>
-    Edit,
+    /// <summary>Deny the step and stop execution.</summary>
+    Deny,
 
-    /// <summary>Skip this step and continue with the next.</summary>
-    Skip,
-
-    /// <summary>Cancel all remaining steps in the plan.</summary>
-    CancelPlan
+    /// <summary>Cancel the workflow and stop any remaining steps.</summary>
+    CancelWorkflow
 }

@@ -26,7 +26,9 @@ public sealed record Skill(
     string? Os = null,
     string? Version = null,
     string? SkillDirectory = null,
-    OpenClawMetadata? Metadata = null)
+    OpenClawMetadata? Metadata = null,
+    IReadOnlyDictionary<string, SkillAction>? Actions = null,
+    IReadOnlyDictionary<string, SkillOption>? Options = null)
 {
     /// <summary>
     /// Returns true when the skill has scripts in a <c>scripts/</c> subdirectory.

@@ -48,6 +48,7 @@ using YAi.Client.CLI.Services;
 using YAi.Persona.Extensions;
 using YAi.Persona.Models;
 using YAi.Persona.Services;
+using YAi.Persona.Services.Execution;
 using YAi.Persona.Services.Tools;
 using System.Text;
 #endregion
@@ -888,7 +889,7 @@ static async Task<(string Reply, bool GuardHit)> RunChatTurnWithToolsAsync(
 
 		foreach (ToolCallParser.ParsedToolCall toolCall in toolCalls)
 		{
-			ToolResult result = await toolRegistry.ExecuteAsync(toolCall.ToolName, toolCall.Parameters);
+			SkillResult result = await toolRegistry.ExecuteAsync(toolCall.ToolName, toolCall.Parameters);
 			string toolResultText = ToolCallParser.FormatToolResult(toolCall, result);
 			OpenRouterChatMessage toolMessage = new()
 			{

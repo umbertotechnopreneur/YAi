@@ -158,32 +158,23 @@ public sealed class FilesystemPlannerService
 
             switch (decision)
             {
-                case ApprovalDecision.Run:
+                case ApprovalDecision.Approve:
                     await RunStepAsync (step, workspaceRoot, auditFolder, ct);
                     CountStep (step.Status, ref succeeded, ref failed, ref skipped);
                     break;
 
-                case ApprovalDecision.Skip:
-                    step.Status = StepStatus.Skipped;
+                case ApprovalDecision.Deny:
+                    step.Status = StepStatus.Failed;
                     _auditService.WriteStepResult (auditFolder, step, []);
                     await _presenter.ReportStepResultAsync (step, ct);
-                    skipped++;
+                    failed++;
+                    cancelled = true;
                     break;
 
-                case ApprovalDecision.CancelPlan:
+                case ApprovalDecision.CancelWorkflow:
                     cancelled = true;
                     step.Status = StepStatus.Cancelled;
                     _auditService.WriteStepResult (auditFolder, step, []);
-                    break;
-
-                case ApprovalDecision.Edit:
-                    // Edit is not yet implemented — treat as skip and log.
-                    _logger.LogWarning (
-                        "Edit decision is not yet implemented for step {StepId}; skipping.",
-                        step.StepId);
-                    step.Status = StepStatus.Skipped;
-                    _auditService.WriteStepResult (auditFolder, step, []);
-                    skipped++;
                     break;
             }
         }

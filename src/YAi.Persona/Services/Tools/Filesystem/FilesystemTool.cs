@@ -26,11 +26,13 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text.Json;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using YAi.Persona.Services.Execution;
 using YAi.Persona.Services.Operations.Models;
+using YAi.Persona.Services.Operations.Safety;
 using YAi.Persona.Services.Tools.Filesystem.Models;
 using YAi.Persona.Services.Tools.Filesystem.Services;
 
@@ -49,6 +51,7 @@ public sealed class FilesystemTool : ITool
 
     private readonly FilesystemPlannerService _planner;
     private readonly ContextManager _contextManager;
+    private readonly WorkspaceBoundaryService _boundary;
     private readonly ILogger<FilesystemTool> _logger;
 
     private const string ActionParam = "action";
@@ -57,6 +60,8 @@ public sealed class FilesystemTool : ITool
     private const string CurrentFolderParam = "current_folder";
     private const string UserRequestParam = "request";
     private const string PathParam = "path";
+    private const string ContentParam = "content";
+    private const string OverwriteParam = "overwrite";
 
     #endregion
 
@@ -68,10 +73,12 @@ public sealed class FilesystemTool : ITool
     public FilesystemTool (
         FilesystemPlannerService planner,
         ContextManager contextManager,
+        WorkspaceBoundaryService boundary,
         ILogger<FilesystemTool> logger)
     {
         _planner = planner;
         _contextManager = contextManager;
+        _boundary = boundary;
         _logger = logger;
     }
 
@@ -96,33 +103,37 @@ public sealed class FilesystemTool : ITool
     {
         return
         [
-            new (ActionParam,       "string", true,  "plan | list_directory | read_metadata"),
+            new (ActionParam,        "string", true,  "plan | list_directory | read_metadata | create_file"),
             new (WorkspaceRootParam, "string", true,  "Absolute path to the workspace root."),
             new (CurrentFolderParam, "string", false, "Absolute path to the active folder."),
             new (UserRequestParam,   "string", false, "The raw user request (used with action=plan)."),
             new (PlanJsonParam,      "string", false, "Serialized CommandPlan JSON (used with action=execute)."),
-            new (PathParam,          "string", false, "Target path (used with list_directory and read_metadata).")
+            new (PathParam,          "string", false, "Target path relative to workspace_root (used with list_directory, read_metadata, create_file)."),
+            new (ContentParam,       "string", false, "File content to write (used with action=create_file)."),
+            new (OverwriteParam,     "string", false, "true | false — whether to overwrite an existing file (default false, used with action=create_file).")
         ];
     }
 
     /// <inheritdoc/>
-    public async Task<ToolResult> ExecuteAsync (
+    public async Task<SkillResult> ExecuteAsync(
         IReadOnlyDictionary<string, string> parameters)
     {
         if (!parameters.TryGetValue (ActionParam, out string? action) || string.IsNullOrWhiteSpace (action))
-            return new (false, "Missing required parameter: action.");
+            return SkillResult.Failure(Name, string.Empty, "missing_param", "Missing required parameter: action.");
 
         if (!parameters.TryGetValue (WorkspaceRootParam, out string? workspaceRoot) || string.IsNullOrWhiteSpace (workspaceRoot))
-            return new (false, "Missing required parameter: workspace_root.");
+            return SkillResult.Failure(Name, action, "missing_param", "Missing required parameter: workspace_root.");
 
         _logger.LogInformation ("FilesystemTool executing action={Action}", action);
 
         return action.ToLowerInvariant () switch
         {
-            "plan" => await HandlePlanAsync (parameters, workspaceRoot),
+            "plan" => await HandlePlanAsync(parameters, workspaceRoot),
             "list_directory" => HandleListDirectory (parameters, workspaceRoot),
-            "read_metadata" => HandleReadMetadata (parameters, workspaceRoot),
-            _ => new (false, $"Unknown filesystem action: {action}. Supported: plan, list_directory, read_metadata.")
+            "read_metadata" => HandleReadMetadata(parameters, workspaceRoot),
+            "create_file" => await HandleCreateFileAsync(parameters, workspaceRoot),
+            _ => SkillResult.Failure(Name, action, "unknown_action",
+                $"Unknown filesystem action: {action}. Supported: plan, list_directory, read_metadata, create_file.")
         };
     }
 
@@ -130,10 +141,11 @@ public sealed class FilesystemTool : ITool
 
     #region Action handlers
 
-    private async Task<ToolResult> HandlePlanAsync (
+    private async Task<SkillResult> HandlePlanAsync(
         IReadOnlyDictionary<string, string> parameters,
         string workspaceRoot)
     {
+        DateTimeOffset s = DateTimeOffset.UtcNow;
         parameters.TryGetValue (CurrentFolderParam, out string? currentFolder);
         parameters.TryGetValue (UserRequestParam, out string? userRequest);
         parameters.TryGetValue (PlanJsonParam, out string? planJson);
@@ -143,80 +155,95 @@ public sealed class FilesystemTool : ITool
 
         if (string.IsNullOrWhiteSpace (planJson))
         {
-            // No plan yet — build context pack and return it for the model to use
             ContextPack context = _contextManager.Build (workspaceRoot, currentFolder, userRequest);
             string contextJson = JsonSerializer.Serialize (context, new JsonSerializerOptions { WriteIndented = true });
 
-            return new (true, $"Context pack built. Send this to the model to generate a CommandPlan:\n{contextJson}");
+            return SkillResult.Text(Name, "plan", $"Context pack built. Send this to the model to generate a CommandPlan:\n{contextJson}", s, DateTimeOffset.UtcNow);
         }
 
-        // Execute a plan that the model already produced
         try
         {
             CommandPlan? plan = JsonSerializer.Deserialize<CommandPlan> (planJson,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
             if (plan is null)
-                return new (false, "Could not deserialize the provided plan_json.");
+                return SkillResult.Failure(Name, "plan", "invalid_plan", "Could not deserialize the provided plan_json.");
 
             PlanExecutionSummary summary = await _planner.ExecuteAsync (
                 plan, workspaceRoot, currentFolder, userRequest);
 
-            return summary.IsFullSuccess
-                ? new (true, $"Plan '{plan.Title}' completed. Succeeded={summary.Succeeded}.")
-                : new (false,
-                    $"Plan '{plan.Title}' finished with issues. " +
-                    $"Succeeded={summary.Succeeded} Failed={summary.Failed} " +
-                    $"Skipped={summary.Skipped} Cancelled={summary.Cancelled}.");
+            if (summary.IsFullSuccess)
+
+                return SkillResult.Text(Name, "plan", $"Plan '{plan.Title}' completed. Succeeded={summary.Succeeded}.", s, DateTimeOffset.UtcNow);
+
+            return SkillResult.Failure(Name, "plan", "plan_partial_failure",
+                $"Plan '{plan.Title}' finished with issues. " +
+                $"Succeeded={summary.Succeeded} Failed={summary.Failed} " +
+                $"Skipped={summary.Skipped} Cancelled={summary.Cancelled}.",
+                s, DateTimeOffset.UtcNow);
         }
         catch (JsonException ex)
         {
             _logger.LogError (ex, "Could not parse plan_json.");
 
-            return new (false, $"plan_json is not valid JSON: {ex.Message}");
+            return SkillResult.Failure(Name, "plan", "json_parse_error", $"plan_json is not valid JSON: {ex.Message}");
         }
         catch (Exception ex)
         {
             _logger.LogError (ex, "Unexpected error executing filesystem plan.");
 
-            return new (false, $"Unexpected error: {ex.Message}");
+            return SkillResult.Failure(Name, "plan", "unexpected_error", $"Unexpected error: {ex.Message}");
         }
     }
 
-    private ToolResult HandleListDirectory (
+    private SkillResult HandleListDirectory(
         IReadOnlyDictionary<string, string> parameters,
         string workspaceRoot)
     {
+        DateTimeOffset s = DateTimeOffset.UtcNow;
+
         if (!parameters.TryGetValue (PathParam, out string? path) || string.IsNullOrWhiteSpace (path))
-            return new (false, "Missing required parameter: path.");
+            return SkillResult.Failure(Name, "list_directory", "missing_param", "Missing required parameter: path.");
 
         if (!IsInsideWorkspace (path, workspaceRoot))
-            return new (false, $"Path '{path}' is outside the workspace root.");
+            return SkillResult.Failure(Name, "list_directory", "boundary_violation", $"Path '{path}' is outside the workspace root.");
 
         if (!System.IO.Directory.Exists (path))
-            return new (false, $"Directory not found: {path}");
+            return SkillResult.Failure(Name, "list_directory", "not_found", $"Directory not found: {path}");
 
         ContextPack pack = _contextManager.Build (workspaceRoot, path, "list_directory");
-        string json = JsonSerializer.Serialize (pack.ExistingItems, new JsonSerializerOptions { WriteIndented = true });
+        JsonElement data = JsonSerializer.SerializeToElement(pack.ExistingItems);
 
-        return new (true, json);
+        return new SkillResult
+        {
+            SkillName = Name,
+            Action = "list_directory",
+            Success = true,
+            Status = "completed",
+            Data = data,
+            RiskLevel = ToolRiskLevel.SafeReadOnly,
+            StartedAtUtc = s,
+            CompletedAtUtc = DateTimeOffset.UtcNow
+        };
     }
 
-    private ToolResult HandleReadMetadata (
+    private SkillResult HandleReadMetadata(
         IReadOnlyDictionary<string, string> parameters,
         string workspaceRoot)
     {
+        DateTimeOffset s = DateTimeOffset.UtcNow;
+
         if (!parameters.TryGetValue (PathParam, out string? path) || string.IsNullOrWhiteSpace (path))
-            return new (false, "Missing required parameter: path.");
+            return SkillResult.Failure(Name, "read_metadata", "missing_param", "Missing required parameter: path.");
 
         if (!IsInsideWorkspace (path, workspaceRoot))
-            return new (false, $"Path '{path}' is outside the workspace root.");
+            return SkillResult.Failure(Name, "read_metadata", "boundary_violation", $"Path '{path}' is outside the workspace root.");
 
         bool isFile = System.IO.File.Exists (path);
         bool isDir = System.IO.Directory.Exists (path);
 
         if (!isFile && !isDir)
-            return new (false, $"Path not found: {path}");
+            return SkillResult.Failure(Name, "read_metadata", "not_found", $"Path not found: {path}");
 
         object metadata;
 
@@ -246,7 +273,125 @@ public sealed class FilesystemTool : ITool
             };
         }
 
-        return new (true, JsonSerializer.Serialize (metadata, new JsonSerializerOptions { WriteIndented = true }));
+        JsonElement data = JsonSerializer.SerializeToElement(metadata);
+
+        return new SkillResult
+        {
+            SkillName = Name,
+            Action = "read_metadata",
+            Success = true,
+            Status = "completed",
+            Data = data,
+            RiskLevel = ToolRiskLevel.SafeReadOnly,
+            StartedAtUtc = s,
+            CompletedAtUtc = DateTimeOffset.UtcNow
+        };
+    }
+
+    /// <summary>
+    /// Creates a file at the given path inside the workspace root.
+    /// </summary>
+    /// <remarks>
+    /// Risk level: <c>SafeWrite</c>. Requires approval: <c>true</c>.
+    /// Approval enforcement is the responsibility of the caller.
+    /// </remarks>
+    private async Task<SkillResult> HandleCreateFileAsync(
+        IReadOnlyDictionary<string, string> parameters,
+        string workspaceRoot)
+    {
+        DateTimeOffset s = DateTimeOffset.UtcNow;
+
+        if (!parameters.TryGetValue(PathParam, out string? relativePath) || string.IsNullOrWhiteSpace(relativePath))
+        {
+            return new SkillResult
+            {
+                SkillName = Name,
+                Action = "create_file",
+                Success = false,
+                Status = "failed",
+                Errors = [new SkillError("missing_param", "Missing required parameter: path.")],
+                RiskLevel = ToolRiskLevel.SafeWrite,
+                RequiresApproval = true,
+                StartedAtUtc = s,
+                CompletedAtUtc = DateTimeOffset.UtcNow
+            };
+        }
+
+        if (!parameters.TryGetValue(ContentParam, out string? content) || content is null)
+            content = string.Empty;
+
+        bool overwrite = parameters.TryGetValue(OverwriteParam, out string? overwriteStr)
+            && bool.TryParse(overwriteStr, out bool overwriteParsed)
+            && overwriteParsed;
+
+        string fullPath = Path.GetFullPath(Path.Combine(workspaceRoot, relativePath));
+
+        List<string> violations = [];
+
+        if (!_boundary.CheckPathBoundary("create_file", fullPath, workspaceRoot, violations))
+        {
+            _logger.LogWarning("create_file boundary violation: {Violation}", violations[0]);
+
+            return new SkillResult
+            {
+                SkillName = Name,
+                Action = "create_file",
+                Success = false,
+                Status = "failed",
+                Errors = [new SkillError("boundary_violation", violations[0])],
+                RiskLevel = ToolRiskLevel.SafeWrite,
+                RequiresApproval = true,
+                StartedAtUtc = s,
+                CompletedAtUtc = DateTimeOffset.UtcNow
+            };
+        }
+
+        string? parentDir = Path.GetDirectoryName(fullPath);
+
+        if (parentDir is not null)
+            Directory.CreateDirectory(parentDir);
+
+        if (File.Exists(fullPath) && !overwrite)
+        {
+            return new SkillResult
+            {
+                SkillName = Name,
+                Action = "create_file",
+                Success = false,
+                Status = "failed",
+                Errors = [new SkillError("file_exists", "File already exists and overwrite is false.")],
+                RiskLevel = ToolRiskLevel.SafeWrite,
+                RequiresApproval = true,
+                StartedAtUtc = s,
+                CompletedAtUtc = DateTimeOffset.UtcNow
+            };
+        }
+
+        await File.WriteAllTextAsync(fullPath, content).ConfigureAwait(false);
+
+        _logger.LogInformation("create_file wrote {Path}", fullPath);
+
+        JsonElement data = JsonSerializer.SerializeToElement(new
+        {
+            path = relativePath,
+            absolutePath = fullPath,
+            created = true,
+            bytesWritten = content.Length
+        });
+
+        return new SkillResult
+        {
+            SkillName = Name,
+            Action = "create_file",
+            Success = true,
+            Status = "completed",
+            Data = data,
+            Artifacts = [new SkillArtifact("file", relativePath, "Created file.")],
+            RiskLevel = ToolRiskLevel.SafeWrite,
+            RequiresApproval = true,
+            StartedAtUtc = s,
+            CompletedAtUtc = DateTimeOffset.UtcNow
+        };
     }
 
     #endregion

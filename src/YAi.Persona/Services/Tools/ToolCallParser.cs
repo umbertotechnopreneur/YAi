@@ -10,8 +10,10 @@
 
 #region Using directives
 
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using YAi.Persona.Services.Execution;
 
 #endregion
 
@@ -104,25 +106,30 @@ public static class ToolCallParser
     }
 
     /// <summary>
-    /// Formats a tool result for inclusion back into the conversation.
+    /// Formats a skill result for inclusion back into the conversation.
     /// </summary>
-    public static string FormatToolResult(ParsedToolCall call, ToolResult result)
+    public static string FormatToolResult(ParsedToolCall call, SkillResult result)
     {
         StringBuilder sb = new();
         sb.AppendLine($"[TOOL_RESULT: {call.ToolName}]");
         sb.AppendLine($"Success: {result.Success}");
 
-        if (!string.IsNullOrWhiteSpace(result.Message))
+        if (!result.Success && result.Errors.Count > 0)
         {
-            sb.AppendLine($"Output:\n{result.Message}");
+            sb.AppendLine($"Error: {result.Errors[0].Message}");
+        }
+        else if (result.Data.HasValue)
+        {
+            sb.AppendLine($"Output:\n{result.Data.Value.GetRawText()}");
         }
 
-        if (result.FilePath is not null)
+        if (result.Artifacts.Count > 0)
         {
-            sb.AppendLine($"FilePath: {result.FilePath}");
+            sb.AppendLine($"Artifacts: {string.Join(", ", result.Artifacts.Select(a => a.Path))}");
         }
 
         sb.AppendLine("[/TOOL_RESULT]");
+
         return sb.ToString();
     }
 

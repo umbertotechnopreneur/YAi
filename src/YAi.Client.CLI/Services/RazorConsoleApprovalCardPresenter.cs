@@ -32,7 +32,6 @@ using Spectre.Console;
 using YAi.Client.CLI.Components.Screens.Tools.Filesystem;
 using YAi.Persona.Services.Operations.Models;
 using YAi.Persona.Services.Tools.Filesystem;
-using YAi.Persona.Services.Tools.Filesystem.Models;
 
 #endregion
 
@@ -68,11 +67,7 @@ public sealed class RazorConsoleApprovalCardPresenter : IApprovalCardPresenter
             "Showing approval card for step {StepId}: {Title}",
             step.StepId, step.Title);
 
-        if (step is not FilesystemOperationStep fsStep)
-            throw new InvalidOperationException (
-                $"RazorConsoleApprovalCardPresenter only supports FilesystemOperationStep (got {step.GetType ().Name}).");
-
-        ApprovalCardScreenHost host = new (fsStep, remainingCount: 0);
+        ApprovalCardScreenHost host = new(step, remainingCount: 0);
         ApprovalDecision decision = await host.RunAsync (ct);
 
         _logger.LogDebug (

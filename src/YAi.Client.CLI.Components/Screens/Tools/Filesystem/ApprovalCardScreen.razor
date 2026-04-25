@@ -15,12 +15,12 @@
 @using YAi.Client.CLI.Components.Components.Cards
 @using YAi.Client.CLI.Components.Screens
 @using YAi.Persona.Services.Operations.Models
-@using YAi.Persona.Services.Tools.Filesystem.Models
+@using YAi.Persona.Services.Workflows.Models
 
 @inject IHostApplicationLifetime AppLifetime
 @inject RazorScreenResult<ApprovalDecision> Result
 @inject ApprovalCardScreenParams ScreenParams
-@inject FilesystemOperationStep Card
+@inject OperationStep Card
 
 <ApprovalCard Card="@Card"
               RemainingCount="@ScreenParams.RemainingCount"

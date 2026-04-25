@@ -319,3 +319,39 @@ command_plan:
         - type: path_is_directory
           path: <workspace_root>\Gamma
 ```
+
+## Options
+
+### default_output_directory
+
+Description: Default directory for file creation when no output path is specified in the request.
+Type: path
+Required: false
+Default: ./output
+Scope: workspace
+UI: path
+Sensitive: false
+Requires restart: false
+
+### overwrite_behavior
+
+Description: Behavior when the target file already exists.
+Type: enum
+Required: false
+Default: fail
+Allowed values: fail, overwrite, append
+Scope: user
+UI: select
+Sensitive: false
+Requires restart: false
+
+### require_write_approval
+
+Description: Force approval prompt for all write operations, even low-risk ones.
+Type: boolean
+Required: false
+Default: true
+Scope: workspace
+UI: switch
+Sensitive: false
+Requires restart: false

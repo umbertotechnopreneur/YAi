@@ -12,8 +12,10 @@
 
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using YAi.Persona.Services;
+using YAi.Persona.Services.Tools;
 
 #endregion
 
@@ -42,20 +44,29 @@ public sealed partial class SkillLoader
     /// <summary>
     /// Loads all available skills, with workspace skills overriding bundled skills.
     /// </summary>
-    public IReadOnlyList<Skill> LoadAll()
+    public IReadOnlyList<Skill> LoadAll() => LoadAllWithDiagnostics().Skills;
+
+    /// <summary>
+    /// Loads all available skills and returns any parse diagnostics alongside them.
+    /// Workspace skills override bundled skills of the same name.
+    /// </summary>
+    public SkillLoadResult LoadAllWithDiagnostics()
     {
         Dictionary<string, Skill> skills = new(StringComparer.OrdinalIgnoreCase);
+        List<SkillLoadDiagnostic> diagnostics = [];
 
-        LoadSkillsFromDirectory(_bundledSkillsDir, skills);
-        LoadSkillsFromDirectory(_workspaceSkillsDir, skills);
+        LoadSkillsFromDirectory(_bundledSkillsDir, skills, diagnostics);
+        LoadSkillsFromDirectory(_workspaceSkillsDir, skills, diagnostics);
 
         string currentOs = GetCurrentOsTag();
-        return skills.Values
+        List<Skill> filtered = skills.Values
             .Where(skill => MatchesOs(skill, currentOs))
             .Where(CheckRequiredBins)
             .Where(CheckRequiredEnv)
             .OrderBy(skill => skill.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+        return new SkillLoadResult { Skills = filtered, Diagnostics = diagnostics };
     }
 
     /// <summary>
@@ -87,7 +98,10 @@ public sealed partial class SkillLoader
         return sb.ToString();
     }
 
-    private static void LoadSkillsFromDirectory(string directory, Dictionary<string, Skill> target)
+    private static void LoadSkillsFromDirectory(
+        string directory,
+        Dictionary<string, Skill> target,
+        List<SkillLoadDiagnostic> diagnostics)
     {
         if (!Directory.Exists(directory))
         {
@@ -96,7 +110,7 @@ public sealed partial class SkillLoader
 
         foreach (string skillFile in Directory.EnumerateFiles(directory, "SKILL.md", SearchOption.AllDirectories))
         {
-            Skill? skill = ParseSkillFile(skillFile);
+            Skill? skill = ParseSkillFile(skillFile, diagnostics);
             if (skill is not null)
             {
                 target[skill.Name] = skill;
@@ -104,7 +118,7 @@ public sealed partial class SkillLoader
         }
     }
 
-    internal static Skill? ParseSkillFile(string filePath)
+    internal static Skill? ParseSkillFile(string filePath, List<SkillLoadDiagnostic>? diagnostics = null)
     {
         string content = File.ReadAllText(filePath);
 
@@ -134,7 +148,13 @@ public sealed partial class SkillLoader
             body = body.Replace("{baseDir}", skillDir, StringComparison.OrdinalIgnoreCase);
         }
 
-        return new Skill(name, description, body, os, version, skillDir, metadata);
+        IReadOnlyDictionary<string, SkillAction> actions = ParseActionSection(
+            name, body, filePath, diagnostics);
+
+        IReadOnlyDictionary<string, SkillOption> options = ParseOptionSection(
+            name, body, filePath, diagnostics);
+
+        return new Skill(name, description, body, os, version, skillDir, metadata, actions, options);
     }
 
     private static OpenClawMetadata? ParseOpenClawMetadata(string frontmatter)
@@ -316,6 +336,428 @@ public sealed partial class SkillLoader
 
         return true;
     }
+
+    // -----------------------------------------------------------------------------------------
+    // Action section parsing
+    // -----------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Parses the <c>## Actions</c> section of a SKILL.md body into a dictionary of
+    /// <see cref="SkillAction"/> instances keyed by action name.
+    /// </summary>
+    private static IReadOnlyDictionary<string, SkillAction> ParseActionSection(
+        string skillName,
+        string body,
+        string filePath,
+        List<SkillLoadDiagnostic>? diagnostics)
+    {
+        Dictionary<string, SkillAction> actions = new(StringComparer.OrdinalIgnoreCase);
+
+        // Find the ## Actions heading.
+        Match actionsHeader = Regex.Match(body, @"^##\s+Actions\s*$", RegexOptions.Multiline);
+        if (!actionsHeader.Success)
+        {
+            return actions;
+        }
+
+        string actionsBody = body[(actionsHeader.Index + actionsHeader.Length)..];
+
+        // Split on ### headings, each of which is one action.
+        string[] actionBlocks = Regex.Split(actionsBody, @"^(?=###\s)", RegexOptions.Multiline);
+
+        foreach (string block in actionBlocks)
+        {
+            string trimmed = block.Trim();
+            if (string.IsNullOrWhiteSpace(trimmed))
+            {
+                continue;
+            }
+
+            // Stop at the next ## section (non-action sibling).
+            if (Regex.IsMatch(trimmed, @"^##\s+(?!#)"))
+            {
+                break;
+            }
+
+            Match nameMatch = Regex.Match(trimmed, @"^###\s+(.+)$", RegexOptions.Multiline);
+            if (!nameMatch.Success)
+            {
+                continue;
+            }
+
+            string actionName = nameMatch.Groups[1].Value.Trim();
+
+            if (actions.ContainsKey(actionName))
+            {
+                diagnostics?.Add(SkillLoadDiagnostic.DuplicateAction(skillName, actionName, filePath));
+            }
+
+            SkillAction action = ParseActionBlock(skillName, actionName, trimmed, filePath, diagnostics);
+            actions[actionName] = action;
+        }
+
+        return actions;
+    }
+
+    private static SkillAction ParseActionBlock(
+        string skillName,
+        string actionName,
+        string block,
+        string filePath,
+        List<SkillLoadDiagnostic>? diagnostics)
+    {
+        // Description: lines between ### heading and first metadata/subheading line.
+        string? description = ExtractActionDescription(block);
+
+        // Metadata lines: "Risk:", "Side effects:", "Requires approval:".
+        string? riskRaw = ExtractMetaLine(block, @"risk");
+        string? sideEffectsRaw = ExtractMetaLine(block, @"side\s+effects");
+        string? requiresApprovalRaw = ExtractMetaLine(block, @"requires\s+approval");
+
+        ToolRiskLevel riskLevel = ParseRiskLevel(skillName, actionName, filePath, riskRaw, diagnostics);
+        bool requiresApproval = ParseRequiresApproval(
+            skillName, actionName, filePath, requiresApprovalRaw, riskLevel, diagnostics);
+
+        // JSON schema blocks under #### headings.
+        string? inputSchemaJson = ExtractSchemaBlock(
+            skillName, actionName, filePath, block,
+            "input schema", DiagnosticCodes.InputSchemaInvalidJson, diagnostics,
+            isRequired: false);
+
+        string? outputSchemaJson = ExtractSchemaBlock(
+            skillName, actionName, filePath, block,
+            "output schema", DiagnosticCodes.OutputSchemaInvalidJson, diagnostics,
+            isRequired: false);
+
+        string? emittedVariablesJson = ExtractSchemaBlock(
+            skillName, actionName, filePath, block,
+            "emitted variables", DiagnosticCodes.VariablesSchemaInvalidJson, diagnostics,
+            isRequired: false);
+
+        return new SkillAction
+        {
+            Name = actionName,
+            Description = description,
+            RiskLevel = riskLevel,
+            RequiresApproval = requiresApproval,
+            SideEffects = sideEffectsRaw,
+            InputSchemaJson = inputSchemaJson,
+            OutputSchemaJson = outputSchemaJson,
+            EmittedVariablesJson = emittedVariablesJson
+        };
+    }
+
+    private static string? ExtractActionDescription(string block)
+    {
+        string[] lines = block.Split('\n');
+        StringBuilder sb = new();
+        bool pastHeading = false;
+
+        foreach (string line in lines)
+        {
+            string trimmedLine = line.Trim();
+
+            if (!pastHeading)
+            {
+                if (trimmedLine.StartsWith("###"))
+                {
+                    pastHeading = true;
+                }
+
+                continue;
+            }
+
+            // Stop at metadata lines, sub-headings, or fences.
+            if (Regex.IsMatch(trimmedLine, @"^(Risk|Side effects|Requires approval)\s*:", RegexOptions.IgnoreCase)
+                || trimmedLine.StartsWith('#')
+                || trimmedLine.StartsWith("```"))
+            {
+                break;
+            }
+
+            if (!string.IsNullOrWhiteSpace(trimmedLine))
+            {
+                sb.AppendLine(trimmedLine);
+            }
+        }
+
+        string result = sb.ToString().Trim();
+
+        return string.IsNullOrWhiteSpace(result) ? null : result;
+    }
+
+    private static string? ExtractMetaLine(string block, string labelPattern)
+    {
+        Match match = Regex.Match(
+            block,
+            $@"^{labelPattern}\s*:\s*(.+)$",
+            RegexOptions.Multiline | RegexOptions.IgnoreCase);
+
+        return match.Success ? match.Groups[1].Value.Trim() : null;
+    }
+
+    private static string? ExtractSchemaBlock(
+        string skillName,
+        string actionName,
+        string filePath,
+        string block,
+        string headingKeyword,
+        string invalidJsonCode,
+        List<SkillLoadDiagnostic>? diagnostics,
+        bool isRequired)
+    {
+        // Look for #### <headingKeyword> (case-insensitive).
+        Match headingMatch = Regex.Match(
+            block,
+            $@"^####\s+{Regex.Escape(headingKeyword)}\s*$",
+            RegexOptions.Multiline | RegexOptions.IgnoreCase);
+
+        if (!headingMatch.Success)
+        {
+            return null;
+        }
+
+        string afterHeading = block[(headingMatch.Index + headingMatch.Length)..];
+
+        // Find the next ```json fence.
+        Match fenceOpen = Regex.Match(afterHeading, @"^```json\s*$", RegexOptions.Multiline);
+        if (!fenceOpen.Success)
+        {
+            if (isRequired || diagnostics is not null)
+            {
+                diagnostics?.Add(SkillLoadDiagnostic.SchemaMissingJsonFence(
+                    skillName, actionName, filePath, headingKeyword));
+            }
+
+            return null;
+        }
+
+        string afterFenceOpen = afterHeading[(fenceOpen.Index + fenceOpen.Length)..];
+        Match fenceClose = Regex.Match(afterFenceOpen, @"^```\s*$", RegexOptions.Multiline);
+        if (!fenceClose.Success)
+        {
+            return null;
+        }
+
+        string json = afterFenceOpen[..fenceClose.Index].Trim();
+
+        // Validate that the extracted text is valid JSON.
+        try
+        {
+            using JsonDocument _ = JsonDocument.Parse(json);
+        }
+        catch (JsonException ex)
+        {
+            diagnostics?.Add(new SkillLoadDiagnostic
+            {
+                Severity = "warning",
+                Code = invalidJsonCode,
+                Message = $"Invalid JSON in '{headingKeyword}' for action '{actionName}': {ex.Message}",
+                SkillName = skillName,
+                ActionName = actionName,
+                FilePath = filePath
+            });
+
+            return null;
+        }
+
+        return json;
+    }
+
+    private static ToolRiskLevel ParseRiskLevel(
+        string skillName,
+        string actionName,
+        string filePath,
+        string? raw,
+        List<SkillLoadDiagnostic>? diagnostics)
+    {
+        if (raw is null)
+        {
+            return ToolRiskLevel.SafeReadOnly;
+        }
+
+        if (Enum.TryParse<ToolRiskLevel>(raw.Trim(), ignoreCase: true, out ToolRiskLevel level))
+        {
+            return level;
+        }
+
+        diagnostics?.Add(SkillLoadDiagnostic.InvalidRiskLevel(skillName, actionName, filePath, raw));
+
+        return ToolRiskLevel.SafeReadOnly;
+    }
+
+    private static bool ParseRequiresApproval(
+        string skillName,
+        string actionName,
+        string filePath,
+        string? raw,
+        ToolRiskLevel riskLevel,
+        List<SkillLoadDiagnostic>? diagnostics)
+    {
+        if (raw is null)
+        {
+            return InferApprovalFromRisk(riskLevel);
+        }
+
+        string normalized = raw.Trim().ToLowerInvariant();
+
+        return normalized switch
+        {
+            "true" or "yes" or "required" => true,
+            "false" or "no" or "not required" => false,
+            _ => InferWithDiagnostic()
+        };
+
+        bool InferWithDiagnostic()
+        {
+            diagnostics?.Add(SkillLoadDiagnostic.InvalidRequiresApproval(
+                skillName, actionName, filePath, raw));
+
+            return InferApprovalFromRisk(riskLevel);
+        }
+    }
+
+    private static bool InferApprovalFromRisk(ToolRiskLevel risk) =>
+        risk is ToolRiskLevel.SafeWrite or ToolRiskLevel.Risky or ToolRiskLevel.Destructive;
+
+    // -----------------------------------------------------------------------------------------
+    // Option section parsing
+    // -----------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Parses the <c>## Options</c> section of a SKILL.md body into a dictionary of
+    /// <see cref="SkillOption"/> instances keyed by option name.
+    /// </summary>
+    private static IReadOnlyDictionary<string, SkillOption> ParseOptionSection(
+        string skillName,
+        string body,
+        string filePath,
+        List<SkillLoadDiagnostic>? diagnostics)
+    {
+        Dictionary<string, SkillOption> options = new(StringComparer.OrdinalIgnoreCase);
+
+        Match optionsHeader = Regex.Match(body, @"^##\s+Options\s*$", RegexOptions.Multiline);
+        if (!optionsHeader.Success)
+        {
+            return options;
+        }
+
+        string optionsBody = body[(optionsHeader.Index + optionsHeader.Length)..];
+
+        // Split on ### headings, each of which is one option.
+        string[] optionBlocks = Regex.Split(optionsBody, @"^(?=###\s)", RegexOptions.Multiline);
+
+        foreach (string block in optionBlocks)
+        {
+            string trimmed = block.Trim();
+            if (string.IsNullOrWhiteSpace(trimmed))
+            {
+                continue;
+            }
+
+            // Stop at the next ## section (non-option sibling).
+            if (Regex.IsMatch(trimmed, @"^##\s+(?!#)"))
+            {
+                break;
+            }
+
+            Match nameMatch = Regex.Match(trimmed, @"^###\s+(.+)$", RegexOptions.Multiline);
+            if (!nameMatch.Success)
+            {
+                continue;
+            }
+
+            string optionName = nameMatch.Groups[1].Value.Trim();
+
+            if (options.ContainsKey(optionName))
+            {
+                diagnostics?.Add(SkillLoadDiagnostic.DuplicateOption(skillName, optionName, filePath));
+            }
+
+            SkillOption option = ParseOptionBlock(skillName, optionName, trimmed, filePath, diagnostics);
+            options[optionName] = option;
+        }
+
+        return options;
+    }
+
+    private static readonly HashSet<string> _knownOptionTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "string", "boolean", "integer", "decimal", "enum", "path"
+    };
+
+    private static SkillOption ParseOptionBlock(
+        string skillName,
+        string optionName,
+        string block,
+        string filePath,
+        List<SkillLoadDiagnostic>? diagnostics)
+    {
+        string? description = ExtractMetaLine(block, @"description");
+        string? rawType = ExtractMetaLine(block, @"type");
+        string? rawRequired = ExtractMetaLine(block, @"required");
+        string? defaultValue = ExtractMetaLine(block, @"default");
+        string? scope = ExtractMetaLine(block, @"scope");
+        string? ui = ExtractMetaLine(block, @"ui");
+        string? rawSensitive = ExtractMetaLine(block, @"sensitive");
+        string? rawRestart = ExtractMetaLine(block, @"requires\s+restart");
+        string? allowedRaw = ExtractMetaLine(block, @"allowed\s+values");
+
+        string resolvedType = "string";
+        if (rawType is not null)
+        {
+            if (_knownOptionTypes.Contains(rawType.Trim()))
+            {
+                resolvedType = rawType.Trim().ToLowerInvariant();
+            }
+            else
+            {
+                diagnostics?.Add(SkillLoadDiagnostic.InvalidOptionType(skillName, optionName, filePath, rawType));
+            }
+        }
+
+        bool required = ParseBoolMeta(rawRequired, defaultValue: false);
+        bool isSensitive = ParseBoolMeta(rawSensitive, defaultValue: false);
+        bool requiresRestart = ParseBoolMeta(rawRestart, defaultValue: false);
+
+        IReadOnlyList<string> allowedValues = allowedRaw is not null
+            ? allowedRaw
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(v => !string.IsNullOrWhiteSpace(v))
+                .ToArray()
+            : Array.Empty<string>();
+
+        return new SkillOption
+        {
+            Name = optionName,
+            Description = description ?? string.Empty,
+            Type = resolvedType,
+            Required = required,
+            DefaultValue = defaultValue,
+            Scope = scope ?? "user",
+            Ui = ui ?? "text",
+            AllowedValues = allowedValues,
+            IsSensitive = isSensitive,
+            RequiresRestart = requiresRestart
+        };
+    }
+
+    private static bool ParseBoolMeta(string? raw, bool defaultValue)
+    {
+        if (raw is null)
+        {
+            return defaultValue;
+        }
+
+        return raw.Trim().ToLowerInvariant() switch
+        {
+            "true" or "yes" => true,
+            "false" or "no" => false,
+            _ => defaultValue
+        };
+    }
+
+    // -----------------------------------------------------------------------------------------
 
     [GeneratedRegex(@"^---\s*\n([\s\S]*?)\n---", RegexOptions.Multiline)]
     private static partial Regex FrontmatterRegex();

@@ -10,15 +10,17 @@
 
 #region Using directives
 
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
+using System.Text.Json;
+using YAi.Persona.Services.Execution;
+using YAi.Persona.Services.Tools;
 
 #endregion
 
 namespace YAi.Persona.Services.Tools.SystemInfo;
-
-using YAi.Persona.Services.Tools;
 
 /// <summary>
 /// System information tool providing environment details.
@@ -38,20 +40,36 @@ public sealed class SystemInfoTool : ITool
     public IReadOnlyList<ToolParameter> GetParameters()
     {
         return [
-            new ToolParameter(
+            new ToolParameter (
                 "action",
                 "string",
                 false,
-                "Information type: overview (system summary, CPU usage, CPU cores, total RAM, available RAM), date (local date), time (local time), env (environment variable), processes (running processes), disk (disk usage), network (network interfaces)",
+                "Information type: get_datetime (structured date/time with emitted variables), overview (system summary, CPU usage, CPU cores, total RAM, available RAM), date (local date), time (local time), env (environment variable), processes (running processes), disk (disk usage), network (network interfaces)",
                 "overview"),
-            new ToolParameter(
+            new ToolParameter (
+                "timezone",
+                "string",
+                false,
+                "IANA timezone identifier or 'local'. Used by the get_datetime action.",
+                "local"),
+            new ToolParameter (
                 "name",
                 "string",
                 false,
                 "Environment variable name (for env action)")];
     }
 
-    public Task<ToolResult> ExecuteAsync(IReadOnlyDictionary<string, string> parameters)
+    /// <summary>
+    /// Executes the requested system-info action and returns a structured <see cref="SkillResult"/>.
+    /// </summary>
+    /// <remarks>
+    /// <b>Limitation (follow-up PR required):</b> Skill options <c>default_timezone</c>,
+    /// <c>timestamp_format</c>, and <c>include_unix_seconds</c> are not yet honored.
+    /// Only the <c>timezone</c> parameter in the action input is supported in this version.
+    /// </remarks>
+    /// <param name="parameters">Execution parameters from the caller.</param>
+    /// <returns>A structured <see cref="SkillResult"/>.</returns>
+    public Task<SkillResult> ExecuteAsync(IReadOnlyDictionary<string, string> parameters)
     {
         string action = parameters.TryGetValue("action", out string? actionValue)
             ? actionValue.ToLowerInvariant()
@@ -59,31 +77,101 @@ public sealed class SystemInfoTool : ITool
 
         return action switch
         {
-            "overview" => GetOverviewAsync(),
-            "date" => Task.FromResult(GetLocalDate()),
-            "time" => Task.FromResult(GetLocalTime()),
-            "env" => Task.FromResult(GetEnvVariable(parameters)),
-            "processes" => Task.FromResult(GetTopProcesses()),
-            "disk" => Task.FromResult(GetDiskInfo()),
-            "network" => Task.FromResult(GetNetworkInfo()),
-            _ => Task.FromResult(new ToolResult(false, $"Unknown action '{action}'. Use: overview, date, time, env, processes, disk, network."))
+            "get_datetime" => Task.FromResult(BuildDatetimeSkillResult(parameters)),
+            "overview" => GetOverviewAsync(action),
+            "date" => Task.FromResult(GetLocalDate(action)),
+            "time" => Task.FromResult(GetLocalTime(action)),
+            "env" => Task.FromResult(GetEnvVariable(parameters, action)),
+            "processes" => Task.FromResult(GetTopProcesses(action)),
+            "disk" => Task.FromResult(GetDiskInfo(action)),
+            "network" => Task.FromResult(GetNetworkInfo(action)),
+            _ => Task.FromResult(SkillResult.Failure(Name, action, "unknown_action",
+                $"Unknown action '{action}'. Use: get_datetime, overview, date, time, env, processes, disk, network."))
         };
     }
 
-    private static ToolResult GetLocalDate()
+    private static SkillResult BuildDatetimeSkillResult(IReadOnlyDictionary<string, string> parameters)
     {
-        string value = DateTime.Now.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
-        return new ToolResult(true, value);
+        DateTimeOffset startedAt = DateTimeOffset.UtcNow;
+        TimeZoneInfo tz = ResolveTimezone(parameters);
+        DateTimeOffset localNow = TimeZoneInfo.ConvertTime(startedAt, tz);
+
+        string date = localNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        string time = localNow.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+        string timestampSafe = localNow.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
+        string timezone = tz.Id;
+        long unixSeconds = startedAt.ToUnixTimeSeconds();
+
+        JsonElement data = JsonSerializer.SerializeToElement(new
+        {
+            utc = startedAt.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture),
+            local = localNow.ToString("yyyy-MM-ddTHH:mm:sszzz", CultureInfo.InvariantCulture),
+            timezone,
+            date,
+            time,
+            timestampSafe,
+            unixSeconds
+        });
+
+        return new SkillResult
+        {
+            SkillName = "system_info",
+            Action = "get_datetime",
+            Success = true,
+            Status = "completed",
+            Data = data,
+            Variables = new Dictionary<string, string>
+            {
+                ["date"] = date,
+                ["time"] = time,
+                ["timestamp_safe"] = timestampSafe,
+                ["timezone"] = timezone
+            },
+            RiskLevel = ToolRiskLevel.SafeReadOnly,
+            RequiresApproval = false,
+            StartedAtUtc = startedAt,
+            CompletedAtUtc = DateTimeOffset.UtcNow
+        };
     }
 
-    private static ToolResult GetLocalTime()
+    private static TimeZoneInfo ResolveTimezone(IReadOnlyDictionary<string, string> parameters)
     {
-        string value = DateTime.Now.ToString("HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
-        return new ToolResult(true, value);
+        if (!parameters.TryGetValue("timezone", out string? tzParam)
+            || string.IsNullOrWhiteSpace(tzParam)
+            || tzParam.Equals("local", StringComparison.OrdinalIgnoreCase))
+        {
+            return TimeZoneInfo.Local;
+        }
+
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(tzParam);
+        }
+        catch
+        {
+            return TimeZoneInfo.Local;
+        }
     }
 
-    private static async Task<ToolResult> GetOverviewAsync()
+    private SkillResult GetLocalDate(string action)
     {
+        DateTimeOffset s = DateTimeOffset.UtcNow;
+        string value = DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+        return SkillResult.Text(Name, action, value, s, DateTimeOffset.UtcNow);
+    }
+
+    private SkillResult GetLocalTime(string action)
+    {
+        DateTimeOffset s = DateTimeOffset.UtcNow;
+        string value = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+
+        return SkillResult.Text(Name, action, value, s, DateTimeOffset.UtcNow);
+    }
+
+    private async Task<SkillResult> GetOverviewAsync(string action)
+    {
+        DateTimeOffset s = DateTimeOffset.UtcNow;
         (string totalRam, string availableRam) = GetMemoryInfo();
         string cpuUsage = await GetCpuUsageAsync().ConfigureAwait(false);
 
@@ -105,7 +193,7 @@ public sealed class SystemInfoTool : ITool
             $"Uptime: {TimeSpan.FromMilliseconds(Environment.TickCount64):d\\.hh\\:mm\\:ss}"
         ];
 
-        return new ToolResult(true, string.Join("\n", info));
+        return SkillResult.Text(Name, action, string.Join("\n", info), s, DateTimeOffset.UtcNow);
     }
 
     private static (string TotalRam, string AvailableRam) GetMemoryInfo()
@@ -594,8 +682,10 @@ public sealed class SystemInfoTool : ITool
     [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
     private static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX lpBuffer);
 
-    private static ToolResult GetEnvVariable(IReadOnlyDictionary<string, string> parameters)
+    private SkillResult GetEnvVariable(IReadOnlyDictionary<string, string> parameters, string action)
     {
+        DateTimeOffset s = DateTimeOffset.UtcNow;
+
         if (!parameters.TryGetValue("name", out string? name) || string.IsNullOrWhiteSpace(name))
         {
             IEnumerable<string> vars = Environment.GetEnvironmentVariables()
@@ -604,25 +694,25 @@ public sealed class SystemInfoTool : ITool
                 .OrderBy(key => key, StringComparer.OrdinalIgnoreCase)
                 .Take(100);
 
-            return new ToolResult(true, $"Environment variables:\n{string.Join("\n", vars)}");
+            return SkillResult.Text(Name, action, $"Environment variables:\n{string.Join("\n", vars)}", s, DateTimeOffset.UtcNow);
         }
 
         string? value = Environment.GetEnvironmentVariable(name);
         if (value is null)
-        {
-            return new ToolResult(false, $"Environment variable '{name}' is not set.");
-        }
+
+            return SkillResult.Failure(Name, action, "env_not_found", $"Environment variable '{name}' is not set.");
 
         if (LooksLikeSecret(name))
-        {
-            return new ToolResult(true, $"{name} = [REDACTED for security]");
-        }
 
-        return new ToolResult(true, $"{name} = {value}");
+            return SkillResult.Text(Name, action, $"{name} = [REDACTED for security]", s, DateTimeOffset.UtcNow);
+
+        return SkillResult.Text(Name, action, $"{name} = {value}", s, DateTimeOffset.UtcNow);
     }
 
-    private static ToolResult GetTopProcesses()
+    private SkillResult GetTopProcesses(string action)
     {
+        DateTimeOffset s = DateTimeOffset.UtcNow;
+
         try
         {
             IEnumerable<string> processes = System.Diagnostics.Process.GetProcesses()
@@ -650,32 +740,36 @@ public sealed class SystemInfoTool : ITool
                     }
                 });
 
-            return new ToolResult(true, $"Top processes by memory:\n{string.Join("\n", processes)}");
+            return SkillResult.Text(Name, action, $"Top processes by memory:\n{string.Join("\n", processes)}", s, DateTimeOffset.UtcNow);
         }
         catch (Exception ex)
         {
-            return new ToolResult(false, $"Could not list processes: {ex.Message}");
+            return SkillResult.Failure(Name, action, "process_error", $"Could not list processes: {ex.Message}");
         }
     }
 
-    private static ToolResult GetDiskInfo()
+    private SkillResult GetDiskInfo(string action)
     {
+        DateTimeOffset s = DateTimeOffset.UtcNow;
+
         try
         {
             IEnumerable<string> drives = DriveInfo.GetDrives()
                 .Where(drive => drive.IsReady)
                 .Select(drive => $"{drive.Name}  {drive.DriveType}  {drive.AvailableFreeSpace / 1024 / 1024 / 1024} GB free / {drive.TotalSize / 1024 / 1024 / 1024} GB total  ({drive.DriveFormat})");
 
-            return new ToolResult(true, string.Join("\n", drives));
+            return SkillResult.Text(Name, action, string.Join("\n", drives), s, DateTimeOffset.UtcNow);
         }
         catch (Exception ex)
         {
-            return new ToolResult(false, $"Could not get disk info: {ex.Message}");
+            return SkillResult.Failure(Name, action, "disk_error", $"Could not get disk info: {ex.Message}");
         }
     }
 
-    private static ToolResult GetNetworkInfo()
+    private SkillResult GetNetworkInfo(string action)
     {
+        DateTimeOffset s = DateTimeOffset.UtcNow;
+
         try
         {
             IEnumerable<string> interfaces = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
@@ -689,11 +783,11 @@ public sealed class SystemInfoTool : ITool
                     return $"{network.Name}: {network.NetworkInterfaceType} [{string.Join(", ", ips)}]";
                 });
 
-            return new ToolResult(true, string.Join("\n", interfaces));
+            return SkillResult.Text(Name, action, string.Join("\n", interfaces), s, DateTimeOffset.UtcNow);
         }
         catch (Exception ex)
         {
-            return new ToolResult(false, $"Could not get network info: {ex.Message}");
+            return SkillResult.Failure(Name, action, "network_error", $"Could not get network info: {ex.Message}");
         }
     }
 

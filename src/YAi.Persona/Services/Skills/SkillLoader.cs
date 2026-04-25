@@ -1,4 +1,4 @@
-/*
+﻿/*
  * YAi!
  *
  * Copyright (c) 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.
@@ -14,7 +14,9 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
 using YAi.Persona.Services;
+using YAi.Persona.Services.Security.ResourceIntegrity;
 using YAi.Persona.Services.Tools;
 
 #endregion
@@ -28,17 +30,25 @@ public sealed partial class SkillLoader
 {
     private readonly string _workspaceSkillsDir;
     private readonly string _bundledSkillsDir;
+    private readonly string _assetReferenceRoot;
+    private readonly IResourceSignatureVerifier? _verifier;
+    private readonly ILogger<SkillLoader>? _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SkillLoader"/> class.
     /// </summary>
     /// <param name="paths">Application path configuration used to resolve skill roots.</param>
-    public SkillLoader(AppPaths paths)
+    /// <param name="verifier">Optional resource integrity verifier. When provided, bundled skills are only loaded as trusted if verification passes.</param>
+    /// <param name="logger">Optional logger.</param>
+    public SkillLoader(AppPaths paths, IResourceSignatureVerifier? verifier = null, ILogger<SkillLoader>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(paths);
 
         _workspaceSkillsDir = paths.RuntimeSkillsRoot;
         _bundledSkillsDir = paths.AssetSkillsRoot;
+        _assetReferenceRoot = paths.AssetReferenceRoot;
+        _verifier = verifier;
+        _logger = logger;
     }
 
     /// <summary>
@@ -55,6 +65,44 @@ public sealed partial class SkillLoader
         Dictionary<string, Skill> skills = new(StringComparer.OrdinalIgnoreCase);
         List<SkillLoadDiagnostic> diagnostics = [];
 
+        // Verify bundled resources before loading them as trusted.
+        ResourceIntegrityResult? integrityResult = null;
+        if (_verifier is not null)
+        {
+            integrityResult = _verifier.VerifyAsync(_assetReferenceRoot).GetAwaiter().GetResult();
+
+            if (!integrityResult.Success)
+            {
+                _logger?.LogError(
+                    "Bundled resource integrity verification FAILED. " +
+                    "Built-in skills will not be loaded as trusted. " +
+                    "Diagnostics: {Diagnostics}",
+                    string.Join("; ", integrityResult.Diagnostics.Select(d => $"[{d.Code}] {d.Message}")));
+
+                // Do not load bundled skills when verification fails.
+                LoadSkillsFromDirectory(_workspaceSkillsDir, skills, diagnostics);
+
+                string currentOsTag = GetCurrentOsTag();
+                List<Skill> filteredResult = skills.Values
+                    .Where(skill => MatchesOs(skill, currentOsTag))
+                    .Where(CheckRequiredBins)
+                    .Where(CheckRequiredEnv)
+                    .OrderBy(skill => skill.Name, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                return new SkillLoadResult
+                {
+                    Skills = filteredResult,
+                    Diagnostics = diagnostics,
+                    BundledIntegrityResult = integrityResult
+                };
+            }
+
+            _logger?.LogInformation(
+                "Bundled resource integrity verified. {Count} files verified.",
+                integrityResult.VerifiedFiles.Count);
+        }
+
         LoadSkillsFromDirectory(_bundledSkillsDir, skills, diagnostics);
         LoadSkillsFromDirectory(_workspaceSkillsDir, skills, diagnostics);
 
@@ -66,7 +114,7 @@ public sealed partial class SkillLoader
             .OrderBy(skill => skill.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        return new SkillLoadResult { Skills = filtered, Diagnostics = diagnostics };
+        return new SkillLoadResult { Skills = filtered, Diagnostics = diagnostics, BundledIntegrityResult = integrityResult };
     }
 
     /// <summary>

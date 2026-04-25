@@ -1,4 +1,4 @@
-/*
+﻿/*
  * YAi!
  *
  * Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.
@@ -26,6 +26,7 @@
 
 using System.Text;
 using Microsoft.Extensions.Logging;
+using YAi.Persona.Services.Security.ResourceIntegrity;
 
 #endregion
 
@@ -56,6 +57,7 @@ public sealed class PromptAssetService
 
     private readonly AppPaths _paths;
     private readonly ILogger<PromptAssetService> _logger;
+    private readonly IResourceSignatureVerifier? _verifier;
 
     #endregion
 
@@ -66,10 +68,12 @@ public sealed class PromptAssetService
     /// </summary>
     /// <param name="paths">Application path provider.</param>
     /// <param name="logger">Logger.</param>
-    public PromptAssetService(AppPaths paths, ILogger<PromptAssetService> logger)
+    /// <param name="verifier">Optional resource integrity verifier. When provided, the legacy bundled asset fallback is blocked if verification fails.</param>
+    public PromptAssetService(AppPaths paths, ILogger<PromptAssetService> logger, IResourceSignatureVerifier? verifier = null)
     {
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _verifier = verifier;
     }
 
     #endregion
@@ -113,11 +117,27 @@ public sealed class PromptAssetService
                 Path.Combine(categoriesRoot, $"{key}.{language}.md"), "runtime-category");
         }
 
-        // Fallback: legacy asset SYSTEM-PROMPTS.md
+        // Fallback: legacy asset SYSTEM-PROMPTS.md — only if bundled resources pass integrity check
         if (!found)
         {
-            string legacyPath = Path.Combine(_paths.AssetWorkspaceRoot, "SYSTEM-PROMPTS.md");
-            TryAppendSection(sb, ref found, key, legacyPath, "legacy-asset");
+            bool bundledTrusted = true;
+            if (_verifier is not null)
+            {
+                ResourceIntegrityResult integrity = _verifier.VerifyAsync(_paths.AssetReferenceRoot).GetAwaiter().GetResult();
+                if (!integrity.Success)
+                {
+                    bundledTrusted = false;
+                    _logger.LogWarning(
+                        "Legacy bundled asset fallback BLOCKED for section '{Key}': resource integrity verification failed.",
+                        key);
+                }
+            }
+
+            if (bundledTrusted)
+            {
+                string legacyPath = Path.Combine(_paths.AssetWorkspaceRoot, "SYSTEM-PROMPTS.md");
+                TryAppendSection(sb, ref found, key, legacyPath, "legacy-asset");
+            }
         }
 
         if (!found)

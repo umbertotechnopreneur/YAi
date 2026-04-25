@@ -29,6 +29,7 @@ using Microsoft.Extensions.DependencyInjection;
 using YAi.Persona.Models;
 using YAi.Persona.Services;
 using YAi.Persona.Services.Operations.Safety;
+using YAi.Persona.Services.Security.ResourceIntegrity;
 using YAi.Persona.Services.Skills;
 using YAi.Persona.Services.Skills.Validation;
 using YAi.Persona.Services.Tools;
@@ -59,6 +60,7 @@ public static class ServiceCollectionExtensions
             throw new ArgumentNullException(nameof(services));
 
         services.AddSingleton(appPaths ?? new AppPaths());
+        services.AddSingleton<IResourceSignatureVerifier, ResourceSignatureVerifier>();
         services.AddSingleton<MemoryFileParser>();
         services.AddSingleton<PromptAssetService>();
         services.AddSingleton<WorkspaceProfileService>();

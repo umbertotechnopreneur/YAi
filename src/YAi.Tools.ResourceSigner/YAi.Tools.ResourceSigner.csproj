@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+	<OutputType>Exe</OutputType>
+	<TargetFramework>net10.0</TargetFramework>
+	<ImplicitUsings>enable</ImplicitUsings>
+	<Nullable>enable</Nullable>
+	<AssemblyName>yai-resource-signer</AssemblyName>
+	<RootNamespace>YAi.Tools.ResourceSigner</RootNamespace>
+	<Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- Share the ResourceManifest model types from YAi.Persona -->
+  <ItemGroup>
+	<ProjectReference Include="..\YAi.Persona\YAi.Persona.csproj" />
+  </ItemGroup>
+
+</Project>

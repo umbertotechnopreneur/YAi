@@ -1,0 +1,63 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project>
+
+  <!--
+    SignYaiResourcesBeforeBuild
+    Incremental auto-signing target for official YAi bundled resources.
+
+    Fires only when YaiAutoSignResources=true and YaiSkipResourceSigning!=true,
+    and only when resource files are newer than manifest.yai.json or manifest.yai.sig.
+
+    Properties (all have defaults in YAi.Resources.csproj):
+      YaiAutoSignResources     true/false (true in Debug, false otherwise)
+      YaiResourceRoot          Path to reference/ directory
+      YaiSigningPrivateKey     Path to .secrets/yai-signing-private-key.pem
+      YaiSigningToolProject    Path to YAi.Tools.ResourceSigner.csproj
+      YaiSkipResourceSigning   Set true to skip signing (runtime verification still runs)
+      YaiSigningPassphraseEnv  Env var name holding passphrase (CI only)
+  -->
+
+  <Target Name="SignYaiResourcesBeforeBuild"
+          BeforeTargets="Build"
+          Condition="'$(YaiSkipResourceSigning)' != 'true' and '$(YaiAutoSignResources)' == 'true'"
+          Inputs="@(YaiSignableResourceFiles)"
+          Outputs="$(YaiResourceRoot)\manifest.yai.json;$(YaiResourceRoot)\manifest.yai.sig">
+
+    <ItemGroup>
+      <YaiSignableResourceFiles Include="$(YaiResourceRoot)\**\*"
+                                Exclude="$(YaiResourceRoot)\manifest.yai.json;$(YaiResourceRoot)\manifest.yai.sig;$(YaiResourceRoot)\public-key.yai.pem;$(YaiResourceRoot)\**\*.pem;$(YaiResourceRoot)\**\*.key" />
+    </ItemGroup>
+
+    <Error Condition="!Exists('$(YaiSigningPrivateKey)')"
+           Text="YAi resource signing: official resources are stale but the signing private key was not found at '$(YaiSigningPrivateKey)'. Restore the key to .secrets/ or set YaiSkipResourceSigning=true to skip." />
+
+    <PropertyGroup>
+      <_YaiPassphraseEnvArg Condition="'$(YaiSigningPassphraseEnv)' != ''"> --passphrase-env $(YaiSigningPassphraseEnv)</_YaiPassphraseEnvArg>
+      <_YaiPassphraseEnvArg Condition="'$(YaiSigningPassphraseEnv)' == ''"></_YaiPassphraseEnvArg>
+    </PropertyGroup>
+
+    <Message Importance="high" Text="YAi resource signing: official resources changed, invoking ResourceSigner..." />
+
+    <Exec Command="dotnet run --project &quot;$(YaiSigningToolProject)&quot; --no-launch-profile -- sign --root &quot;$(YaiResourceRoot)&quot; --private-key &quot;$(YaiSigningPrivateKey)&quot; --manifest &quot;$(YaiResourceRoot)\manifest.yai.json&quot; --signature &quot;$(YaiResourceRoot)\manifest.yai.sig&quot;$(_YaiPassphraseEnvArg)"
+          WorkingDirectory="$(MSBuildThisFileDirectory)"
+          EchoOff="false"
+          IgnoreExitCode="false" />
+
+    <Message Importance="high" Text="YAi resource signing: manifest.yai.json and manifest.yai.sig updated." />
+
+  </Target>
+
+  <!--
+    WarnYaiResourceSigningSkipped
+    Emits a warning when signing is skipped.
+    Runtime verification remains active even when signing is skipped.
+  -->
+  <Target Name="WarnYaiResourceSigningSkipped"
+          BeforeTargets="Build"
+          Condition="'$(YaiSkipResourceSigning)' == 'true'">
+
+    <Warning Text="YAi resource signing is skipped (YaiSkipResourceSigning=true). Runtime integrity verification is still active. Tests that require valid manifest signatures may fail." />
+
+  </Target>
+
+</Project>

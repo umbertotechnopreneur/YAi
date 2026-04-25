@@ -1,4 +1,4 @@
-/*
+﻿/*
  * YAi!
  *
  * Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.
@@ -48,6 +48,18 @@ public sealed class AppPaths
 
     /// <summary>Gets the root directory for bundled skill markdown files.</summary>
     public string AssetSkillsRoot => Path.Combine(AssetWorkspaceRoot, "skills");
+
+    /// <summary>Gets the root directory for official signed reference assets (<c>reference/</c> under the binary).</summary>
+    public string AssetReferenceRoot => Path.Combine(AssetRoot, "reference");
+
+    /// <summary>Gets the path to the signed resource manifest (<c>reference/manifest.yai.json</c>).</summary>
+    public string AssetReferenceManifestPath => Path.Combine(AssetReferenceRoot, "manifest.yai.json");
+
+    /// <summary>Gets the path to the manifest signature file (<c>reference/manifest.yai.sig</c>).</summary>
+    public string AssetReferenceSignaturePath => Path.Combine(AssetReferenceRoot, "manifest.yai.sig");
+
+    /// <summary>Gets the path to the public key used for manifest verification (<c>reference/public-key.yai.pem</c>).</summary>
+    public string AssetReferencePublicKeyPath => Path.Combine(AssetReferenceRoot, "public-key.yai.pem");
 
     /// <summary>Gets the default appsettings.json bundled with the binary.</summary>
     public string AppSettingsPath => Path.Combine(AssetRoot, "appsettings.json");

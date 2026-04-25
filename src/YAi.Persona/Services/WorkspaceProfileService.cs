@@ -26,6 +26,7 @@
 
 using Microsoft.Extensions.Logging;
 using YAi.Persona.Models;
+using YAi.Persona.Services.Security.ResourceIntegrity;
 
 #endregion
 
@@ -47,6 +48,7 @@ public sealed class WorkspaceProfileService
     private readonly AppPaths _paths;
     private readonly MemoryFileParser _parser;
     private readonly ILogger<WorkspaceProfileService> _logger;
+    private readonly IResourceSignatureVerifier? _verifier;
 
     #endregion
 
@@ -58,11 +60,13 @@ public sealed class WorkspaceProfileService
     /// <param name="paths">Application path provider.</param>
     /// <param name="parser">Memory file frontmatter parser.</param>
     /// <param name="logger">Logger.</param>
-    public WorkspaceProfileService(AppPaths paths, MemoryFileParser parser, ILogger<WorkspaceProfileService> logger)
+    /// <param name="verifier">Optional resource integrity verifier. When provided, template seeding is blocked if bundled resources fail verification.</param>
+    public WorkspaceProfileService(AppPaths paths, MemoryFileParser parser, ILogger<WorkspaceProfileService> logger, IResourceSignatureVerifier? verifier = null)
     {
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
         _parser = parser ?? throw new ArgumentNullException(nameof(parser));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _verifier = verifier;
     }
 
     #endregion
@@ -75,6 +79,20 @@ public sealed class WorkspaceProfileService
     public void EnsureInitializedFromTemplates()
     {
         _paths.EnsureDirectories();
+
+        // Verify bundled resource integrity before seeding.
+        if (_verifier is not null)
+        {
+            ResourceIntegrityResult result = _verifier.VerifyAsync(_paths.AssetReferenceRoot).GetAwaiter().GetResult();
+            if (!result.Success)
+            {
+                _logger.LogError(
+                    "Workspace template seeding BLOCKED: bundled resource integrity verification failed. " +
+                    "Diagnostics: {Diagnostics}",
+                    string.Join("; ", result.Diagnostics.Select(d => $"[{d.Code}] {d.Message}")));
+                return;
+            }
+        }
 
         _logger.LogInformation(
             "Seeding workspace templates from {SourceWorkspace} to {TargetWorkspace}",

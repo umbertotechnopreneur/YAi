@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\YAi.Persona\YAi.Persona.csproj" />
     <ProjectReference Include="..\YAi.Resources\YAi.Resources.csproj" />
+    <ProjectReference Include="..\YAi.Tools.ResourceSigner\YAi.Tools.ResourceSigner.csproj" />
   </ItemGroup>
 
 </Project>

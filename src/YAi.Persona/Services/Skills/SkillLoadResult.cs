@@ -1,4 +1,4 @@
-/*
+﻿/*
  * YAi!
  *
  * Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.
@@ -22,6 +22,8 @@
  * Result returned by SkillLoader.LoadAllWithDiagnostics.
  */
 
+using YAi.Persona.Services.Security.ResourceIntegrity;
+
 namespace YAi.Persona.Services.Skills;
 
 /// <summary>
@@ -37,6 +39,19 @@ public sealed class SkillLoadResult
 
     /// <summary>Gets any diagnostics produced during loading (parse warnings, schema issues, etc.).</summary>
     public IReadOnlyList<SkillLoadDiagnostic> Diagnostics { get; init; } = Array.Empty<SkillLoadDiagnostic>();
+
+    /// <summary>
+    /// Gets the integrity verification result for the bundled skill root.
+    /// <c>null</c> when the verifier was not available or verification was not performed.
+    /// </summary>
+    public ResourceIntegrityResult? BundledIntegrityResult { get; init; }
+
+    /// <summary>
+    /// Returns <c>true</c> when bundled skills were loaded from a verified official resource root.
+    /// <c>false</c> when verification failed or was not performed.
+    /// </summary>
+    public bool BundledResourcesVerified =>
+        BundledIntegrityResult?.Status == ResourceIntegrityStatus.Verified;
 
     #endregion
 }

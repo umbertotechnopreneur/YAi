@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -6,6 +6,24 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <!-- Signing configuration -->
+  <PropertyGroup>
+    <!-- Set to true in local Debug builds to auto-invoke the signer when resources are stale. -->
+    <YaiAutoSignResources Condition="'$(YaiAutoSignResources)' == '' and '$(Configuration)' == 'Debug'">true</YaiAutoSignResources>
+    <YaiAutoSignResources Condition="'$(YaiAutoSignResources)' == ''">false</YaiAutoSignResources>
+    <!-- Path to the resource root inside this project -->
+    <YaiResourceRoot Condition="'$(YaiResourceRoot)' == ''">$(MSBuildThisFileDirectory)reference</YaiResourceRoot>
+    <!-- Private key location � outside the repo, never committed -->
+    <YaiSigningPrivateKey Condition="'$(YaiSigningPrivateKey)' == ''">$(MSBuildThisFileDirectory)..\..\.secrets\yai-signing-private-key.pem</YaiSigningPrivateKey>
+    <!-- Path to the signing tool project -->
+    <YaiSigningToolProject Condition="'$(YaiSigningToolProject)' == ''">$(MSBuildThisFileDirectory)..\YAi.Tools.ResourceSigner\YAi.Tools.ResourceSigner.csproj</YaiSigningToolProject>
+    <!-- Set to true to skip auto-signing without disabling runtime verification -->
+    <YaiSkipResourceSigning Condition="'$(YaiSkipResourceSigning)' == ''">false</YaiSkipResourceSigning>
+    <!-- Optional: name of env var containing passphrase for CI non-interactive mode -->
+    <YaiSigningPassphraseEnv Condition="'$(YaiSigningPassphraseEnv)' == ''"></YaiSigningPassphraseEnv>
+  </PropertyGroup>
+
+  <!-- Bundled resource files copied to output -->
   <ItemGroup>
     <None Update="reference\templates\**\*.md">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -18,4 +36,21 @@
     </None>
   </ItemGroup>
 
+  <!-- Signing artifacts copied to output -->
+  <ItemGroup>
+    <None Update="reference\manifest.yai.json" Condition="Exists('$(MSBuildThisFileDirectory)reference\manifest.yai.json')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="reference\manifest.yai.sig" Condition="Exists('$(MSBuildThisFileDirectory)reference\manifest.yai.sig')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="reference\public-key.yai.pem" Condition="Exists('$(MSBuildThisFileDirectory)reference\public-key.yai.pem')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- Import incremental signing target -->
+  <Import Project="YAi.Resources.Signing.targets" />
+
 </Project>
+

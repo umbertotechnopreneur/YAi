@@ -11,4 +11,6 @@
   <Project Path="YAi.Persona.Tests/YAi.Persona.Tests.csproj" />
   <Project Path="YAi.Persona/YAi.Persona.csproj" Id="66d18aa4-7826-443c-a04d-0a6293a54b4c" />
   <Project Path="YAi.Resources/YAi.Resources.csproj" Id="fb33a815-e898-45ac-809e-47baddbe3972" />
+  <Project Path="YAi.Tools.ResourceSigner/YAi.Tools.ResourceSigner.csproj" />
 </Solution>
+

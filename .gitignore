@@ -160,3 +160,12 @@ dist/
 # storage/memories.local.md
 # storage/lessons.local.md
 # storage/rules.local.md
+
+############################
+# YAi signing secrets
+############################
+.secrets/
+*.key
+*.private.pem
+*yai-signing-private-key.pem
+!src/YAi.Resources/reference/public-key.yai.pem

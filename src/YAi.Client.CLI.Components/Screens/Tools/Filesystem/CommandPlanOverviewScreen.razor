@@ -23,6 +23,10 @@
 @inject CommandPlanOverviewScreenParams ScreenParams
 
 <Rows>
+    <AppHeader />
+
+    <Newline />
+
     @if (_showValidationError)
     {
         <MessageBox Severity="MessageBox.MessageSeverity.Error"

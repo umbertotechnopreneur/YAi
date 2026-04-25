@@ -2,7 +2,9 @@
 
 Thank you for taking the time to improve this project.
 
-YAi is intended to stay local-first, explicit, safe by default, and multiplatform across Windows, macOS, and Linux. Contributions are welcome, but they should support those goals rather than weaken them. When you add, rename, or remove configuration files, memory files, skill files, workspace files, or the SQLite storage path, keep the path inventory used by `--show-paths` and `--gonuclear` in sync with the code and docs.
+YAi is intended to stay local-first, explicit, safe by default, and multiplatform across Windows, macOS, and Linux. Contributions are welcome, but they should support those goals rather than weaken them. The root [MANIFEST.md](MANIFEST.md) captures the project's trust posture, and changes should continue to favor security, ownership, and determinism over hidden automation. When you add, rename, or remove configuration files, memory files, skill files, workspace files, or the SQLite storage path, keep the path inventory used by `--show-paths` and `--gonuclear` in sync with the code and docs.
+
+Project repository: [https://github.com/umbertotechnopreneur/YAi](https://github.com/umbertotechnopreneur/YAi)
 
 > YAi!
 >

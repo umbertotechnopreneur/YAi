@@ -42,7 +42,7 @@ Startup is split into a few fixed stages:
 - OpenRouter balance display, banner splash, model selection, and workspace seeding.
 - Command dispatch or bootstrap ritual execution.
 
-Razor screens are now the primary terminal UI layer. Spectre.Console is still used, but mostly as the rendering primitive inside Razor components for markup, panels, status spinners, and console clearing. The active screen flow is hosted by [RazorScreen.cs](../../../src/YAi.Client.CLI.Components/Screens/RazorScreen.cs), and the current screens include the banner, OpenRouter balance, OpenRouter model selector, configured paths, knowledge hub, exception panel, and destructive reset screen.
+Razor screens are now the primary terminal UI layer. Spectre.Console is still used, but mostly as the rendering primitive inside Razor components for markup, panels, status spinners, and console clearing. The chat and bootstrap loops now share a top app header with a clickable `umbertogiacobbi.biz/YAi` link, the workspace location, the current OpenRouter provider and model, and the current local time, plus a bottom status bar that surfaces local or network activity and token counts. The active screen flow is hosted by [RazorScreen.cs](../../../src/YAi.Client.CLI.Components/Screens/RazorScreen.cs), and the current screens include the banner, OpenRouter balance, OpenRouter model selector, configured paths, knowledge hub, exception panel, and destructive reset screen.
 
 Persistent data is split into distinct roots:
 - Workspace data under `WorkspaceRoot`.

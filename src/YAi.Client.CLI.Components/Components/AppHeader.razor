@@ -1,0 +1,18 @@
+@namespace YAi.Client.CLI.Components
+
+@using Microsoft.AspNetCore.Components
+@using RazorConsole.Components
+
+<Panel Expand="true">
+    <RawMarkup Content="@HeaderState.ToMarkup()" />
+</Panel>
+
+@code {
+    /// <summary>
+    /// Gets or sets the application header state to render.
+    /// </summary>
+    [Parameter]
+    public AppHeaderState? State { get; set; }
+
+    private AppHeaderState HeaderState => State ?? AppHeaderState.Current;
+}

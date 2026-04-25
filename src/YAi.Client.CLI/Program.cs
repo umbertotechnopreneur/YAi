@@ -43,6 +43,7 @@ using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using Spectre.Console;
+using YAi.Client.CLI.Components;
 using YAi.Client.CLI.Components.Screens;
 using YAi.Client.CLI.Services;
 using YAi.Persona.Extensions;
@@ -74,7 +75,7 @@ PrintHelp();
 
 if (IsVersionRequest(cliArgs))
 {
-	PrintVersion();
+	await PrintVersionAsync();
 	return;
 }
 
@@ -87,6 +88,12 @@ return;
 if (IsShowBannerRequest(cliArgs))
 {
 	RunShowBanner();
+	return;
+}
+
+if (IsManifestoRequest(cliArgs))
+{
+	await RunManifestoAsync();
 	return;
 }
 
@@ -139,6 +146,7 @@ try
 	await using ServiceProvider sp = services.BuildServiceProvider();
 
 	CliServices svc = ResolveCliServices(sp);
+	BuildAppHeaderState(appPaths, svc.OpenRouterClient);
 	BootstrapState? bootstrapState = svc.Config.LoadBootstrapState();
 
 	if (RequiresCompletedBootstrap(cmd) && bootstrapState?.IsCompleted != true)
@@ -161,7 +169,8 @@ try
 
 	bool isExplicitBootstrap = cliArgs.Length > 0
 		&& string.Equals(cliArgs[0], "--bootstrap", StringComparison.OrdinalIgnoreCase);
-	bool shouldBootstrap = isExplicitBootstrap || bootstrapState?.IsCompleted != true;
+	bool isFirstRun = bootstrapState?.IsCompleted != true;
+	bool shouldBootstrap = isExplicitBootstrap || isFirstRun;
 
 	await ShowOpenRouterBalanceAsync(svc.OpenRouterBalance, true, true);
 	await new BannerScreenHost().RunAsync();
@@ -171,13 +180,15 @@ try
 		return;
 	}
 
+	BuildAppHeaderState(appPaths, svc.OpenRouterClient);
+
 	Log.Information("OpenRouter model: {Model}", svc.OpenRouterClient.CurrentModel);
 	Log.Information("OpenRouter verbosity: {Verbosity}", svc.OpenRouterClient.CurrentVerbosity);
 	Log.Information("OpenRouter cache enabled: {CacheEnabled}", svc.OpenRouterClient.CacheEnabled);
 
 	if (shouldBootstrap)
 	{
-		await ShowComingAliveBannerAsync();
+		await ShowComingAliveBannerAsync(isFirstRun);
 	}
 
 	// Ensure templates and runtime workspace are ready
@@ -200,7 +211,7 @@ try
 	{
 		Log.Information("Starting bootstrap workflow (explicit={Explicit}, hasCompletedState={HasState})",
 			isExplicitBootstrap, bootstrapState?.IsCompleted == true);
-		await DoBootstrapAsync(svc.Config, svc.Runtime, svc.Workspace, svc.BootstrapSvc, svc.History, svc.AppConfig, svc.OpenRouterBalance);
+		await DoBootstrapAsync(appPaths, svc.Config, svc.Runtime, svc.Workspace, svc.BootstrapSvc, svc.History, svc.AppConfig, svc.OpenRouterBalance, svc.OpenRouterClient);
 		Log.Information("Bootstrap workflow completed");
 
 		// After automatic bootstrap on first run, fall through to normal use
@@ -235,7 +246,7 @@ try
 				Log.Information("Starting ask workflow");
 				await ShowOpenRouterBalanceAsync(svc.OpenRouterBalance);
 				string prompt = cliArgs.Length > 1 ? string.Join(' ', cliArgs.Skip(1)) : string.Empty;
-				await DoAskAsync(svc.PromptBuilder, svc.OpenRouterClient, svc.ToolRegistry, svc.History, svc.AppConfig, prompt);
+				await DoAskAsync(appPaths, svc.PromptBuilder, svc.OpenRouterClient, svc.ToolRegistry, svc.History, svc.AppConfig, prompt);
 				Log.Information("Ask workflow completed");
 			},
 			["--translate"] = async () =>
@@ -246,14 +257,14 @@ try
 				if (string.IsNullOrWhiteSpace(text))
 					AnsiConsole.MarkupLine("[yellow]⚠ No text provided.[/]");
 				else
-					await DoTranslateAsync(svc.PromptBuilder, svc.OpenRouterClient, svc.History, svc.AppConfig, text);
+					await DoTranslateAsync(appPaths, svc.PromptBuilder, svc.OpenRouterClient, svc.History, svc.AppConfig, text);
 				Log.Information("Translate workflow completed");
 			},
 			["--talk"] = async () =>
 			{
 				Log.Information("Starting talk workflow");
 				await ShowOpenRouterBalanceAsync(svc.OpenRouterBalance);
-				await DoTalkAsync(svc.PromptBuilder, svc.OpenRouterClient, svc.ToolRegistry, svc.History, svc.AppConfig);
+				await DoTalkAsync(appPaths, svc.PromptBuilder, svc.OpenRouterClient, svc.ToolRegistry, svc.History, svc.AppConfig);
 				Log.Information("Talk workflow completed");
 			},
 			["--dream"] = async () =>
@@ -356,6 +367,13 @@ static bool IsShowBannerRequest(string[] args)
 	return string.Equals(firstArg, "--show-banner", StringComparison.OrdinalIgnoreCase);
 }
 
+static bool IsManifestoRequest(string[] args)
+{
+	string? firstArg = args.FirstOrDefault();
+
+	return string.Equals(firstArg, "--manifesto", StringComparison.OrdinalIgnoreCase);
+}
+
 static bool IsRecognizedCommand(string cmd)
 {
 	return cmd is "--bootstrap"
@@ -365,6 +383,7 @@ static bool IsRecognizedCommand(string cmd)
 		or "--knowledge"
 		or "--lenna"
 		or "--ask"
+		or "--manifesto"
 		or "--show-banner"
 		or "--show-paths"
 		or "--talk"
@@ -416,14 +435,49 @@ static void RunShowBanner()
 	WriteBanner();
 }
 
+static async Task RunManifestoAsync()
+{
+	AnsiConsole.Clear();
+	await new BannerScreenHost().RunAsync().ConfigureAwait(false);
+	AnsiConsole.WriteLine();
+	WriteManifesto();
+}
+
+static void WriteManifesto()
+{
+	string manifestoMarkup =
+		"[bold cyan]YAi! Manifesto[/]\n" +
+		"[grey70]Trust-first AI agents for builders who do not trust magic.[/]\n\n" +
+		"[bold]OpenClaw optimizes for autonomy.[/]\n" +
+		"[bold]YAi! optimizes for trust.[/]\n\n" +
+		"[grey70]AI should propose.[/]\n" +
+		"[grey70]The runtime should verify.[/]\n" +
+		"[grey70]The human should approve.[/]\n\n" +
+		"[grey70]Local-first workflows, explicit approvals, and auditable execution stay at the center.[/]\n" +
+		"[grey70]No silent automation. No hidden trust boundaries. No fake success.[/]\n\n" +
+		"[link=https://github.com/umbertotechnopreneur/YAi][underline]https://github.com/umbertotechnopreneur/YAi[/][/]";
+
+	Panel manifestoPanel = new Panel(Align.Center(new Markup(manifestoMarkup)))
+	{
+		Border = BoxBorder.Rounded,
+		BorderStyle = new Style(Color.Cyan1),
+		Padding = new Padding(1, 1, 1, 1)
+	};
+
+	AnsiConsole.Write(Align.Center(manifestoPanel));
+}
+
 static void WriteBanner()
 {
+	WriteAppHeader(AppHeaderState.Current);
+	AnsiConsole.WriteLine();
+
 	AnsiConsole.Write(new Panel(new Markup(
 		"[cyan1]╔════════════════╗[/]\n" +
 		"[cyan1]║      YAi!      ║[/]\n" +
 		"[cyan1]╚════════════════╝[/]\n\n" +
 		"[grey70]Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.[/]\n" +
-		"[deepskyblue1]Website: https://umbertogiacobbi.biz[/]\n" +
+		"[deepskyblue1]Website: [link=https://umbertogiacobbi.biz/YAi][underline]umbertogiacobbi.biz/YAi[/][/]\n" +
 		"[springgreen2]Email: hello@umbertogiacobbi.biz[/]"))
 	{
 		Border = BoxBorder.Rounded,
@@ -551,8 +605,12 @@ static async Task RunGoNuclearAsync()
 	await new NuclearResetScreenHost(appPaths).RunAsync().ConfigureAwait(false);
 }
 
-static void PrintVersion()
+static async Task PrintVersionAsync()
 {
+	AnsiConsole.Clear();
+	await new BannerScreenHost().RunAsync().ConfigureAwait(false);
+	AnsiConsole.WriteLine();
+
 	string version = GetVersionString();
 	AnsiConsole.MarkupLine($"[bold cyan]YAi! CLI[/] version [bold]{Markup.Escape(version)}[/]");
 }
@@ -573,14 +631,30 @@ static string GetVersionString()
 
 static async Task RunLennaAsync()
 {
-	string scriptPath = Path.Combine(AppContext.BaseDirectory, "lenna.ps1");
+	await TryRunPowerShellScriptAsync("lenna.ps1", "Lenna", propagateExitCode: true).ConfigureAwait(false);
+}
+
+static async Task<bool> TryRunPowerShellScriptAsync(
+	string scriptFileName,
+	string friendlyName,
+	bool propagateExitCode,
+	bool showErrors = true)
+{
+	string scriptPath = Path.Combine(AppContext.BaseDirectory, scriptFileName);
 
 	if (!File.Exists(scriptPath))
 	{
-		AnsiConsole.MarkupLine($"[red]✖ Lenna script not found:[/] {Markup.Escape(scriptPath)}");
-		Environment.ExitCode = 1;
+		if (showErrors)
+		{
+			AnsiConsole.MarkupLine($"[red]✖ {Markup.Escape(friendlyName)} script not found:[/] {Markup.Escape(scriptPath)}");
+		}
 
-		return;
+		if (propagateExitCode)
+		{
+			Environment.ExitCode = 1;
+		}
+
+		return false;
 	}
 
 	string[] executables = ["pwsh", "powershell"];
@@ -607,9 +681,12 @@ static async Task RunLennaAsync()
 
 			await process.WaitForExitAsync().ConfigureAwait(false);
 
-			Environment.ExitCode = process.ExitCode;
+			if (propagateExitCode)
+			{
+				Environment.ExitCode = process.ExitCode;
+			}
 
-			return;
+			return process.ExitCode == 0;
 		}
 		catch (Win32Exception)
 		{
@@ -617,23 +694,39 @@ static async Task RunLennaAsync()
 		}
 		catch (Exception ex)
 		{
-			AnsiConsole.MarkupLine($"[red]✖ Failed to run Lenna script with {Markup.Escape(executable)}:[/] {Markup.Escape(ex.Message)}");
-			Environment.ExitCode = 1;
+			if (showErrors)
+			{
+				AnsiConsole.MarkupLine($"[red]✖ Failed to run {Markup.Escape(friendlyName)} script with {Markup.Escape(executable)}:[/] {Markup.Escape(ex.Message)}");
+			}
 
-			return;
+			if (propagateExitCode)
+			{
+				Environment.ExitCode = 1;
+			}
+
+			return false;
 		}
 	}
 
-	AnsiConsole.MarkupLine("[red]✖ Unable to find PowerShell (`pwsh` or `powershell`) to run Lenna.ps1.[/]");
-	Environment.ExitCode = 1;
+	if (showErrors)
+	{
+		AnsiConsole.MarkupLine($"[red]✖ Unable to find PowerShell (`pwsh` or `powershell`) to run {Markup.Escape(friendlyName)}.[/]");
+	}
+
+	if (propagateExitCode)
+	{
+		Environment.ExitCode = 1;
+	}
+
+	return false;
 }
 
 static void PrintHelp()
 {
-	AnsiConsole.Write(new Panel(new Markup(
+	AnsiConsole.Write(new Panel(Align.Center(new Markup(
 		"[bold cyan]YAi! CLI[/]\n" +
 		"[grey70]Interactive command line client for bootstrap, banner splash, ask, translate, talk, local path review, custom data reset, and Lenna citation flows.[/]\n\n" +
-		"[yellow]Tip:[/] First launch bootstraps automatically unless you pass [bold]--help[/], [bold]--version[/], [bold]--bootstrap[/], [bold]--show-banner[/], [bold]--lenna[/], [bold]--show-paths[/], or [bold]--gonuclear[/]."))
+		"[yellow]Tip:[/] First launch bootstraps automatically unless you pass [bold]--help[/], [bold]--version[/], [bold]--bootstrap[/], [bold]--show-banner[/], [bold]--manifesto[/], [bold]--lenna[/], [bold]--show-paths[/], or [bold]--gonuclear[/].")))
 	{
 		Border = BoxBorder.Rounded,
 		BorderStyle = new Style(Color.Cyan1),
@@ -646,13 +739,13 @@ static void PrintHelp()
 
 	Table table = new Table()
 		.Border(TableBorder.Rounded)
-		.Expand()
 		.AddColumn(new TableColumn("[bold]Command[/]").Centered())
 		.AddColumn(new TableColumn("[bold]What it does[/]"));
 
 	table.AddRow("[green]--bootstrap[/]", "🧭 Rebuild the first-run workspace and refresh identity files.");
 	table.AddRow("[grey70]--version[/]", "🏷️ Show the compiled CLI version and exit.");
 	table.AddRow("[cyan1]--show-banner[/]", "🖼️ Show the CLI banner splash and exit.");
+	table.AddRow("[cyan1]--manifesto[/]", "🧾 Show the banner splash, then the manifesto excerpt, and exit.");
 	table.AddRow("[cyan1]--show-paths[/]", "📍 Show the resolved config, memory, skill, and storage paths.");
 	table.AddRow("[red1]--gonuclear[/]", "☢️ Confirm and permanently delete the workspace, data, and config roots. Cannot be undone.");
 	table.AddRow("[orchid1]--lenna[/]", "🖼️ Run the Lenna citation script and exit.");
@@ -661,19 +754,29 @@ static void PrintHelp()
 	table.AddRow("[mediumspringgreen]--talk[/]", "🗣️ Start the interactive REPL. Requires a completed bootstrap.");
 	table.AddRow("[grey70]-h, --help[/]", "❓ Show this help and exit.");
 
-	AnsiConsole.Write(table);
+	AnsiConsole.Write(Align.Center(table));
 	AnsiConsole.WriteLine();
-	AnsiConsole.MarkupLine("[bold]Examples[/]");
-	AnsiConsole.MarkupLine("[grey70]dotnet run --project src/YAi.Client.CLI -- --bootstrap[/]");
-	AnsiConsole.MarkupLine("[grey70]dotnet run --project src/YAi.Client.CLI -- --version[/]");
-	AnsiConsole.MarkupLine("[grey70]dotnet run --project src/YAi.Client.CLI -- --show-banner[/]");
-	AnsiConsole.MarkupLine("[grey70]dotnet run --project src/YAi.Client.CLI -- --show-paths[/]");
-	AnsiConsole.MarkupLine("[grey70]dotnet run --project src/YAi.Client.CLI -- --gonuclear[/]");
-	AnsiConsole.MarkupLine("[grey70]dotnet run --project src/YAi.Client.CLI -- --lenna[/]");
-	AnsiConsole.MarkupLine("[grey70]dotnet run --project src/YAi.Client.CLI -- --ask \"Hello\"[/]");
-	AnsiConsole.MarkupLine("[grey70]dotnet run --project src/YAi.Client.CLI -- --talk[/]");
+	AnsiConsole.Write(Align.Center(new Markup("[bold]Examples[/]")));
 	AnsiConsole.WriteLine();
-	AnsiConsole.MarkupLine("[yellow]Requires:[/] [bold]YAI_OPENROUTER_API_KEY[/] for [bold]--ask[/], [bold]--translate[/], [bold]--talk[/], and [bold]--bootstrap[/]. [bold]--ask[/], [bold]--translate[/], and [bold]--talk[/] also require a completed bootstrap. [bold]--show-paths[/] and [bold]--gonuclear[/] are local maintenance flows and do not need the key. The model selector can still open without the key when a cached catalog is available.");
+	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --bootstrap[/]")));
+	AnsiConsole.WriteLine();
+	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --version[/]")));
+	AnsiConsole.WriteLine();
+	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --show-banner[/]")));
+	AnsiConsole.WriteLine();
+	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --manifesto[/]")));
+	AnsiConsole.WriteLine();
+	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --show-paths[/]")));
+	AnsiConsole.WriteLine();
+	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --gonuclear[/]")));
+	AnsiConsole.WriteLine();
+	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --lenna[/]")));
+	AnsiConsole.WriteLine();
+	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --ask \"Hello\"[/]")));
+	AnsiConsole.WriteLine();
+	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --talk[/]")));
+	AnsiConsole.WriteLine();
+	AnsiConsole.Write(Align.Center(new Markup("[yellow]Requires:[/] [bold]YAI_OPENROUTER_API_KEY[/] for [bold]--ask[/], [bold]--translate[/], [bold]--talk[/], and [bold]--bootstrap[/]. [bold]--ask[/], [bold]--translate[/], and [bold]--talk[/] also require a completed bootstrap. [bold]--show-paths[/] and [bold]--gonuclear[/] are local maintenance flows and do not need the key. The model selector can still open without the key when a cached catalog is available.")));
 }
 
 static async Task<bool> EnsureOpenRouterModelSelectedAsync(
@@ -843,6 +946,37 @@ static void WriteAssistantLine(string message, string? assistantName = null)
 	AnsiConsole.MarkupLine($"{GetAssistantLabelMarkup(assistantName)} {Markup.Escape(message)}");
 }
 
+static AppHeaderState BuildAppHeaderState(AppPaths appPaths, OpenRouterClient openrouter)
+{
+	return AppHeaderState.Create(
+		Environment.CurrentDirectory,
+		openrouter.CurrentProvider,
+		openrouter.CurrentModel,
+		DateTimeOffset.Now);
+}
+
+static void WriteAppHeader(AppHeaderState header)
+{
+	AnsiConsole.Write(new Panel(new Markup(header.ToMarkup()))
+	{
+		Border = BoxBorder.Rounded,
+		BorderStyle = new Style(Color.Cyan1),
+		Expand = true,
+		Padding = new Padding(1, 0, 1, 0)
+	});
+}
+
+static void WriteStatusBar(StatusBarState statusBar)
+{
+	AnsiConsole.Write(new Panel(new Markup(statusBar.ToMarkup()))
+	{
+		Border = BoxBorder.Rounded,
+		BorderStyle = new Style(statusBar.GetAccentColor()),
+		Expand = true,
+		Padding = new Padding(1, 0, 1, 0)
+	});
+}
+
 static Task RunThinkingTaskAsync(Func<Task> action)
 {
 	return AnsiConsole.Status()
@@ -859,10 +993,28 @@ static Task<T> RunThinkingAsync<T>(Func<Task<T>> action)
 		.StartAsync("[cyan]thinking...[/]", _ => action());
 }
 
-static async Task ShowComingAliveBannerAsync()
+static async Task ShowComingAliveBannerAsync(bool useLogoSplash)
 {
-	AnsiConsole.Clear();
-	await new BannerScreenHost().RunAsync().ConfigureAwait(false);
+	if (useLogoSplash)
+	{
+		bool rendered = await TryRunPowerShellScriptAsync(
+			"yai_logo_ansi_800x600.ps1",
+			"YAi! first-run splash",
+			propagateExitCode: false,
+			showErrors: false).ConfigureAwait(false);
+
+		if (!rendered)
+		{
+			AnsiConsole.Clear();
+			await new BannerScreenHost().RunAsync().ConfigureAwait(false);
+		}
+	}
+	else
+	{
+		AnsiConsole.Clear();
+		await new BannerScreenHost().RunAsync().ConfigureAwait(false);
+	}
+
 	AnsiConsole.WriteLine();
 	AnsiConsole.MarkupLine("[bold cyan]Coming alive... initializing bootstrap workspace[/]");
 	AnsiConsole.MarkupLine("[grey70]Loading profiles...[/]");
@@ -870,23 +1022,29 @@ static async Task ShowComingAliveBannerAsync()
 }
 
 static async Task DoBootstrapAsync(
+	AppPaths appPaths,
 	ConfigService config,
 	RuntimeState runtime,
 	WorkspaceProfileService workspace,
 	BootstrapInterviewService bootstrapSvc,
 	HistoryService history,
 	AppConfig appConfig,
-	OpenRouterBalanceService openRouterBalance)
+	OpenRouterBalanceService openRouterBalance,
+	OpenRouterClient openrouter)
 {
 	try
 	{
 		AnsiConsole.Clear();
 		await new BannerScreenHost().RunAsync();
 		AnsiConsole.WriteLine();
+		WriteAppHeader(BuildAppHeaderState(appPaths, openrouter));
+		AnsiConsole.WriteLine();
 		AnsiConsole.MarkupLine("[bold cyan]First-run setup[/]");
 		AnsiConsole.MarkupLine("[grey70]Your AI assistant is waking up for the first time. Type [bold]done[/] or [bold]exit[/] when you are ready to finish.[/]");
 		AnsiConsole.WriteLine();
 		await ShowOpenRouterBalanceAsync(openRouterBalance, false, false);
+		AnsiConsole.WriteLine();
+		WriteStatusBar(StatusBarState.Local("idle", "bootstrap"));
 		AnsiConsole.WriteLine();
 
 		// Build the initial system context from BOOTSTRAP.md + workspace files
@@ -904,14 +1062,21 @@ static async Task DoBootstrapAsync(
 		// Get the model's opening message
 		try
 		{
-			string opening = await RunThinkingAsync(() => bootstrapSvc.GetOpeningMessageAsync(kickoffMessages, CancellationToken.None)).ConfigureAwait(false);
-			if (!string.IsNullOrWhiteSpace(opening))
+			WriteStatusBar(StatusBarState.Network("sending", "bootstrap"));
+			AnsiConsole.WriteLine();
+
+			OpenRouterResponse opening = await RunThinkingAsync(() => bootstrapSvc.GetOpeningMessageAsync(kickoffMessages, CancellationToken.None)).ConfigureAwait(false);
+			string openingText = opening.Text ?? string.Empty;
+
+			if (!string.IsNullOrWhiteSpace(openingText))
 			{
-				WriteAssistantLine(opening, runtime.AgentName);
+				WriteAssistantLine(openingText, runtime.AgentName);
+				AnsiConsole.WriteLine();
+				WriteStatusBar(StatusBarState.Local("idle", "bootstrap", opening.PromptTokens, opening.CompletionTokens, opening.TotalTokens));
 				AnsiConsole.WriteLine();
 
-				conversation.Add(new OpenRouterChatMessage { Role = "assistant", Content = opening });
-				sessionEntries.Add(new HistoryEntry { Prompt = "(Begin)", Response = opening, Mode = "bootstrap" });
+				conversation.Add(new OpenRouterChatMessage { Role = "assistant", Content = openingText });
+				sessionEntries.Add(new HistoryEntry { Prompt = "(Begin)", Response = openingText, Mode = "bootstrap" });
 			}
 		}
 		catch (Exception ex)
@@ -950,10 +1115,15 @@ static async Task DoBootstrapAsync(
 
 			try
 			{
-				string resp = await RunThinkingAsync(() => bootstrapSvc.SendBootstrapTurnAsync(messages, CancellationToken.None)).ConfigureAwait(false);
-				string reply = resp ?? string.Empty;
+				WriteStatusBar(StatusBarState.Network("sending", "bootstrap"));
+				AnsiConsole.WriteLine();
+
+				OpenRouterResponse resp = await RunThinkingAsync(() => bootstrapSvc.SendBootstrapTurnAsync(messages, CancellationToken.None)).ConfigureAwait(false);
+				string reply = resp.Text ?? string.Empty;
 
 				WriteAssistantLine(reply, runtime.AgentName);
+				AnsiConsole.WriteLine();
+				WriteStatusBar(StatusBarState.Local("idle", "bootstrap", resp.PromptTokens, resp.CompletionTokens, resp.TotalTokens));
 				AnsiConsole.WriteLine();
 
 				conversation.Add(new OpenRouterChatMessage { Role = "user", Content = trimmed });
@@ -967,6 +1137,8 @@ static async Task DoBootstrapAsync(
 			}
 		}
 
+		AnsiConsole.WriteLine();
+		WriteStatusBar(StatusBarState.Local("saving", "bootstrap profiles"));
 		AnsiConsole.WriteLine();
 		AnsiConsole.MarkupLine("[grey70]Saving your profiles — this may take a moment...[/]");
 
@@ -998,6 +1170,8 @@ static async Task DoBootstrapAsync(
 		config.SaveBootstrapState(state);
 		runtime.IsBootstrapped = true;
 
+		WriteStatusBar(StatusBarState.Local("done", "bootstrap complete"));
+		AnsiConsole.WriteLine();
 		AnsiConsole.MarkupLine("[green]Bootstrap complete. Your profiles are saved.[/]");
 		AnsiConsole.WriteLine();
 	}
@@ -1028,7 +1202,7 @@ static async Task DoDreamAsync(DreamingService dreamingService)
 	}
 }
 
-static async Task DoAskAsync(PromptBuilder promptBuilder, OpenRouterClient openrouter, ToolRegistry toolRegistry, HistoryService history, AppConfig appConfig, string prompt)
+static async Task DoAskAsync(AppPaths appPaths, PromptBuilder promptBuilder, OpenRouterClient openrouter, ToolRegistry toolRegistry, HistoryService history, AppConfig appConfig, string prompt)
 {
 	if (string.IsNullOrWhiteSpace(prompt))
 	{
@@ -1039,23 +1213,32 @@ static async Task DoAskAsync(PromptBuilder promptBuilder, OpenRouterClient openr
 	List<OpenRouterChatMessage> conversation = [];
 	try
 	{
-		(string response, bool guardHit) = await RunChatTurnWithToolsAsync("ask", prompt, promptBuilder, openrouter, toolRegistry, conversation);
+		WriteAppHeader(BuildAppHeaderState(appPaths, openrouter));
+		AnsiConsole.WriteLine();
+		WriteStatusBar(StatusBarState.Network("sending", "ask"));
+		AnsiConsole.WriteLine();
+
+		(OpenRouterResponse response, bool guardHit) = await RunChatTurnWithToolsAsync("ask", prompt, promptBuilder, openrouter, toolRegistry, conversation);
+		string responseText = response.Text ?? string.Empty;
 
 		if (guardHit)
 		{
 			AnsiConsole.MarkupLine("[yellow]⚠ Tool call loop reached the guard limit.[/]");
 		}
 
-		if (string.IsNullOrWhiteSpace(response))
+		if (string.IsNullOrWhiteSpace(responseText))
 		{
 			AnsiConsole.MarkupLine("[yellow]⚠ No response provided.[/]");
 		}
 		else
 		{
-			WriteAssistantLine(response);
+			WriteAssistantLine(responseText);
 		}
 
-		RecordHistoryEntry(history, appConfig, prompt, response, "ask");
+		WriteStatusBar(StatusBarState.Local("idle", "ask", response.PromptTokens, response.CompletionTokens, response.TotalTokens));
+		AnsiConsole.WriteLine();
+
+		RecordHistoryEntry(history, appConfig, prompt, responseText, "ask");
 	}
 	catch (Exception ex)
 	{
@@ -1063,7 +1246,7 @@ static async Task DoAskAsync(PromptBuilder promptBuilder, OpenRouterClient openr
 	}
 }
 
-static async Task DoTranslateAsync(PromptBuilder promptBuilder, OpenRouterClient openrouter, HistoryService history, AppConfig appConfig, string text)
+static async Task DoTranslateAsync(AppPaths appPaths, PromptBuilder promptBuilder, OpenRouterClient openrouter, HistoryService history, AppConfig appConfig, string text)
 {
 	if (string.IsNullOrWhiteSpace(text))
 	{
@@ -1074,8 +1257,15 @@ static async Task DoTranslateAsync(PromptBuilder promptBuilder, OpenRouterClient
 	List<OpenRouterChatMessage> messages = promptBuilder.BuildMessages("translate", text);
 	try
 	{
+		WriteAppHeader(BuildAppHeaderState(appPaths, openrouter));
+		AnsiConsole.WriteLine();
+		WriteStatusBar(StatusBarState.Network("sending", "translate"));
+		AnsiConsole.WriteLine();
+
 		OpenRouterResponse resp = await RunThinkingAsync(() => openrouter.SendChatAsync(messages, CancellationToken.None)).ConfigureAwait(false);
 		WriteAssistantLine(resp.Text ?? string.Empty);
+		WriteStatusBar(StatusBarState.Local("idle", "translate", resp.PromptTokens, resp.CompletionTokens, resp.TotalTokens));
+		AnsiConsole.WriteLine();
 		RecordHistoryEntry(history, appConfig, text, resp.Text, "translate");
 	}
 	catch (Exception ex)
@@ -1084,9 +1274,13 @@ static async Task DoTranslateAsync(PromptBuilder promptBuilder, OpenRouterClient
 	}
 }
 
-static async Task DoTalkAsync(PromptBuilder promptBuilder, OpenRouterClient openrouter, ToolRegistry toolRegistry, HistoryService history, AppConfig appConfig)
+static async Task DoTalkAsync(AppPaths appPaths, PromptBuilder promptBuilder, OpenRouterClient openrouter, ToolRegistry toolRegistry, HistoryService history, AppConfig appConfig)
 {
+	WriteAppHeader(BuildAppHeaderState(appPaths, openrouter));
+	AnsiConsole.WriteLine();
 	AnsiConsole.MarkupLine("[bold cyan]🗣️ Entering talk REPL[/] [grey70](type 'exit' to quit)[/]");
+	WriteStatusBar(StatusBarState.Local("idle", "talk"));
+	AnsiConsole.WriteLine();
 	List<OpenRouterChatMessage> conversation = new List<OpenRouterChatMessage>();
 	List<HistoryEntry> sessionEntries = new List<HistoryEntry>();
 
@@ -1101,7 +1295,11 @@ static async Task DoTalkAsync(PromptBuilder promptBuilder, OpenRouterClient open
 
 		try
 		{
-			(string assistantReply, bool guardHit) = await RunChatTurnWithToolsAsync("talk", userInput, promptBuilder, openrouter, toolRegistry, conversation);
+			WriteStatusBar(StatusBarState.Network("sending", "talk"));
+			AnsiConsole.WriteLine();
+
+			(OpenRouterResponse assistantResponse, bool guardHit) = await RunChatTurnWithToolsAsync("talk", userInput, promptBuilder, openrouter, toolRegistry, conversation);
+			string assistantReply = assistantResponse.Text ?? string.Empty;
 
 			if (guardHit)
 			{
@@ -1116,6 +1314,9 @@ static async Task DoTalkAsync(PromptBuilder promptBuilder, OpenRouterClient open
 			{
 				WriteAssistantLine(assistantReply);
 			}
+
+			WriteStatusBar(StatusBarState.Local("idle", "talk", assistantResponse.PromptTokens, assistantResponse.CompletionTokens, assistantResponse.TotalTokens));
+			AnsiConsole.WriteLine();
 
 			HistoryEntry entry = new HistoryEntry
 			{
@@ -1139,10 +1340,12 @@ static async Task DoTalkAsync(PromptBuilder promptBuilder, OpenRouterClient open
 		history.SaveChatSession(new ChatSession { Entries = sessionEntries });
 	}
 
+	WriteStatusBar(StatusBarState.Local("done", "talk session"));
+	AnsiConsole.WriteLine();
 	AnsiConsole.MarkupLine("[grey70]Exiting REPL[/]");
 }
 
-static async Task<(string Reply, bool GuardHit)> RunChatTurnWithToolsAsync(
+static async Task<(OpenRouterResponse Response, bool GuardHit)> RunChatTurnWithToolsAsync(
 	string promptKey,
 	string userInput,
 	PromptBuilder promptBuilder,
@@ -1156,14 +1359,14 @@ static async Task<(string Reply, bool GuardHit)> RunChatTurnWithToolsAsync(
 		new OpenRouterChatMessage { Role = "user", Content = userInput }
 	];
 
-	string? lastAssistantReply = null;
+	OpenRouterResponse? lastResponse = null;
 	bool guardHit = true;
 
 	for (int round = 0; round < 4; round++)
 	{
 		OpenRouterResponse resp = await RunThinkingAsync(() => openrouter.SendChatAsync(messages, CancellationToken.None)).ConfigureAwait(false);
 		string assistantReply = resp.Text ?? string.Empty;
-		lastAssistantReply = assistantReply;
+		lastResponse = resp;
 
 		OpenRouterChatMessage assistantMessage = new()
 		{
@@ -1179,7 +1382,7 @@ static async Task<(string Reply, bool GuardHit)> RunChatTurnWithToolsAsync(
 		{
 			guardHit = false;
 			conversation.AddRange(turnMessages);
-			return (assistantReply, false);
+			return (resp, false);
 		}
 
 		foreach (ToolCallParser.ParsedToolCall toolCall in toolCalls)
@@ -1199,13 +1402,8 @@ static async Task<(string Reply, bool GuardHit)> RunChatTurnWithToolsAsync(
 
 	conversation.AddRange(turnMessages);
 
-	string reply = ToolCallParser.RemoveToolCalls(lastAssistantReply ?? string.Empty);
-	if (string.IsNullOrWhiteSpace(reply))
-	{
-		reply = lastAssistantReply ?? string.Empty;
-	}
-
-	return (reply, guardHit);
+	OpenRouterResponse fallbackResponse = lastResponse ?? new OpenRouterResponse { Text = string.Empty };
+	return (fallbackResponse, guardHit);
 }
 
 static void RecordHistoryEntry(HistoryService history, AppConfig appConfig, string prompt, string? response, string mode)
@@ -1224,7 +1422,7 @@ static void RecordHistoryEntry(HistoryService history, AppConfig appConfig, stri
 	});
 }
 
-static void ReportRecoverableException(Exception exception, string panelTitle, string logMessage)
+static void ReportRecoverableException(Exception exception, string logMessage, string panelTitle)
 {
 	new ExceptionScreenHost(exception, panelTitle).RunAsync().GetAwaiter().GetResult();
 	Log.Warning(exception, logMessage);

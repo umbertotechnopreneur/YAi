@@ -33,7 +33,7 @@ The diagram below is intentionally detailed because the startup path touches bot
 
 The current CLI is command-driven. It now performs a lightweight bootstrap-state check before the preflight and model-selection work begins. Chat-style commands (`--ask`, `--translate`, and `--talk`) require a completed bootstrap and exit early with a local warning if `config/first-run.json` is missing or incomplete. Informational and maintenance commands such as `--help`, `--version`, `--lenna`, `--show-paths`, and `--gonuclear` also return before the normal bootstrap path, and the `--gonuclear` screen can optionally create a zip backup before it deletes the roots.
 
-After that early gate, the process runs the filesystem and logging bootstrap, builds the service provider, loads the persisted bootstrap state again through `ConfigService`, shows the balance and banner, selects an OpenRouter model if one is not already configured, seeds the runtime workspace, and then either dispatches the requested command or runs the explicit `--bootstrap` ritual. The earlier note that `Program.cs` does not call `LoadBootstrapState()` during startup is stale.
+After that early gate, the process runs the filesystem and logging bootstrap, builds the service provider, loads the persisted bootstrap state again through `ConfigService`, shows the balance and banner, selects an OpenRouter model if one is not already configured, seeds the runtime workspace, and then either dispatches the requested command or runs the explicit `--bootstrap` ritual. When the startup path detects a first run, the bootstrap intro clears the console and scrollback and renders the centered 800x600 YAi splash from `yai_logo_ansi_800x600.ps1` through the shared PowerShell splash helper before the workspace setup message appears. The earlier note that `Program.cs` does not call `LoadBootstrapState()` during startup is stale.
 
 ## Boot Responsibilities
 
@@ -81,6 +81,7 @@ sequenceDiagram
     participant Log as Serilog
     participant DI as ServiceCollection<br/>+ service provider
     participant Balance as OpenRouter balance screen
+    participant Splash as yai_logo_ansi_800x600.ps1
     participant Workspace as WorkspaceProfileService
     participant Config as ConfigService
     participant Banner as Banner
@@ -146,6 +147,10 @@ sequenceDiagram
             Workspace-->>Program: workspace seeded or already up to date
 
             alt first run or explicit --bootstrap
+                opt first run
+                    Program->>Splash: render centered YAi splash
+                    Splash-->>Program: splash rendered
+                end
                 Program->>Bootstrap: DoBootstrapAsync()
                 Bootstrap->>Workspace: build bootstrap messages
                 Bootstrap->>Disk: persist profiles

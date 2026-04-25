@@ -1,0 +1,4 @@
+E:\YAi!\src\YAi.Persona\Services\Tools\Filesystem\IApprovalCardPresenter.cs(51,28): warning CS0108: 'IApprovalCardPresenter.ShowCardAsync(OperationStep, CancellationToken)' nasconde il membro ereditato 'IOperationApprovalPresenter.ShowCardAsync(OperationStep, CancellationToken)'. Se questo comportamento è intenzionale, usare la parola chiave new. [E:\YAi!\src\YAi.Persona\YAi.Persona.csproj]
+E:\YAi!\src\YAi.Persona\Services\Tools\Filesystem\IApprovalCardPresenter.cs(66,10): warning CS0108: 'IApprovalCardPresenter.ReportStepResultAsync(OperationStep, CancellationToken)' nasconde il membro ereditato 'IOperationApprovalPresenter.ReportStepResultAsync(OperationStep, CancellationToken)'. Se questo comportamento è intenzionale, usare la parola chiave new. [E:\YAi!\src\YAi.Persona\YAi.Persona.csproj]
+[2J[3J[1;1H
+[1;38;5;14mYAi! CLI[0m version [1m1.0.0[0m

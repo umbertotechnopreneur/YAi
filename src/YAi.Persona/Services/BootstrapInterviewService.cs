@@ -75,14 +75,14 @@ public sealed class BootstrapInterviewService
     /// </summary>
     /// <param name="kickoffMessages">System messages plus the silent kickoff user turn.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The model's opening message text.</returns>
-    public async Task<string> GetOpeningMessageAsync (
+    /// <returns>The model response for the opening message.</returns>
+    public async Task<OpenRouterResponse> GetOpeningMessageAsync(
         IReadOnlyList<OpenRouterChatMessage> kickoffMessages,
         CancellationToken cancellationToken = default)
     {
-        var response = await _openRouter.SendChatAsync (kickoffMessages.ToList (), cancellationToken, "Bootstrap-Open");
+        OpenRouterResponse response = await _openRouter.SendChatAsync(kickoffMessages.ToList(), cancellationToken, "Bootstrap-Open");
 
-        return response.Text ?? string.Empty;
+        return response;
     }
 
     /// <summary>
@@ -90,14 +90,14 @@ public sealed class BootstrapInterviewService
     /// </summary>
     /// <param name="messages">Full message list (system + prior turns + new user turn).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The assistant reply text.</returns>
-    public async Task<string> SendBootstrapTurnAsync (
+    /// <returns>The model response for the bootstrap turn.</returns>
+    public async Task<OpenRouterResponse> SendBootstrapTurnAsync(
         IReadOnlyList<OpenRouterChatMessage> messages,
         CancellationToken cancellationToken = default)
     {
-        var response = await _openRouter.SendChatAsync (messages.ToList (), cancellationToken, "Bootstrap-Turn");
+        OpenRouterResponse response = await _openRouter.SendChatAsync(messages.ToList(), cancellationToken, "Bootstrap-Turn");
 
-        return response.Text ?? string.Empty;
+        return response;
     }
 
     /// <summary>

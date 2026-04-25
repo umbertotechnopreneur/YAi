@@ -113,11 +113,29 @@ public sealed class OpenRouterClient
 
     public string CurrentModel => _model;
 
+    public string CurrentProvider => GetProviderName(_model);
+
     public string CurrentVerbosity => _verbosity ?? "medium";
 
     public bool CacheEnabled => _cacheEnabled;
 
     public bool HasApiKey => !string.IsNullOrWhiteSpace(_apiKey);
+
+    private static string GetProviderName(string modelId)
+    {
+        if (string.IsNullOrWhiteSpace(modelId))
+        {
+            return "not configured";
+        }
+
+        int slashIndex = modelId.IndexOf('/');
+        if (slashIndex <= 0)
+        {
+            return "unknown";
+        }
+
+        return modelId[..slashIndex];
+    }
 
     public void SetModel(string model)
     {
@@ -217,10 +235,15 @@ public sealed class OpenRouterClient
         if (string.IsNullOrWhiteSpace(content))
             throw new InvalidOperationException("The OpenRouter response did not contain any message content.");
 
+        OpenRouterUsage? usage = chatResponse?.Usage;
+
         return new OpenRouterResponse
         {
             Id = chatResponse?.Id,
-            Text = content
+            Text = content,
+            PromptTokens = usage?.PromptTokens,
+            CompletionTokens = usage?.CompletionTokens,
+            TotalTokens = usage?.TotalTokens
         };
     }
 

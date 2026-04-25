@@ -22,6 +22,10 @@
 @inject ApprovalCardScreenParams ScreenParams
 @inject OperationStep Card
 
+<AppHeader />
+
+<Newline />
+
 <ApprovalCard Card="@Card"
               RemainingCount="@ScreenParams.RemainingCount"
               OnDecision="DecisionMade" />

@@ -57,6 +57,21 @@ namespace YAi.Persona.Models
 
         [JsonPropertyName("choices")]
         public List<OpenRouterChoice> Choices { get; init; } = [];
+
+        [JsonPropertyName("usage")]
+        public OpenRouterUsage? Usage { get; init; }
+    }
+
+    public sealed class OpenRouterUsage
+    {
+        [JsonPropertyName("prompt_tokens")]
+        public int? PromptTokens { get; init; }
+
+        [JsonPropertyName("completion_tokens")]
+        public int? CompletionTokens { get; init; }
+
+        [JsonPropertyName("total_tokens")]
+        public int? TotalTokens { get; init; }
     }
 
     public sealed class OpenRouterChoice

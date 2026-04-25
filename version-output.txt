@@ -1,0 +1,7 @@
+E:\YAi!\src\YAi.Persona\Services\Tools\Filesystem\IApprovalCardPresenter.cs(51,28): warning CS0108: 'IApprovalCardPresenter.ShowCardAsync(OperationStep, CancellationToken)' nasconde il membro ereditato 'IOperationApprovalPresenter.ShowCardAsync(OperationStep, CancellationToken)'. Se questo comportamento è intenzionale, usare la parola chiave new. [E:\YAi!\src\YAi.Persona\YAi.Persona.csproj]
+E:\YAi!\src\YAi.Persona\Services\Tools\Filesystem\IApprovalCardPresenter.cs(66,10): warning CS0108: 'IApprovalCardPresenter.ReportStepResultAsync(OperationStep, CancellationToken)' nasconde il membro ereditato 'IOperationApprovalPresenter.ReportStepResultAsync(OperationStep, CancellationToken)'. Se questo comportamento è intenzionale, usare la parola chiave new. [E:\YAi!\src\YAi.Persona\YAi.Persona.csproj]
+Unhandled exception. System.IO.IOException: Handle non valido.
+   at System.ConsolePal.GetBufferInfo(Boolean throwOnNoConsole, Boolean& succeeded)
+   at System.ConsolePal.Clear()
+   at Program.<Main>$(String[] args) in E:\YAi!\src\YAi.Client.CLI\Program.cs:line 62
+   at Program.<Main>(String[] args)

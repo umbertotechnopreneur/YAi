@@ -22,57 +22,120 @@
 
 <Rows>
     <Panel Title="Go nuclear">
-        <Rows>
-            <RawMarkup
-            Content="[bold red]This will delete the workspace root, data root, and config root and everything beneath them.[/]" />
-            <RawMarkup Content="[grey70]Asset files in the application install folder are left untouched.[/]" />
-            <Newline />
+        <Panel Title="Go nuclear">
+            <Rows>
+                <RawMarkup Content="@GetIntroMarkup()" />
+                <Newline />
 
-            @if (_customEntries.Count > 0)
-            {
-                <RawMarkup Content="[bold]Custom paths that will be removed[/]" />
+                <Columns>
+                    <Panel Title="Impact">
+                        <Rows>
+                            <RawMarkup Content="@GetImpactSummaryMarkup()" />
+                        </Rows>
+                    </Panel>
+                    <Panel Title="Backup">
+                        <Rows>
+                            <RawMarkup Content="@GetBackupSummaryMarkup()" />
+                        </Rows>
+                    </Panel>
+                    <Panel Title="Safety">
+                        <Rows>
+                            <RawMarkup Content="@GetSafetySummaryMarkup()" />
+                        </Rows>
+                    </Panel>
+                </Columns>
 
-                @foreach ((string Category, string Label, string Path, bool IsCustom) entry in _customEntries)
+                <Newline />
+
+                <Panel Title="Paths scheduled for removal">
+                    <Rows>
+                        @if (_customEntries.Count > 0)
+                        {
+                            @foreach ((string Category, string Label, string Path, bool IsCustom) entry in _customEntries)
+                            {
+                                <RawMarkup Content="@(NuclearResetCleanupHelper.FormatEntry(entry))" />
+                                <Newline />
+                            }
+                        }
+                        else
+                        {
+                            <RawMarkup
+                            Content="[grey70]No custom paths were discovered. The workspace, data, and config roots will still be cleared.[/]" />
+                        }
+                    </Rows>
+                </Panel>
+
+                <Newline />
+
+                <RawMarkup Content="@GetActionPromptMarkup()" />
+                <Newline />
+
+                @if (_view is ResetView.Confirm)
                 {
-                    <RawMarkup Content="@(NuclearResetCleanupHelper.FormatEntry(entry))" />
+                    <Columns>
+                        <TextButton Content="[B] Backup + delete" OnClick="BackupAndDeleteClicked"
+                                    BackgroundColor="@Color.Green" FocusedColor="@Color.Green3" />
+                        <TextButton Content="[D] Delete only" OnClick="DeleteOnlyClicked" BackgroundColor="@Color.DarkRed"
+                                    FocusedColor="@Color.OrangeRed1" />
+                        <TextButton Content="[Esc] Cancel" OnClick="CancelDelete" BackgroundColor="@Color.Grey"
+                                    FocusedColor="@Color.Silver" />
+                    </Columns>
                 }
-
-                <Newline />
-            }
-
-            @if (_view is ResetView.Confirm)
-            {
-                <ConfirmationDialog Title="Go nuclear"
-                                    Message="Delete all custom data and start fresh? This cannot be undone automatically."
-                                    RiskColor="@Color.OrangeRed1"
-                                    OnConfirm="ConfirmDelete"
-                                    OnCancel="CancelDelete" />
-            }
-            else if (_view is ResetView.Deleting)
-            {
-                <RawMarkup Content="[red]Deleting workspace, data, and config roots...[/]" />
-            }
-            else if (_view is ResetView.Outcome)
-            {
-                <RawMarkup Content="[bold]Deletion result[/]" />
-
-                @foreach ((string Category, string Label, string Path, bool IsCustom) entry in _customEntries)
+                else if (_view is ResetView.BackingUp)
                 {
-                    <RawMarkup Content="@(NuclearResetCleanupHelper.FormatOutcome(entry, _rootExisted))" />
+                    <Panel Title="Creating backup">
+                        <Rows>
+                            <RawMarkup Content="[cyan]Creating zip backup...[/]" />
+                            <RawMarkup Content="@GetBackupArchiveDirectoryMarkup()" Foreground="@Color.Grey70" />
+                        </Rows>
+                    </Panel>
                 }
+                else if (_view is ResetView.Deleting)
+                {
+                    <Panel Title="Deleting">
+                        <Rows>
+                            @if (!string.IsNullOrWhiteSpace(_backupArchivePath))
+                            {
+                                <RawMarkup Content="[green]Backup archive ready.[/]" />
+                                <RawMarkup Content="@GetBackupArchivePathMarkup()" Foreground="@Color.Grey70" />
+                                <Newline />
+                            }
 
-                <Newline />
-                <RawMarkup Content="@_statusMarkup" />
-                <Newline />
-                <TextButton Content="[Enter] OK" OnClick="CloseClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.Silver" />
-            }
-            else if (_view is ResetView.Notice)
-            {
-                <MessageBox Severity="@_noticeSeverity"
-                            Message="@_noticeMessage"
-                            OnDismiss="DismissNotice" />
-            }
-        </Rows>
+                            <RawMarkup Content="[red]Deleting workspace, data, and config roots...[/]" />
+                        </Rows>
+                    </Panel>
+                }
+                else if (_view is ResetView.Outcome)
+                {
+                    <Panel Title="Deletion result">
+                        <Rows>
+                            @if (_customEntries.Count > 0)
+                            {
+                                @foreach ((string Category, string Label, string Path, bool IsCustom) entry in _customEntries)
+                                {
+                                    <RawMarkup Content="@(NuclearResetCleanupHelper.FormatOutcome(entry, _rootExisted))" />
+                                    <Newline />
+                                }
+                            }
+                            else
+                            {
+                                <RawMarkup Content="[grey70]No custom paths were discovered.[/]" />
+                                <Newline />
+                            }
+
+                            <RawMarkup Content="@_statusMarkup" />
+                            <Newline />
+                            <TextButton Content="[Enter] OK" OnClick="CloseClicked" BackgroundColor="@Color.Grey"
+                                        FocusedColor="@Color.Silver" />
+                        </Rows>
+                    </Panel>
+                }
+                else if (_view is ResetView.Notice)
+                {
+                    <MessageBox Severity="@_noticeSeverity" Message="@_noticeMessage" OnDismiss="DismissNotice" />
+                }
+            </Rows>
+        </Panel>
     </Panel>
 </Rows>
 
@@ -80,6 +143,7 @@
     private enum ResetView
     {
         Confirm,
+        BackingUp,
         Deleting,
         Outcome,
         Notice
@@ -89,6 +153,8 @@
 
     private ResetView _view = ResetView.Confirm;
     private bool _rootExisted;
+    private string _backupArchiveDirectory = string.Empty;
+    private string _backupArchivePath = string.Empty;
     private string _statusMarkup = string.Empty;
     private string _noticeMessage = string.Empty;
     private MessageBox.MessageSeverity _noticeSeverity = MessageBox.MessageSeverity.Warning;
@@ -99,6 +165,7 @@
         AnsiConsole.Clear ();
         Console.Write ("\x1b[3J");
 
+        _backupArchiveDirectory = NuclearResetCleanupHelper.GetBackupArchiveDirectory(Paths);
         _customEntries.AddRange(NuclearResetCleanupHelper.GetCustomEntries(Paths));
 
         if (Console.IsInputRedirected)
@@ -109,16 +176,92 @@
         }
     }
 
-    private async Task ConfirmDelete ()
+    private static string GetIntroMarkup()
     {
-        _view = ResetView.Deleting;
-        await InvokeAsync (StateHasChanged).ConfigureAwait (false);
-        await Task.Yield ();
+        return "[bold red]DANGER ZONE[/]\n" +
+            "[grey70]Destructive local reset for the current workspace.[/]\n" +
+            "[grey70]This removes the workspace root, data root, and config root.[/]\n" +
+            "[grey70]Installed assets in the application folder stay untouched.[/]";
+    }
 
-        _rootExisted = NuclearResetCleanupHelper.DeleteCustomDataRoots(Paths);
-        _statusMarkup = NuclearResetCleanupHelper.BuildOutcomeMarkup(Paths, _rootExisted);
-        _view = ResetView.Outcome;
-        await InvokeAsync (StateHasChanged).ConfigureAwait (false);
+    private static string GetImpactSummaryMarkup()
+    {
+        return "[bold red]3 roots[/]\n" +
+            "[grey70]workspace / data / config[/]";
+    }
+
+    private string GetBackupSummaryMarkup()
+    {
+        return "[bold springgreen2]optional zip[/]\n" +
+            "[grey70]workspace / data / config included[/]\n" +
+            $"[grey70]{GetBackupArchiveDirectoryMarkup()}[/]";
+    }
+
+    private static string GetSafetySummaryMarkup()
+    {
+        return "[bold orange1]assets untouched[/]\n" +
+            "[grey70]packaged workspace assets remain on disk[/]";
+    }
+
+    private static string GetActionPromptMarkup()
+    {
+        return "[bold red]Choose an action[/]\n" +
+            "[grey70]Backup first if you want a zip archive with the folder structure.[/]";
+    }
+
+    private string GetBackupArchiveDirectoryMarkup()
+    {
+        return Spectre.Console.Markup.Escape(_backupArchiveDirectory);
+    }
+
+    private string GetBackupArchivePathMarkup()
+    {
+        return Spectre.Console.Markup.Escape(_backupArchivePath);
+    }
+
+    private async Task BackupAndDeleteClicked()
+    {
+        await ExecuteDeleteWorkflowAsync(true).ConfigureAwait(false);
+    }
+
+    private async Task DeleteOnlyClicked()
+    {
+        await ExecuteDeleteWorkflowAsync(false).ConfigureAwait(false);
+    }
+
+    private async Task ExecuteDeleteWorkflowAsync(bool createBackup)
+    {
+        try
+        {
+            _backupArchivePath = string.Empty;
+
+            if (createBackup)
+            {
+                _view = ResetView.BackingUp;
+                await InvokeAsync(StateHasChanged).ConfigureAwait(false);
+                await Task.Yield();
+
+                _backupArchivePath = await NuclearResetCleanupHelper.CreateBackupArchiveAsync(Paths).ConfigureAwait(false);
+            }
+
+            _view = ResetView.Deleting;
+            await InvokeAsync(StateHasChanged).ConfigureAwait(false);
+            await Task.Yield();
+
+            _rootExisted = NuclearResetCleanupHelper.DeleteCustomDataRoots(Paths);
+            _statusMarkup = NuclearResetCleanupHelper.BuildOutcomeMarkup(Paths, _rootExisted, _backupArchivePath);
+            _view = ResetView.Outcome;
+            await InvokeAsync(StateHasChanged).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _noticeMessage = createBackup
+                ? $"Failed to create the zip backup before deletion: {ex.Message}"
+                : $"Failed to delete the selected roots: {ex.Message}";
+            _noticeSeverity = MessageBox.MessageSeverity.Error;
+            _view = ResetView.Notice;
+            await InvokeAsync(StateHasChanged).ConfigureAwait(false);
+        }
     }
 
     private Task CancelDelete ()

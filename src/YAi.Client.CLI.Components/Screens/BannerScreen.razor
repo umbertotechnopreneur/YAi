@@ -20,14 +20,19 @@
 <Rows>
     <Newline />
 
-    <Panel>
+    <Panel Title="Launch sequence">
         <Rows>
             <RawMarkup Content="@BannerArt" Foreground="@Color.Cyan1" />
             <Newline />
-            <RawMarkup Content="Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved."
-                       Foreground="@Color.Grey70" />
-            <RawMarkup Content="Website: https://umbertogiacobbi.biz" Foreground="@Color.DeepSkyBlue1" />
-            <RawMarkup Content="Email: hello@umbertogiacobbi.biz" Foreground="@Color.SpringGreen2" />
+            <RawMarkup Content="[dim]workspace intelligence for the current session[/]" />
+            <RawMarkup Content="[dim]orchestrate · inspect · reset · repeat[/]" />
+            <Newline />
+            <RawMarkup Content="[dim]Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.[/]" />
+            <RawMarkup Content="Website: [link=https://umbertogiacobbi.biz][underline]umbertogiacobbi.biz[/][/]"
+                       Foreground="@Color.DeepSkyBlue1" />
+            <RawMarkup
+            Content="Email: [link=mailto:hello@umbertogiacobbi.biz][underline]hello@umbertogiacobbi.biz[/][/]"
+            Foreground="@Color.SpringGreen2" />
         </Rows>
     </Panel>
 
@@ -36,10 +41,11 @@
 
 @code {
     private const string BannerArt = """
-╔════════════════╗
-║      YAi!      ║
-╚════════════════╝
-""";
+    ╭────────────────────────────╮
+    │   [bold cyan1]YAi![/]   [grey70]signal online[/]   │
+    │ [grey70]workspace intelligence[/] │
+    ╰────────────────────────────╯
+    """;
 
     protected override Task OnAfterRenderAsync (bool firstRender)
     {

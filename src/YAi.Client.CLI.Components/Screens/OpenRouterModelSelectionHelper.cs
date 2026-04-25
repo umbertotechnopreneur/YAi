@@ -43,6 +43,8 @@ namespace YAi.Client.CLI.Components.Screens;
 internal static class OpenRouterModelSelectionHelper
 {
     private const int VisibleRowCount = 6;
+    private const int DescriptionWrapWidth = 42;
+    private const int DescriptionWrapLines = 2;
 
     /// <summary>
     /// Gets the catalog models ordered for display.
@@ -245,22 +247,13 @@ internal static class OpenRouterModelSelectionHelper
         string modelName = string.IsNullOrWhiteSpace (item.Name)
             ? item.Id
             : item.Name;
-        string description = string.IsNullOrWhiteSpace (item.Description)
-            ? "No description available."
-            : item.Description.Replace ("\r", string.Empty, StringComparison.Ordinal).Replace ("\n", " ", StringComparison.Ordinal).Trim ();
-
-        if (description.Length > 96)
-        {
-            description = $"{description[..93]}...";
-        }
+        string description = BuildDescriptionMarkup(item.Description);
 
         string selectionBadge = selected
-            ? "[black on green bold] SELECTED [/]"
-            : $"[grey70]#{number}[/]";
+            ? "[black on green bold]  SELECTED  [/]"
+            : string.Empty;
 
-        string title = selected
-            ? $"#{number} SELECTED"
-            : $"#{number}";
+        string title = $"#{number}";
 
         return new OpenRouterModelCardViewModel (
             title,
@@ -269,7 +262,81 @@ internal static class OpenRouterModelSelectionHelper
             $"[grey70]Key:[/] [white]{HighlightMatches (item.Id, searchQuery)}[/]",
             $"[white]{HighlightMatches (modelName, searchQuery)}[/]",
             $"[green]{Markup.Escape (cost)}[/]",
-            $"[grey70]{Markup.Escape (description)}[/]");
+            description);
+    }
+
+    private static string BuildDescriptionMarkup(string? description)
+    {
+        string normalizedDescription = string.IsNullOrWhiteSpace(description)
+            ? "No description available."
+            : description.Replace("\r", " ", StringComparison.Ordinal).Replace("\n", " ", StringComparison.Ordinal).Trim();
+
+        string[] wrappedLines = WrapText(normalizedDescription, DescriptionWrapWidth, DescriptionWrapLines);
+
+        if (wrappedLines.Length == 1)
+        {
+            wrappedLines = [wrappedLines[0], string.Empty];
+        }
+
+        return $"[grey70]{Markup.Escape(wrappedLines[0])}[/]\n[grey70]{Markup.Escape(wrappedLines[1])}[/]";
+    }
+
+    private static string[] WrapText(string text, int maxWidth, int maxLines)
+    {
+        List<string> lines = [];
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return [string.Empty];
+        }
+
+        string remaining = text.Trim();
+
+        while (remaining.Length > 0 && lines.Count < maxLines)
+        {
+            if (remaining.Length <= maxWidth)
+            {
+                lines.Add(remaining);
+                break;
+            }
+
+            int breakIndex = remaining.LastIndexOf(' ', Math.Min(maxWidth, remaining.Length - 1));
+            if (breakIndex <= 0)
+            {
+                breakIndex = maxWidth;
+            }
+
+            string line = remaining[..breakIndex].Trim();
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                line = remaining[..Math.Min(maxWidth, remaining.Length)].Trim();
+                breakIndex = Math.Min(maxWidth, remaining.Length);
+            }
+
+            lines.Add(line);
+
+            remaining = remaining[breakIndex..].TrimStart();
+        }
+
+        if (remaining.Length > 0 && lines.Count > 0)
+        {
+            string lastLine = lines[^1];
+            if (lastLine.Length > 3 && lastLine.Length >= maxWidth)
+            {
+                lastLine = lastLine[..Math.Max(0, maxWidth - 3)];
+            }
+
+            lines[^1] = string.IsNullOrWhiteSpace(lastLine)
+                ? "..."
+                : $"{lastLine.TrimEnd()}...";
+        }
+
+        while (lines.Count < maxLines)
+        {
+            lines.Add(string.Empty);
+        }
+
+        return lines.Take(maxLines).ToArray();
     }
 
     private static string BuildSubtitleMarkup (OpenRouterModelCatalog? catalog, AppConfig appConfig)

@@ -26,14 +26,14 @@ This document is grounded in the current CLI and runtime code, especially [Progr
 YAi CLI is a local-first assistant shell that uses OpenRouter-backed chat flows, a bootstrap ritual, workspace-scoped memory, and a RazorConsole UI layer. The process is intentionally command-driven rather than parser-heavy: `Program.cs` reads the raw arguments, handles a small set of special cases early, then wires services and dispatches to the relevant workflow.
 
 The main runtime modes are:
-- Help and maintenance commands such as `--help`, `--lenna`, `--show-paths`, and `--gonuclear`.
+- Help and maintenance commands such as `--help`, `--version`, `--lenna`, `--show-paths`, and `--gonuclear`.
 - First-run or explicit bootstrap via `--bootstrap`.
 - Chat-style flows via `--ask`, `--translate`, and `--talk`.
 - Workspace inspection and memory review via `--knowledge` and `--dream`.
 - Default no-args launch, which still performs startup work and then prints help.
 
 Startup is split into a few fixed stages:
-- Early argument checks for help and Lenna.
+- Early argument checks for help, version, and Lenna.
 - Global exception handlers.
 - Path discovery with `AppPaths`.
 - Preflight warnings for OpenRouter key and connectivity.
@@ -134,9 +134,10 @@ flowchart TD
 | ---------------- | ------- | ----------- | ------------ | -------------- | ----- |
 | No args | Startup, workspace/model setup, then help output | Top-level `Program.cs` flow | Startup branches + `PrintHelp()` | Implemented | On first run it can auto-bootstrap before help is shown. |
 | `--help`, `-h` | Print the command reference and exit | `IsHelpRequest()` | `PrintHelp()` | Implemented | Runs before preflight, DI, logging, or screens. |
+| `--version` | Print the compiled CLI version and exit | `IsVersionRequest()` | `PrintVersion()` | Implemented | Uses the shared `Directory.Build.props` version so every assembly reports the same build number. |
 | `--bootstrap` | Run the first-run bootstrap ritual | Top-level `Program.cs` flow | `DoBootstrapAsync()` | Implemented | If no model is configured, the selector runs first. Returns early after the ritual completes. |
 | `--show-paths` | Show resolved path inventory | `IsShowPathsRequest()` | `RunShowPathsAsync()` | Implemented | Uses `ConfiguredPathsScreenHost`; skips the normal startup branch. |
-| `--gonuclear` | Delete workspace, data, and config roots | `IsGoNuclearRequest()` | `RunGoNuclearAsync()` | Implemented | Uses `NuclearResetScreenHost` and is intentionally destructive. |
+| `--gonuclear` | Optionally back up the workspace, data, and config folder structure, then delete the roots | `IsGoNuclearRequest()` | `RunGoNuclearAsync()` | Implemented | Uses `NuclearResetScreenHost`; the backup archive is written outside the deleted roots under `%LOCALAPPDATA%\YAi\backups\yyyyMMdd\`. |
 | `--lenna` | Run the Lenna citation script and exit | `IsLennaRequest()` | `RunLennaAsync()` | Implemented | Tries `pwsh` first, then `powershell`. |
 | `--ask <text>` | Single-shot chat prompt | Main dispatch branch | `DoAskAsync()` | Implemented | Requires a completed bootstrap and `YAI_OPENROUTER_API_KEY`. Tool calls are allowed through `ToolRegistry`. |
 | `--translate <text>` | Translation / rewrite prompt | Main dispatch branch | `DoTranslateAsync()` | Implemented | Requires a completed bootstrap and `YAI_OPENROUTER_API_KEY`. No tool context is injected. |
@@ -215,7 +216,7 @@ sequenceDiagram
     Help-->>Shell: command table + examples
 ```
 
-`--help` and `-h` exit before preflight, DI, logging, model selection, or workspace seeding.
+`--help` and `-h` exit before preflight, DI, logging, model selection, or workspace seeding. `--version` follows the same early-exit path and prints the compiled version from `Directory.Build.props`.
 
 ### 4.3 Bootstrap command
 
@@ -560,7 +561,7 @@ This is a manual reflection pass, not a background worker. The review screen exi
 | Documented but unwired flow | The dream success message advertises `--dreams-review`, but there is no dispatch branch or host wiring for it in the current CLI entry point. | Medium | [Program.cs](../../../src/YAi.Client.CLI/Program.cs), [DreamsReviewScreen.razor](../../../src/YAi.Client.CLI.Components/Screens/DreamsReviewScreen.razor) | Wire the command or remove the message so the user-facing text matches the runnable surface. |
 | Startup preflight policy | `PreflightCheck.Validate()` warns on missing key or connectivity and then continues. That is acceptable for model selection, but the chat and bootstrap flows can still fail later, which shifts failure discovery deeper into the launch. | Medium | [PreflightCheck.cs](../../../src/YAi.Client.CLI/Services/PreflightCheck.cs), [Program.cs](../../../src/YAi.Client.CLI/Program.cs) | Decide whether chat/bootstrap should fail earlier or keep the warning model and document it clearly. |
 | Loader simplicity vs. completeness | `MinimalSkillSchemaValidator` only checks structural JSON and required fields, not full JSON Schema semantics. That is fine for MVP, but it is easy to overestimate what is being enforced. | Low | [MinimalSkillSchemaValidator.cs](../../../src/YAi.Persona/Services/Skills/Validation/MinimalSkillSchemaValidator.cs) | Keep the validator narrow and document the exact guarantee so future work does not assume full schema support. |
-| Destructive reset surface | `--gonuclear` intentionally deletes the workspace, data, and config roots. The confirmation screen reduces risk, but the command is still a full-data-loss path if the user confirms it or if a root is mis-pointed. | High | [NuclearResetScreen.razor](../../../src/YAi.Client.CLI.Components/Screens/NuclearResetScreen.razor), [NuclearResetCleanupHelper.cs](../../../src/YAi.Client.CLI.Components/Screens/NuclearResetCleanupHelper.cs), [AppPaths.cs](../../../src/YAi.Persona/Services/AppPaths.cs) | Keep the confirmation, keep the path preview, and keep the command out of any non-interactive flow. |
+| Destructive reset surface | `--gonuclear` now offers an optional zip backup before it deletes the workspace, data, and config roots. That reduces the blast radius, but the command is still a full-data-loss path if the user confirms deletion without a backup or if a root is mis-pointed. | High | [NuclearResetScreen.razor](../../../src/YAi.Client.CLI.Components/Screens/NuclearResetScreen.razor), [NuclearResetCleanupHelper.cs](../../../src/YAi.Client.CLI.Components/Screens/NuclearResetCleanupHelper.cs), [AppPaths.cs](../../../src/YAi.Persona/Services/AppPaths.cs) | Keep the confirmation, keep the path preview, keep the optional backup outside the deleted roots, and keep the command out of any non-interactive flow. |
 
 ## Recommendations
 

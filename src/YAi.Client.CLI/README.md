@@ -1,6 +1,6 @@
 # YAi.Client.CLI
 
-Command-line client for interacting with the YAi Persona services (bootstrap, ask, translate, talk).
+Command-line client for interacting with the YAi Persona services (bootstrap, show-banner, ask, translate, talk).
 
 Prerequisites
 - .NET 10 SDK on Windows, macOS, or Linux
@@ -20,13 +20,25 @@ dotnet run --project src/YAi.Client.CLI -- --help
 Quick usage
 
 - `--help` — show the colored Spectre.Console help screen.
+- `--version` — show the compiled CLI and assembly version and exit.
+- Unrecognized arguments fail fast with the banner, a short explanation, and the help screen.
 - `--bootstrap` — initialize runtime workspace and copy identity templates into the user data root. If no OpenRouter model is configured, the CLI prompts you to choose one first. After preflight passes at startup, the CLI shows the current OpenRouter balance first, then continues into the boot flow.
+- `--show-banner` — show the CLI banner splash and exit. This does not require an OpenRouter key.
 - `--show-paths` — show the resolved asset, config, memory, skill, history, and storage paths.
-- `--gonuclear` — show the custom data wipe screen, confirm interactively, and delete the user data root and all custom runtime state.
+- `--gonuclear` — show the custom data wipe screen, optionally create a zip backup with the workspace/data/config folder structure first, then delete the user data root and all custom runtime state. The backup archive is written outside the deleted roots under `%LOCALAPPDATA%\YAi\backups\yyyyMMdd\`.
 - `--lenna` — run the Lenna citation script and exit. This does not require an OpenRouter key.
 - `--ask "text"` — single-shot prompt; requires a completed bootstrap, `YAI_OPENROUTER_API_KEY` in environment, and a selected OpenRouter model. The CLI shows the cached OpenRouter balance before sending the prompt.
 - `--translate "text"` — translation-style prompt using persona prompts; requires a completed bootstrap, `YAI_OPENROUTER_API_KEY`, and a selected OpenRouter model. The CLI shows the cached OpenRouter balance before sending the prompt.
 - `--talk` — interactive REPL (type `exit` to quit); requires a completed bootstrap, `YAI_OPENROUTER_API_KEY`, and a selected OpenRouter model. The CLI shows the cached OpenRouter balance before entering the loop.
+
+Chat display
+
+- Chat prompts now render the user and assistant names with two-tone labels, such as `umber:` and `YAi!:`, and the CLI shows a `thinking...` spinner while waiting for the model.
+
+Versioning
+
+- The CLI version comes from [Directory.Build.props](../../Directory.Build.props), so every project in the solution builds with the same version number.
+- Run `scripts/Set-YAiVersion.ps1 -Version 1.2.3` for a semver-style update or `scripts/Set-YAiVersion.ps1 -Timestamp` for a timestamp-derived build version.
 
 Environment
 
@@ -65,6 +77,12 @@ Run the Lenna citation splash screen and exit:
 
 ```powershell
 dotnet run --project src/YAi.Client.CLI -- --lenna
+```
+
+Show the CLI banner splash and exit:
+
+```powershell
+dotnet run --project src/YAi.Client.CLI -- --show-banner
 ```
 
 Ask a one-shot question (requires `YAI_OPENROUTER_API_KEY`):

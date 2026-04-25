@@ -13,7 +13,7 @@ Local-first agent runtime inspired by OpenClaw, built for high-control environme
 
 This project is a local-first agent system designed for environments where security and control cannot be delegated. It follows an OpenClaw-like model for skills and workflow compatibility, but runs under tighter local constraints, with stronger permission boundaries, improved auditability, and a more predictable execution model. The goal is to preserve interoperability with the OpenClaw ecosystem while making local trust, safety, and operational control the default.
 
-YAi! is intended to remain multiplatform across Windows, macOS, and Linux. When you add, rename, or remove configuration files, memory files, skill files, workspace files, or the local SQLite storage path, keep the path inventory used by `--show-paths` and `--gonuclear` in sync with the code and documentation.
+YAi! is intended to remain multiplatform across Windows, macOS, and Linux. When you add, rename, or remove configuration files, memory files, skill files, workspace files, or the local SQLite storage path, keep the path inventory used by `--show-paths` and the reset backup location used by `--gonuclear` in sync with the code and documentation.
 
 > YAi!
 >
@@ -73,6 +73,8 @@ dotnet build src/YAi.Services.slnx
 ```powershell
 dotnet build src/YAi.Client.CLI/YAi.Client.CLI.csproj
 ```
+
+Versioning is centralized in [Directory.Build.props](Directory.Build.props). Use [scripts/Set-YAiVersion.ps1](scripts/Set-YAiVersion.ps1) with `-Version 1.2.3` or `-Timestamp` to update every assembly together, then verify the result with `dotnet run --project src/YAi.Client.CLI -- --version`.
 
 If you are exploring the CLI-focused runtime, also check the `poc-cli-intelligence-arch/cli-intelligence/` folder for its own solution and documentation.
 

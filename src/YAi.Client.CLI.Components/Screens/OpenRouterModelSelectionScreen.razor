@@ -61,7 +61,10 @@
                         <Columns>
                             <Panel Title="@left.Title">
                                 <Rows>
-                                    <RawMarkup Content="@left.SelectionBadge" />
+                                    @if (!string.IsNullOrWhiteSpace(left.SelectionBadge))
+                                    {
+                                        <RawMarkup Content="@left.SelectionBadge" />
+                                    }
                                     <RawMarkup Content="@left.ProviderMarkup" />
                                     <RawMarkup Content="@left.KeyMarkup" />
                                     <RawMarkup Content="@left.NameMarkup" />
@@ -74,7 +77,10 @@
                             {
                                 <Panel Title="@right.Title">
                                     <Rows>
-                                        <RawMarkup Content="@right.SelectionBadge" />
+                                        @if (!string.IsNullOrWhiteSpace(right.SelectionBadge))
+                                        {
+                                            <RawMarkup Content="@right.SelectionBadge" />
+                                        }
                                         <RawMarkup Content="@right.ProviderMarkup" />
                                         <RawMarkup Content="@right.KeyMarkup" />
                                         <RawMarkup Content="@right.NameMarkup" />

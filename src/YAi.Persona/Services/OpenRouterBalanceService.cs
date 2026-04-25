@@ -84,7 +84,19 @@ public sealed class OpenRouterBalanceService
 			return CacheFailure ("YAI_OPENROUTER_API_KEY is not set.");
 		}
 
-		string? creditsJson = await _openRouterClient.GetCreditsAsync (cancellationToken).ConfigureAwait (false);
+		string? creditsJson;
+
+		try
+		{
+			creditsJson = await _openRouterClient.GetCreditsAsync(cancellationToken).ConfigureAwait(false);
+		}
+		catch (Exception ex)
+		{
+			_logger.LogWarning(ex, "OpenRouter credits request failed: {Message}", ex.Message);
+
+			return CacheFailure($"OpenRouter credits request failed: {ex.Message}");
+		}
+
 		if (!string.IsNullOrWhiteSpace(creditsJson))
 		{
 			_logger.LogInformation("OpenRouter credits raw response: {CreditsJson}", creditsJson);

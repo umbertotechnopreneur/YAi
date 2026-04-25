@@ -59,7 +59,10 @@ public sealed class PreflightCheck
 
 	private static void WarnIfOpenRouterApiKeyIsMissing ()
 	{
-		string openRouterApiKey = Environment.GetEnvironmentVariable (OpenRouterApiKeyEnvironmentVariable) ?? string.Empty;
+		string openRouterApiKey =
+			Environment.GetEnvironmentVariable(OpenRouterApiKeyEnvironmentVariable)
+			?? Environment.GetEnvironmentVariable(OpenRouterApiKeyEnvironmentVariable, EnvironmentVariableTarget.User)
+			?? string.Empty;
 
 		if (!string.IsNullOrWhiteSpace (openRouterApiKey))
 		{

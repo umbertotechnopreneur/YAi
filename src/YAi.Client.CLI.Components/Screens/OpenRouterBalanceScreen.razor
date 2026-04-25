@@ -27,44 +27,43 @@
                        Foreground="@Color.Silver" />
             <Newline />
 
-            @if (Snapshot.HasBalance)
-            {
-                <Columns>
-                    <RawMarkup Content="Remaining balance:" />
-                    <RawMarkup Content="@Spectre.Console.Markup.Escape(_remainingBalance)" Foreground="@Color.Green" />
-                </Columns>
-
-                <Columns>
-                    <RawMarkup Content="Total spent:" />
-                    <RawMarkup Content="@Spectre.Console.Markup.Escape(_totalSpent)" Foreground="@Color.Yellow" />
-                </Columns>
-
-                <Columns>
-                    <RawMarkup Content="Total credits:" />
-                    <RawMarkup Content="@Spectre.Console.Markup.Escape(_totalCredits)" />
-                </Columns>
-            }
-            else
-            {
-                <RawMarkup Content="Remaining balance unavailable" Foreground="@Color.Red" />
-                <RawMarkup Content="Total spent unavailable" Foreground="@Color.Red" />
-            }
-
             <Columns>
-                <RawMarkup Content="Last balance check:" />
-                <RawMarkup Content="@Spectre.Console.Markup.Escape(_lastBalanceCheck)" />
+                <Panel Title="Remaining">
+                    <Rows>
+                        <RawMarkup Content="@GetRemainingSummaryMarkup()" />
+                    </Rows>
+                </Panel>
+
+                <Panel Title="Spent">
+                    <Rows>
+                        <RawMarkup Content="@GetSpentSummaryMarkup()" />
+                    </Rows>
+                </Panel>
+
+                <Panel Title="Source">
+                    <Rows>
+                        <RawMarkup Content="@GetSourceSummaryMarkup()" />
+                    </Rows>
+                </Panel>
             </Columns>
 
-            <Columns>
-                <RawMarkup Content="Source:" />
-                <RawMarkup Content="@Spectre.Console.Markup.Escape(_sourceLabel)" Foreground="@Color.Cyan1" />
-            </Columns>
+            <Newline />
 
-            @if (!string.IsNullOrWhiteSpace (Snapshot.ErrorMessage))
-            {
-                <Newline />
-                <RawMarkup Content="@Spectre.Console.Markup.Escape(Snapshot.ErrorMessage)" Foreground="@Color.Yellow" />
-            }
+            <Panel Title="Details">
+                <Rows>
+                    <Columns>
+                        <RawMarkup Content="Total credits:" />
+                        <RawMarkup Content="@Spectre.Console.Markup.Escape(_totalCredits)" />
+                    </Columns>
+
+                    @if (!string.IsNullOrWhiteSpace(Snapshot.ErrorMessage))
+                    {
+                        <Newline />
+                        <RawMarkup Content="@Spectre.Console.Markup.Escape(Snapshot.ErrorMessage)"
+                                   Foreground="@Color.Yellow" />
+                    }
+                </Rows>
+            </Panel>
         </Rows>
     </Panel>
 </Rows>
@@ -101,5 +100,34 @@
         return amount.HasValue
             ? $"${amount.Value:0.######}"
             : "n/a";
+    }
+
+    private string GetRemainingSummaryMarkup()
+    {
+        if (!Snapshot.HasBalance)
+        {
+            return "[bold red]unavailable[/]\n[grey70]balance not parsed[/]";
+        }
+
+        return $"[bold green]{_remainingBalance}[/]\n[grey70]remaining credits[/]";
+    }
+
+    private string GetSpentSummaryMarkup()
+    {
+        if (!Snapshot.HasBalance)
+        {
+            return "[bold red]unavailable[/]\n[grey70]usage not parsed[/]";
+        }
+
+        return $"[bold yellow]{_totalSpent}[/]\n[grey70]usage to date[/]";
+    }
+
+    private string GetSourceSummaryMarkup()
+    {
+        string sourceMarkup = Snapshot.IsFromCache
+            ? "[bold cyan1]cache[/]"
+            : "[bold springgreen2]live[/]";
+
+        return $"{sourceMarkup}\n[grey70]{Spectre.Console.Markup.Escape(_lastBalanceCheck)}[/]";
     }
 }

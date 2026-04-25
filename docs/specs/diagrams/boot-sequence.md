@@ -31,7 +31,7 @@ The diagram below is intentionally detailed because the startup path touches bot
 
 ## Notes on the current implementation
 
-The current CLI is command-driven. It now performs a lightweight bootstrap-state check before the preflight and model-selection work begins. Chat-style commands (`--ask`, `--translate`, and `--talk`) require a completed bootstrap and exit early with a local warning if `config/first-run.json` is missing or incomplete. Maintenance commands such as `--show-paths` and `--gonuclear` also return before the normal bootstrap path.
+The current CLI is command-driven. It now performs a lightweight bootstrap-state check before the preflight and model-selection work begins. Chat-style commands (`--ask`, `--translate`, and `--talk`) require a completed bootstrap and exit early with a local warning if `config/first-run.json` is missing or incomplete. Informational and maintenance commands such as `--help`, `--version`, `--lenna`, `--show-paths`, and `--gonuclear` also return before the normal bootstrap path, and the `--gonuclear` screen can optionally create a zip backup before it deletes the roots.
 
 After that early gate, the process runs the filesystem and logging bootstrap, builds the service provider, loads the persisted bootstrap state again through `ConfigService`, shows the balance and banner, selects an OpenRouter model if one is not already configured, seeds the runtime workspace, and then either dispatches the requested command or runs the explicit `--bootstrap` ritual. The earlier note that `Program.cs` does not call `LoadBootstrapState()` during startup is stale.
 
@@ -94,8 +94,8 @@ sequenceDiagram
     Program->>Paths: new AppPaths()
     Program->>Disk: check config/first-run.json
 
-    alt --help or --lenna
-        Program-->>Shell: print help or run Lenna and exit
+    alt --help or --version or --lenna
+        Program-->>Shell: print help, version, or run Lenna and exit
     else --show-paths or --gonuclear
         Program->>Program: run maintenance screen
         Program-->>Shell: return

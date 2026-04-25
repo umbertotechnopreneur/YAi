@@ -26,6 +26,7 @@
 
 using System;
 using System.IO;
+using System.IO.Compression;
 using Spectre.Console;
 using YAi.Persona.Services;
 
@@ -77,7 +78,8 @@ internal static class NuclearResetCleanupHelper
     /// <returns>The formatted markup string.</returns>
     public static string FormatEntry ((string Category, string Label, string Path, bool IsCustom) entry)
     {
-        return $"[yellow]custom[/] {Markup.Escape (entry.Category)} | {Markup.Escape (entry.Label)} | {Markup.Escape (entry.Path)}";
+        return $"[bold orange1]custom[/] [grey70]•[/] [bold]{Markup.Escape(entry.Category)}[/] [grey70]—[/] {Markup.Escape(entry.Label)}\n" +
+            $"  [grey70]{Markup.Escape(entry.Path)}[/]";
     }
 
     /// <summary>
@@ -90,7 +92,8 @@ internal static class NuclearResetCleanupHelper
     {
         string status = rootExisted ? "[green]deleted[/]" : "[grey70]already absent[/]";
 
-        return $"{status} {Markup.Escape (entry.Category)} | {Markup.Escape (entry.Label)} | {Markup.Escape (entry.Path)}";
+        return $"{status} [grey70]•[/] [bold]{Markup.Escape(entry.Category)}[/] [grey70]—[/] {Markup.Escape(entry.Label)}\n" +
+            $"  [grey70]{Markup.Escape(entry.Path)}[/]";
     }
 
     /// <summary>
@@ -99,16 +102,117 @@ internal static class NuclearResetCleanupHelper
     /// <param name="paths">The application path provider.</param>
     /// <param name="rootExisted">Whether the roots existed before deletion.</param>
     /// <returns>The formatted summary markup.</returns>
-    public static string BuildOutcomeMarkup (AppPaths paths, bool rootExisted)
+    public static string BuildOutcomeMarkup(AppPaths paths, bool rootExisted, string? backupArchivePath = null)
     {
         ArgumentNullException.ThrowIfNull (paths);
 
         string status = rootExisted ? "[green]deleted[/]" : "[grey70]already absent[/]";
+        string backupLine = string.IsNullOrWhiteSpace(backupArchivePath)
+            ? "[grey70]Backup:[/] not created"
+            : $"[green]Backup zip:[/] {Markup.Escape(backupArchivePath)}";
 
-        return $"[green]Deleted workspace root:[/] {Markup.Escape (paths.WorkspaceRoot)}\n" +
-            $"[green]Deleted data root:[/] {Markup.Escape (paths.DataRoot)}\n" +
-            $"[green]Deleted config root:[/] {Markup.Escape (paths.ConfigRoot)}\n" +
+        return $"[bold green]Cleanup complete[/]\n" +
+            $"{backupLine}\n" +
+            $"[green]Workspace root:[/] {Markup.Escape(paths.WorkspaceRoot)}\n" +
+            $"[green]Data root:[/] {Markup.Escape(paths.DataRoot)}\n" +
+            $"[green]Config root:[/] {Markup.Escape(paths.ConfigRoot)}\n" +
             $"[grey70]Status:[/] {status}";
+    }
+
+    /// <summary>
+    /// Returns the dated directory used to store a destructive reset backup archive.
+    /// </summary>
+    /// <param name="paths">The application path provider.</param>
+    /// <returns>The directory that will contain the backup zip.</returns>
+    public static string GetBackupArchiveDirectory(AppPaths paths)
+    {
+        ArgumentNullException.ThrowIfNull(paths);
+
+        string backupRoot = GetBackupArchiveRoot(paths);
+
+        return Path.Combine(backupRoot, DateTime.Now.ToString("yyyyMMdd"));
+    }
+
+    /// <summary>
+    /// Creates a zip archive that preserves the workspace, data, and config folder structure.
+    /// </summary>
+    /// <param name="paths">The application path provider.</param>
+    /// <returns>The full path to the created backup archive.</returns>
+    public static async Task<string> CreateBackupArchiveAsync(AppPaths paths)
+    {
+        ArgumentNullException.ThrowIfNull(paths);
+
+        string backupDirectory = GetBackupArchiveDirectory(paths);
+        Directory.CreateDirectory(backupDirectory);
+
+        string archivePath = Path.Combine(backupDirectory, $"go-nuclear-{DateTime.Now:HHmmssfff}.zip");
+
+        await Task.Run(() => CreateBackupArchive(archivePath, paths)).ConfigureAwait(false);
+
+        return archivePath;
+    }
+
+    private static string GetBackupArchiveRoot(AppPaths paths)
+    {
+        string? configParent = Path.GetDirectoryName(paths.ConfigRoot);
+
+        if (!string.IsNullOrWhiteSpace(configParent))
+        {
+            return Path.Combine(configParent, "backups");
+        }
+
+        string? dataParent = Path.GetDirectoryName(paths.DataRoot);
+
+        if (!string.IsNullOrWhiteSpace(dataParent))
+        {
+            return Path.Combine(dataParent, "backups");
+        }
+
+        return Path.Combine(Path.GetTempPath(), "YAi", "backups");
+    }
+
+    private static void CreateBackupArchive(string archivePath, AppPaths paths)
+    {
+        using FileStream fileStream = new FileStream(archivePath, FileMode.Create, FileAccess.Write, FileShare.None);
+        using ZipArchive archive = new ZipArchive(fileStream, ZipArchiveMode.Create);
+
+        AddRootToArchive(archive, paths.WorkspaceRoot, "workspace");
+        AddRootToArchive(archive, paths.DataRoot, "data");
+        AddRootToArchive(archive, paths.ConfigRoot, "config");
+    }
+
+    private static void AddRootToArchive(ZipArchive archive, string sourceRoot, string entryRootName)
+    {
+        archive.CreateEntry($"{entryRootName}/");
+
+        if (!Directory.Exists(sourceRoot))
+        {
+            return;
+        }
+
+        AddDirectoryContentsToArchive(archive, sourceRoot, $"{entryRootName}/");
+    }
+
+    private static void AddDirectoryContentsToArchive(ZipArchive archive, string sourceDirectory, string entryPrefix)
+    {
+        foreach (string directoryPath in Directory.EnumerateDirectories(sourceDirectory))
+        {
+            string directoryName = Path.GetFileName(directoryPath);
+            string nestedPrefix = $"{entryPrefix}{directoryName}/";
+
+            archive.CreateEntry(nestedPrefix);
+            AddDirectoryContentsToArchive(archive, directoryPath, nestedPrefix);
+        }
+
+        foreach (string filePath in Directory.EnumerateFiles(sourceDirectory))
+        {
+            string fileName = Path.GetFileName(filePath);
+            ZipArchiveEntry entry = archive.CreateEntry($"{entryPrefix}{fileName}", CompressionLevel.Optimal);
+
+            using Stream entryStream = entry.Open();
+            using FileStream fileStream = File.OpenRead(filePath);
+            fileStream.CopyTo(entryStream);
+        }
     }
 
     private static void DeleteRoot (string root)

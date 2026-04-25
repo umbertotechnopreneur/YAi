@@ -28,37 +28,69 @@
             Foreground="@Color.Silver" />
             <Newline />
 
-            @if (_assetEntries.Count > 0)
-            {
-                <RawMarkup Content="Asset and template paths" Foreground="@Color.Cyan1" />
+            <Columns>
+                <Panel Title="Assets">
+                    <Rows>
+                        <RawMarkup Content="@GetAssetSummaryMarkup()" />
+                    </Rows>
+                </Panel>
+                <Panel Title="Custom">
+                    <Rows>
+                        <RawMarkup Content="@GetCustomSummaryMarkup()" />
+                    </Rows>
+                </Panel>
+                <Panel Title="Total">
+                    <Rows>
+                        <RawMarkup Content="@GetTotalSummaryMarkup()" />
+                    </Rows>
+                </Panel>
+            </Columns>
 
-                @foreach (PathEntryViewModel entry in _assetEntries)
-                {
-                    <Columns>
-                        <RawMarkup Content="@entry.Scope" />
-                        <RawMarkup Content="@entry.Category" />
-                        <RawMarkup Content="@entry.Label" />
-                        <RawMarkup Content="@entry.Path" />
-                    </Columns>
-                }
+            <Newline />
 
-                <Newline />
-            }
+            <Panel Title="Asset and template paths">
+                <Rows>
+                    @if (_assetEntries.Count > 0)
+                    {
+                        @foreach (PathEntryViewModel entry in _assetEntries)
+                        {
+                            <Columns>
+                                <RawMarkup Content="@entry.Scope" />
+                                <RawMarkup Content="@entry.Category" />
+                                <RawMarkup Content="@entry.Label" />
+                                <RawMarkup Content="@entry.Path" />
+                            </Columns>
+                        }
+                    }
+                    else
+                    {
+                        <RawMarkup Content="[grey70]No asset paths were resolved.[/]" />
+                    }
+                </Rows>
+            </Panel>
 
-            @if (_customEntries.Count > 0)
-            {
-                <RawMarkup Content="Custom runtime paths" Foreground="@Color.Yellow" />
+            <Newline />
 
-                @foreach (PathEntryViewModel entry in _customEntries)
-                {
-                    <Columns>
-                        <RawMarkup Content="@entry.Scope" />
-                        <RawMarkup Content="@entry.Category" />
-                        <RawMarkup Content="@entry.Label" />
-                        <RawMarkup Content="@entry.Path" />
-                    </Columns>
-                }
-            }
+            <Panel Title="Custom runtime paths">
+                <Rows>
+                    @if (_customEntries.Count > 0)
+                    {
+                        @foreach (PathEntryViewModel entry in _customEntries)
+                        {
+                            <Columns>
+                                <RawMarkup Content="@entry.Scope" />
+                                <RawMarkup Content="@entry.Category" />
+                                <RawMarkup Content="@entry.Label" />
+                                <RawMarkup Content="@entry.Path" />
+                            </Columns>
+                        }
+                    }
+                    else
+                    {
+                        <RawMarkup Content="[grey70]No custom runtime paths were resolved.[/]" />
+                    }
+                </Rows>
+            </Panel>
         </Rows>
     </Panel>
 </Rows>
@@ -106,5 +138,20 @@
     private static string Escape (string value)
     {
         return Spectre.Console.Markup.Escape (value);
+    }
+
+    private string GetAssetSummaryMarkup()
+    {
+        return $"[bold cyan1]{_assetEntries.Count}[/]\n[grey70]asset and template paths[/]";
+    }
+
+    private string GetCustomSummaryMarkup()
+    {
+        return $"[bold yellow]{_customEntries.Count}[/]\n[grey70]workspace, memory, data, config, and logs[/]";
+    }
+
+    private string GetTotalSummaryMarkup()
+    {
+        return $"[bold springgreen2]{_assetEntries.Count + _customEntries.Count}[/]\n[grey70]resolved entries[/]";
     }
 }

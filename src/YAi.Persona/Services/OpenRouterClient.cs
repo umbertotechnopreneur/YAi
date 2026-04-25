@@ -40,6 +40,12 @@ public sealed class OpenRouterClient
 {
     private const string ApiKeyEnvironmentVariable = "YAI_OPENROUTER_API_KEY";
 
+    /// <summary>Reads the API key from the process env var, falling back to the user-level store.</summary>
+    private static string ReadApiKey() =>
+        Environment.GetEnvironmentVariable(ApiKeyEnvironmentVariable)
+        ?? Environment.GetEnvironmentVariable(ApiKeyEnvironmentVariable, EnvironmentVariableTarget.User)
+        ?? string.Empty;
+
     private static readonly JsonSerializerOptions RequestSerializerOptions = new()
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
@@ -58,6 +64,24 @@ public sealed class OpenRouterClient
     private string? _verbosity;
     private bool _cacheEnabled;
 
+    private Uri GetBaseUri()
+    {
+        try
+        {
+            var baseUri = new Uri(_baseUrl);
+            if (string.Equals(baseUri.Host, "api.openrouter.ai", StringComparison.OrdinalIgnoreCase))
+            {
+                return new Uri($"{baseUri.Scheme}://openrouter.ai");
+            }
+
+            return baseUri;
+        }
+        catch
+        {
+            return new Uri("https://openrouter.ai");
+        }
+    }
+
     /// <summary>
     /// Initializes a new instance of the <see cref="OpenRouterClient"/> class.
     /// </summary>
@@ -73,7 +97,7 @@ public sealed class OpenRouterClient
 
         _logRepository = logRepository;
 
-        _apiKey = Environment.GetEnvironmentVariable(ApiKeyEnvironmentVariable) ?? string.Empty;
+        _apiKey = ReadApiKey();
 
         _model = string.IsNullOrWhiteSpace(config.OpenRouter.Model)
             ? string.Empty
@@ -137,7 +161,7 @@ public sealed class OpenRouterClient
         if (string.IsNullOrWhiteSpace(_model))
             throw new InvalidOperationException("No OpenRouter model is selected. Use the model selector before using chat or bootstrap flows.");
 
-        Uri url = new(new Uri(_baseUrl), "/api/v1/chat/completions");
+        Uri url = new(GetBaseUri(), "/api/v1/chat/completions");
         OpenRouterChatRequest payload = new()
         {
             Model = _model,
@@ -292,19 +316,21 @@ public sealed class OpenRouterClient
             return null;
         }
 
-        try
+        var url = new Uri(GetBaseUri(), "/api/v1/credits");
+        using var req = new HttpRequestMessage(HttpMethod.Get, url);
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+        using var resp = await _http.SendAsync(req, cancellationToken).ConfigureAwait(false);
+
+        if (!resp.IsSuccessStatusCode)
         {
-            var url = new Uri(new Uri(_baseUrl), "/api/v1/credits");
-            using var req = new HttpRequestMessage(HttpMethod.Get, url);
-            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
-            using var resp = await _http.SendAsync(req, cancellationToken).ConfigureAwait(false);
-            if (!resp.IsSuccessStatusCode) return null;
-            return await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            string errorBody = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            throw new HttpRequestException(
+                $"HTTP {(int)resp.StatusCode} {resp.ReasonPhrase}: {errorBody}",
+                inner: null,
+                statusCode: resp.StatusCode);
         }
-        catch
-        {
-            return null;
-        }
+
+        return await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -314,7 +340,7 @@ public sealed class OpenRouterClient
     /// <returns>The downloaded model catalog.</returns>
     public async Task<OpenRouterModelCatalog> GetModelCatalogAsync(CancellationToken cancellationToken = default)
     {
-        Uri url = new(new Uri(_baseUrl), "/api/v1/models");
+        Uri url = new(GetBaseUri(), "/api/v1/models");
         using HttpResponseMessage response = await _http.GetAsync(url, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 

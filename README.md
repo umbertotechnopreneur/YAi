@@ -4,7 +4,7 @@ YAi! is a local-first AI agent runtime for developers and technical operators wh
 
 Inspired by OpenClaw-style skills and flows, YAi! keeps execution local, separates planning from enforcement, uses typed operations instead of raw shell commands, and requires explicit approval before risky changes.
 
-For the longer trust statement, see [MANIFEST.md](MANIFEST.md). YAi! is built around security, ownership, and deterministic execution, so the user stays in control of files, memory, and workflows.
+For the longer trust statement, see [MANIFEST.md](MANIFEST.md). If that trust posture fits how you like to build, join the project by reading [CONTRIBUTING.md](CONTRIBUTING.md) and sending improvements that keep the runtime local, explicit, and auditable. YAi! is built around security, ownership, and deterministic execution, so the user stays in control of files, memory, and workflows.
 
 agent runtime for cautious builders
 agent runtime for local automation
@@ -82,7 +82,7 @@ If you are exploring the CLI-focused runtime, also check the `poc-cli-intelligen
 
 ## Contributing
 
-Contributions are welcome if they improve clarity, safety, correctness, or usability. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+Contributions are welcome if they improve clarity, safety, correctness, or usability. If the project mission resonates, join the project by reading [CONTRIBUTING.md](CONTRIBUTING.md), checking [MANIFEST.md](MANIFEST.md), and sending fixes, docs, tests, or workflow ideas that keep YAi! trustworthy.
 
 **Repository**
 

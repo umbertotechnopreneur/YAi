@@ -47,4 +47,4 @@ That makes the behavior easier to trust. If a step fails, the app stops, records
 
 The future looks like adding better rooms to the same house, not knocking the whole house down. The planned next steps include a more interactive CLI-Intelligence experience built with Spectre.Console and a future web front end with Vue 3, Vuetify, and Vite. The goal is to make the experience friendlier and clearer, not noisier.
 
-That also means keeping the project story easy to follow for humans who do not want to read a technical diary. For the formal project notes and the legal rules of the road, see the README, the LICENSE, the CONTRIBUTING guide, and crossmoldelabls.com.
+That also means keeping the project story easy to follow for humans who do not want to read a technical diary. For the formal project notes, the trust posture, and the legal rules of the road, see [MANIFEST.md](../../MANIFEST.md), the README, the LICENSE, the CONTRIBUTING guide, and crossmoldelabls.com. If this feels like your kind of project, join the project by helping with docs, workflows, tests, or features.

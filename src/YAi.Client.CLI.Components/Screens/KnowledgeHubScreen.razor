@@ -1,0 +1,265 @@
+@*
+    YAi!
+
+    Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.
+    Website: https://umbertogiacobbi.biz
+    Email: hello@umbertogiacobbi.biz
+
+    YAi.Client.CLI.Components
+    KnowledgeHubScreen — RazorConsole knowledge hub menu and file preview
+*@
+
+@using System.Diagnostics
+@using Microsoft.AspNetCore.Components
+@using Microsoft.Extensions.Hosting
+@using RazorConsole.Components
+@using Spectre.Console
+@using YAi.Client.CLI.Components.Components.Dialogs
+@using YAi.Persona.Services
+
+@inject IHostApplicationLifetime AppLifetime
+@inject RazorScreenResult<bool> Result
+@inject AppPaths Paths
+
+<Rows>
+    <Panel Title="Knowledge Hub">
+        <Rows>
+            <Markup Content="[grey]Browse and open your persistent memory files.[/]" />
+            <Newline />
+
+            @if (_view is HubView.Menu)
+            {
+                <Markup Content="[bold springgreen2]Select a knowledge store to open:[/]" />
+                <Newline />
+
+                <TextButton Content="USER.md" OnClick="SelectUserClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.SpringGreen2" />
+                <TextButton Content="SOUL.md" OnClick="SelectSoulClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.SpringGreen2" />
+                <TextButton Content="IDENTITY.md" OnClick="SelectIdentityClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.SpringGreen2" />
+                <TextButton Content="MEMORIES.md" OnClick="SelectMemoriesClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.SpringGreen2" />
+                <TextButton Content="LESSONS.md" OnClick="SelectLessonsClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.SpringGreen2" />
+                <TextButton Content="LIMITS.md" OnClick="SelectLimitsClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.SpringGreen2" />
+                <TextButton Content="AGENTS.md" OnClick="SelectAgentsClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.SpringGreen2" />
+                <TextButton Content="Episodes" OnClick="SelectEpisodesClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.SpringGreen2" />
+                <TextButton Content="Dreams" OnClick="SelectDreamsClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.SpringGreen2" />
+                <TextButton Content="Back" OnClick="BackClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.Silver" />
+            }
+            else if (_view is HubView.FileActions)
+            {
+                <Panel Title="@_selectedChoice">
+                    <Rows>
+                        <Markup Content="@_selectedPathMarkup" />
+                        <Markup Content="[grey70]What would you like to do?[/]" />
+                        <TextButton Content="Open in editor" OnClick="OpenInEditorClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.SpringGreen2" />
+                        <TextButton Content="View inline" OnClick="ViewInlineClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.SpringGreen2" />
+                        <TextButton Content="Back" OnClick="BackToMenuClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.Silver" />
+                    </Rows>
+                </Panel>
+            }
+            else if (_view is HubView.Preview)
+            {
+                <Markup Content="@_previewHeaderMarkup" />
+                <Markup Content="@_previewPathMarkup" />
+                <Newline />
+                <Panel Title="Preview">
+                    <Markup Content="@_previewContentMarkup" />
+                </Panel>
+
+                @if (!string.IsNullOrWhiteSpace (_previewFooterMarkup))
+                {
+                    <Markup Content="@_previewFooterMarkup" />
+                }
+
+                <Newline />
+                <TextButton Content="Back" OnClick="BackToMenuClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.Silver" />
+            }
+            else if (_view is HubView.Notice)
+            {
+                <MessageBox Severity="@_noticeSeverity"
+                            Message="@_noticeMessage"
+                            OnDismiss="BackToMenuClicked" />
+            }
+        </Rows>
+    </Panel>
+</Rows>
+
+@code {
+    private enum HubView
+    {
+        Menu,
+        FileActions,
+        Preview,
+        Notice
+    }
+
+    private HubView _view = HubView.Menu;
+    private string _selectedChoice = string.Empty;
+    private string _selectedPath = string.Empty;
+    private string _selectedPathMarkup = string.Empty;
+    private string _previewHeaderMarkup = string.Empty;
+    private string _previewPathMarkup = string.Empty;
+    private string _previewContentMarkup = string.Empty;
+    private string _previewFooterMarkup = string.Empty;
+    private string _noticeMessage = string.Empty;
+    private MessageBox.MessageSeverity _noticeSeverity = MessageBox.MessageSeverity.Info;
+
+    protected override void OnInitialized ()
+    {
+        Console.Clear ();
+        AnsiConsole.Clear ();
+        Console.Write ("\x1b[3J");
+    }
+
+    private Task SelectUserClicked () => SelectChoiceAsync ("USER.md");
+
+    private Task SelectSoulClicked () => SelectChoiceAsync ("SOUL.md");
+
+    private Task SelectIdentityClicked () => SelectChoiceAsync ("IDENTITY.md");
+
+    private Task SelectMemoriesClicked () => SelectChoiceAsync ("MEMORIES.md");
+
+    private Task SelectLessonsClicked () => SelectChoiceAsync ("LESSONS.md");
+
+    private Task SelectLimitsClicked () => SelectChoiceAsync ("LIMITS.md");
+
+    private Task SelectAgentsClicked () => SelectChoiceAsync ("AGENTS.md");
+
+    private Task SelectEpisodesClicked () => SelectChoiceAsync ("Episodes");
+
+    private Task SelectDreamsClicked () => SelectChoiceAsync ("Dreams");
+
+    private Task SelectChoiceAsync (string choice)
+    {
+        if (string.Equals (choice, "Back", StringComparison.OrdinalIgnoreCase))
+        {
+            return BackClicked ();
+        }
+
+        if (string.Equals (choice, "Episodes", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!Directory.Exists (Paths.EpisodesRoot))
+            {
+                ShowNotice ($"Episodes directory not found: {Paths.EpisodesRoot}", MessageBox.MessageSeverity.Warning);
+                return Task.CompletedTask;
+            }
+
+            if (!TryOpenInEditor (Paths.EpisodesRoot, out string? errorMessage))
+            {
+                ShowNotice (errorMessage ?? "Could not open the episodes directory.", MessageBox.MessageSeverity.Error);
+                return Task.CompletedTask;
+            }
+
+            return BackToMenuClicked ();
+        }
+
+        string filePath = ResolveFilePath (choice);
+
+        if (string.IsNullOrWhiteSpace (filePath) || !File.Exists (filePath))
+        {
+            ShowNotice ($"File not found: {filePath}", MessageBox.MessageSeverity.Warning);
+            return Task.CompletedTask;
+        }
+
+        _selectedChoice = choice;
+        _selectedPath = filePath;
+        _selectedPathMarkup = $"[grey]{Spectre.Console.Markup.Escape (filePath)}[/]";
+        _view = HubView.FileActions;
+
+        return Task.CompletedTask;
+    }
+
+    private Task OpenInEditorClicked ()
+    {
+        if (string.IsNullOrWhiteSpace (_selectedPath))
+        {
+            return BackToMenuClicked ();
+        }
+
+        if (!TryOpenInEditor (_selectedPath, out string? errorMessage))
+        {
+            ShowNotice (errorMessage ?? "Could not open the selected file.", MessageBox.MessageSeverity.Error);
+            return Task.CompletedTask;
+        }
+
+        return BackToMenuClicked ();
+    }
+
+    private Task ViewInlineClicked ()
+    {
+        if (string.IsNullOrWhiteSpace (_selectedPath) || !File.Exists (_selectedPath))
+        {
+            ShowNotice ($"File not found: {_selectedPath}", MessageBox.MessageSeverity.Warning);
+            return Task.CompletedTask;
+        }
+
+        string content = File.ReadAllText (_selectedPath);
+        bool truncated = content.Length > 4000;
+        string preview = truncated ? content[..4000] : content;
+
+        _previewHeaderMarkup = $"[bold springgreen2]{Spectre.Console.Markup.Escape (_selectedChoice)}[/]";
+        _previewPathMarkup = $"[grey]{Spectre.Console.Markup.Escape (_selectedPath)}[/]";
+        _previewContentMarkup = Spectre.Console.Markup.Escape (preview);
+        _previewFooterMarkup = truncated
+            ? "[grey][truncated - open in editor to see the full file][/]"
+            : string.Empty;
+        _view = HubView.Preview;
+
+        return Task.CompletedTask;
+    }
+
+    private Task BackToMenuClicked ()
+    {
+        _view = HubView.Menu;
+        _selectedChoice = string.Empty;
+        _selectedPath = string.Empty;
+        _selectedPathMarkup = string.Empty;
+        _previewHeaderMarkup = string.Empty;
+        _previewPathMarkup = string.Empty;
+        _previewContentMarkup = string.Empty;
+        _previewFooterMarkup = string.Empty;
+
+        return Task.CompletedTask;
+    }
+
+    private Task BackClicked ()
+    {
+        Result.SetResult (true);
+        AppLifetime.StopApplication ();
+
+        return Task.CompletedTask;
+    }
+
+    private void ShowNotice (string message, MessageBox.MessageSeverity severity)
+    {
+        _noticeMessage = message;
+        _noticeSeverity = severity;
+        _view = HubView.Notice;
+    }
+
+    private bool TryOpenInEditor (string filePath, out string? errorMessage)
+    {
+        try
+        {
+            Process.Start (new ProcessStartInfo (filePath) { UseShellExecute = true });
+            errorMessage = null;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            return false;
+        }
+    }
+
+    private string ResolveFilePath (string choice) => choice switch
+    {
+        "USER.md" => Paths.UserProfilePath,
+        "SOUL.md" => Paths.SoulProfilePath,
+        "IDENTITY.md" => Paths.IdentityProfilePath,
+        "MEMORIES.md" => Paths.MemoriesPath,
+        "LESSONS.md" => Paths.LessonsPath,
+        "LIMITS.md" => Paths.LimitsPath,
+        "AGENTS.md" => Paths.AgentsPath,
+        "Dreams" => Paths.DreamsFilePath,
+        _ => string.Empty
+    };
+}

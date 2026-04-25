@@ -1,0 +1,55 @@
+@*
+    YAi!
+
+    Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.
+    Website: https://umbertogiacobbi.biz
+    Email: hello@umbertogiacobbi.biz
+
+    YAi.Client.CLI.Components
+    BannerScreen — RazorConsole rendering of the CLI banner splash
+*@
+
+@using Microsoft.AspNetCore.Components
+@using Microsoft.Extensions.Hosting
+@using RazorConsole.Components
+@using Spectre.Console
+
+@inject IHostApplicationLifetime AppLifetime
+@inject RazorScreenResult<bool> Result
+
+<Rows>
+    <Newline />
+
+    <Panel>
+        <Rows>
+            <Markup Content="@BannerArt" Foreground="@Color.Cyan1" />
+            <Newline />
+            <Markup Content="Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved." Foreground="@Color.Grey70" />
+            <Markup Content="Website: https://umbertogiacobbi.biz" Foreground="@Color.DeepSkyBlue1" />
+            <Markup Content="Email: hello@umbertogiacobbi.biz" Foreground="@Color.SpringGreen2" />
+        </Rows>
+    </Panel>
+
+    <Newline />
+</Rows>
+
+@code {
+    private const string BannerArt = """
+╔════════════════╗
+║      YAi!      ║
+╚════════════════╝
+""";
+
+    protected override Task OnAfterRenderAsync (bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return Task.CompletedTask;
+        }
+
+        Result.SetResult (true);
+        AppLifetime.StopApplication ();
+
+        return Task.CompletedTask;
+    }
+}

@@ -1,4 +1,4 @@
-﻿/*
+/*
  * YAi!
  *
  * Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.
@@ -43,7 +43,7 @@ using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using Spectre.Console;
-using YAi.Client.CLI.Screens;
+using YAi.Client.CLI.Components.Screens;
 using YAi.Client.CLI.Services;
 using YAi.Persona.Extensions;
 using YAi.Persona.Models;
@@ -163,7 +163,7 @@ try
 	Log.Information("Data root: {DataRoot}", appPaths.DataRoot);
 
 	await ShowOpenRouterBalanceAsync(openRouterBalance, true, false);
-	await new Banner().RunAsync();
+	await new BannerScreenHost().RunAsync();
 
 	if (!await EnsureOpenRouterModelSelectedAsync(config, appConfig, openRouterClient, openRouterCatalog).ConfigureAwait(false))
 	{
@@ -264,15 +264,8 @@ try
 		else if (cmd == "--knowledge")
 		{
 			Log.Information("Opening Knowledge Hub");
-			await new KnowledgeHubScreen(appPaths).RunAsync();
+			await new KnowledgeHubScreenHost(appPaths).RunAsync().ConfigureAwait(false);
 			Log.Information("Knowledge Hub closed");
-		}
-		else if (cmd == "--dreams-review")
-		{
-			Log.Information("Opening Dreams Review");
-			PromotionService promotionSvc = sp.GetRequiredService<PromotionService>();
-			await new DreamsReviewScreen(promotionSvc).RunAsync();
-			Log.Information("Dreams Review closed");
 		}
 		else
 		{
@@ -289,7 +282,7 @@ try
 }
 catch (Exception ex)
 {
-	ExceptionScreen.Show(ex, "Unhandled exception in YAi CLI");
+	new ExceptionScreenHost(ex, "Unhandled exception in YAi CLI").RunAsync().GetAwaiter().GetResult();
 	Log.Fatal(ex, "Unhandled exception in YAi CLI");
 	Environment.ExitCode = 1;
 }
@@ -322,7 +315,7 @@ static void HandleUnhandledException(Exception exception, string title)
 {
 	try
 	{
-		ExceptionScreen.Show(exception, title);
+		new ExceptionScreenHost(exception, title).RunAsync().GetAwaiter().GetResult();
 		Log.Fatal(exception, title);
 		Environment.ExitCode = 1;
 	}
@@ -392,17 +385,17 @@ static bool HasCompletedBootstrapState(string firstRunPath)
 static async Task RunShowPathsAsync()
 {
 	AppPaths appPaths = new AppPaths();
-	ConfiguredPathsScreen screen = new ConfiguredPathsScreen(appPaths);
+	AnsiConsole.Clear();
+	await new BannerScreenHost().RunAsync().ConfigureAwait(false);
+	AnsiConsole.WriteLine();
 
-	await screen.ShowAsync().ConfigureAwait(false);
+	await new ConfiguredPathsScreenHost(appPaths).RunAsync().ConfigureAwait(false);
 }
 
 static async Task RunGoNuclearAsync()
 {
 	AppPaths appPaths = new AppPaths();
-	NuclearResetScreen screen = new NuclearResetScreen(appPaths);
-
-	await screen.ShowAsync().ConfigureAwait(false);
+	await new NuclearResetScreenHost(appPaths).RunAsync().ConfigureAwait(false);
 }
 
 static async Task RunLennaAsync()
@@ -518,8 +511,9 @@ static async Task<bool> EnsureOpenRouterModelSelectedAsync(
 
 	try
 	{
-		OpenRouterModelSelectionScreen modelScreen = new OpenRouterModelSelectionScreen(openRouterCatalog, appConfig);
-		OpenRouterModel? selectedModel = await modelScreen.ShowAsync().ConfigureAwait(false);
+		OpenRouterModel? selectedModel = await new OpenRouterModelSelectionScreenHost(openRouterCatalog, appConfig)
+			.RunAsync()
+			.ConfigureAwait(false);
 
 		if (selectedModel is null || string.IsNullOrWhiteSpace(selectedModel.Id))
 		{
@@ -571,7 +565,28 @@ static async Task ShowOpenRouterBalanceAsync(
 {
 	try
 	{
-		await new OpenRouterBalanceScreen(openRouterBalance).ShowAsync(clearConsole, showBanner).ConfigureAwait(false);
+		if (clearConsole)
+		{
+			AnsiConsole.Clear();
+		}
+
+		if (showBanner)
+		{
+			await new BannerScreenHost().RunAsync().ConfigureAwait(false);
+			AnsiConsole.WriteLine();
+		}
+
+		AnsiConsole.MarkupLine("[bold yellow]OpenRouter balance[/]");
+		AnsiConsole.MarkupLine("[grey70]This screen is cached for 10 minutes to avoid unnecessary credits API calls.[/]");
+		AnsiConsole.WriteLine();
+
+		OpenRouterBalanceSnapshot snapshot = await AnsiConsole.Status()
+			.Spinner(Spinner.Known.Dots)
+			.SpinnerStyle(new Style(Color.Cyan1))
+			.StartAsync("[cyan]Checking OpenRouter balance...[/]", _ => openRouterBalance.GetBalanceAsync(cancellationToken: default))
+			.ConfigureAwait(false);
+
+		await new OpenRouterBalanceScreenHost(snapshot).RunAsync().ConfigureAwait(false);
 	}
 	catch (Exception ex)
 	{
@@ -608,7 +623,7 @@ static async Task DoBootstrapAsync(
 	try
 	{
 		AnsiConsole.Clear();
-		await new Banner().RunAsync();
+		await new BannerScreenHost().RunAsync();
 		AnsiConsole.WriteLine();
 		AnsiConsole.MarkupLine("[bold cyan]First-run setup[/]");
 		AnsiConsole.MarkupLine("[grey70]Your AI assistant is waking up for the first time. Type [bold]done[/] or [bold]exit[/] when you are ready to finish.[/]");
@@ -953,7 +968,7 @@ static void RecordHistoryEntry(HistoryService history, AppConfig appConfig, stri
 
 static void ReportRecoverableException(Exception exception, string panelTitle, string logMessage)
 {
-	ExceptionScreen.Show(exception, panelTitle);
+	new ExceptionScreenHost(exception, panelTitle).RunAsync().GetAwaiter().GetResult();
 	Log.Warning(exception, logMessage);
 }
 

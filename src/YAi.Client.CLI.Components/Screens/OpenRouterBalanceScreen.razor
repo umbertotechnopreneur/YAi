@@ -1,0 +1,104 @@
+@*
+    YAi!
+
+    Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.
+    Website: https://umbertogiacobbi.biz
+    Email: hello@umbertogiacobbi.biz
+
+    YAi.Client.CLI.Components
+    OpenRouterBalanceScreen — RazorConsole rendering of the OpenRouter balance snapshot
+*@
+
+@using System.Globalization
+@using Microsoft.AspNetCore.Components
+@using Microsoft.Extensions.Hosting
+@using RazorConsole.Components
+@using Spectre.Console
+@using YAi.Persona.Models
+
+@inject IHostApplicationLifetime AppLifetime
+@inject RazorScreenResult<bool> Result
+@inject OpenRouterBalanceSnapshot Snapshot
+
+<Rows>
+    <Panel Title="OpenRouter balance">
+        <Rows>
+            <Markup Content="This screen is cached for 10 minutes to avoid unnecessary credits API calls." Foreground="@Color.Silver" />
+            <Newline />
+
+            @if (Snapshot.HasBalance)
+            {
+                <Columns>
+                    <Markup Content="Remaining balance:" />
+                    <Markup Content="@_remainingBalance" Foreground="@Color.Green" />
+                </Columns>
+
+                <Columns>
+                    <Markup Content="Total spent:" />
+                    <Markup Content="@_totalSpent" Foreground="@Color.Yellow" />
+                </Columns>
+
+                <Columns>
+                    <Markup Content="Total credits:" />
+                    <Markup Content="@_totalCredits" />
+                </Columns>
+            }
+            else
+            {
+                <Markup Content="Remaining balance unavailable" Foreground="@Color.Red" />
+                <Markup Content="Total spent unavailable" Foreground="@Color.Red" />
+            }
+
+            <Columns>
+                <Markup Content="Last balance check:" />
+                <Markup Content="@_lastBalanceCheck" />
+            </Columns>
+
+            <Columns>
+                <Markup Content="Source:" />
+                <Markup Content="@_sourceLabel" Foreground="@Color.Cyan1" />
+            </Columns>
+
+            @if (!string.IsNullOrWhiteSpace (Snapshot.ErrorMessage))
+            {
+                <Newline />
+                <Markup Content="@Snapshot.ErrorMessage" Foreground="@Color.Yellow" />
+            }
+        </Rows>
+    </Panel>
+</Rows>
+
+@code {
+    private string _remainingBalance = string.Empty;
+    private string _totalSpent = string.Empty;
+    private string _totalCredits = string.Empty;
+    private string _lastBalanceCheck = string.Empty;
+    private string _sourceLabel = string.Empty;
+
+    protected override void OnInitialized ()
+    {
+        _remainingBalance = FormatMoney (Snapshot.RemainingCredits);
+        _totalSpent = FormatMoney (Snapshot.TotalUsage);
+        _totalCredits = FormatMoney (Snapshot.TotalCredits);
+        _lastBalanceCheck = Snapshot.LastBalanceCheckUtc.ToString ("u", CultureInfo.InvariantCulture);
+        _sourceLabel = Snapshot.IsFromCache ? "cache" : "live";
+    }
+
+    protected override Task OnAfterRenderAsync (bool firstRender)
+    {
+        if (firstRender)
+        {
+            Result.SetResult (true);
+            AppLifetime.StopApplication ();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static string FormatMoney (decimal? amount)
+    {
+        return amount.HasValue
+            ? $"${amount.Value:0.######}"
+            : "n/a";
+    }
+}

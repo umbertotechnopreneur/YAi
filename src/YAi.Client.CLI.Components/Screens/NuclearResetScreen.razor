@@ -1,0 +1,215 @@
+@*
+    YAi!
+
+    Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.
+    Website: https://umbertogiacobbi.biz
+    Email: hello@umbertogiacobbi.biz
+
+    YAi.Client.CLI.Components
+    NuclearResetScreen — RazorConsole destructive reset flow
+*@
+
+@using Microsoft.AspNetCore.Components
+@using Microsoft.Extensions.Hosting
+@using RazorConsole.Components
+@using Spectre.Console
+@using YAi.Client.CLI.Components.Components.Dialogs
+@using YAi.Persona.Services
+
+@inject IHostApplicationLifetime AppLifetime
+@inject RazorScreenResult<bool> Result
+@inject AppPaths Paths
+
+<Rows>
+    <Panel Title="Go nuclear">
+        <Rows>
+            <Markup Content="[bold red]This will delete the workspace root, data root, and config root and everything beneath them.[/]" />
+            <Markup Content="[grey70]Asset files in the application install folder are left untouched.[/]" />
+            <Newline />
+
+            @if (_customEntries.Count > 0)
+            {
+                <Markup Content="[bold]Custom paths that will be removed[/]" />
+
+                @foreach ((string Category, string Label, string Path, bool IsCustom) entry in _customEntries)
+                {
+                    <Markup Content="@(FormatEntry (entry))" />
+                }
+
+                <Newline />
+            }
+
+            @if (_view is ResetView.Confirm)
+            {
+                <ConfirmationDialog Title="Go nuclear"
+                                    Message="Delete all custom data and start fresh? This cannot be undone automatically."
+                                    RiskColor="@Color.OrangeRed1"
+                                    OnConfirm="ConfirmDelete"
+                                    OnCancel="CancelDelete" />
+            }
+            else if (_view is ResetView.Deleting)
+            {
+                <Markup Content="[red]Deleting workspace, data, and config roots...[/]" />
+            }
+            else if (_view is ResetView.Outcome)
+            {
+                <Markup Content="[bold]Deletion result[/]" />
+
+                @foreach ((string Category, string Label, string Path, bool IsCustom) entry in _customEntries)
+                {
+                    <Markup Content="@(FormatOutcome (entry))" />
+                }
+
+                <Newline />
+                <Markup Content="@_statusMarkup" />
+                <Newline />
+                <TextButton Content="[Enter] OK" OnClick="CloseClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.Silver" />
+            }
+            else if (_view is ResetView.Notice)
+            {
+                <MessageBox Severity="@_noticeSeverity"
+                            Message="@_noticeMessage"
+                            OnDismiss="DismissNotice" />
+            }
+        </Rows>
+    </Panel>
+</Rows>
+
+@code {
+    private enum ResetView
+    {
+        Confirm,
+        Deleting,
+        Outcome,
+        Notice
+    }
+
+    private readonly List<(string Category, string Label, string Path, bool IsCustom)> _customEntries = [];
+
+    private ResetView _view = ResetView.Confirm;
+    private bool _rootExisted;
+    private string _statusMarkup = string.Empty;
+    private string _noticeMessage = string.Empty;
+    private MessageBox.MessageSeverity _noticeSeverity = MessageBox.MessageSeverity.Warning;
+
+    protected override void OnInitialized ()
+    {
+        Console.Clear ();
+        AnsiConsole.Clear ();
+        Console.Write ("\x1b[3J");
+
+        _customEntries.AddRange (Paths.GetCustomDataEntries ());
+
+        if (Console.IsInputRedirected)
+        {
+            _noticeMessage = "Interactive confirmation is required for this command.";
+            _noticeSeverity = MessageBox.MessageSeverity.Warning;
+            _view = ResetView.Notice;
+        }
+    }
+
+    private async Task ConfirmDelete ()
+    {
+        _view = ResetView.Deleting;
+        await InvokeAsync (StateHasChanged).ConfigureAwait (false);
+        await Task.Yield ();
+
+        DeleteCustomDataRoot ();
+
+        _statusMarkup = BuildOutcomeMarkup ();
+        _view = ResetView.Outcome;
+        await InvokeAsync (StateHasChanged).ConfigureAwait (false);
+    }
+
+    private Task CancelDelete ()
+    {
+        Result.SetResult (false);
+        AppLifetime.StopApplication ();
+
+        return Task.CompletedTask;
+    }
+
+    private Task CloseClicked ()
+    {
+        Result.SetResult (true);
+        AppLifetime.StopApplication ();
+
+        return Task.CompletedTask;
+    }
+
+    private Task DismissNotice ()
+    {
+        Result.SetResult (false);
+        AppLifetime.StopApplication ();
+
+        return Task.CompletedTask;
+    }
+
+    private void DeleteCustomDataRoot ()
+    {
+        _rootExisted = Directory.Exists (Paths.WorkspaceRoot)
+            || Directory.Exists (Paths.DataRoot)
+            || Directory.Exists (Paths.ConfigRoot);
+
+        DeleteRoot (Paths.WorkspaceRoot);
+        DeleteRoot (Paths.DataRoot);
+        DeleteRoot (Paths.ConfigRoot);
+    }
+
+    private static void DeleteRoot (string root)
+    {
+        if (!Directory.Exists (root))
+        {
+            return;
+        }
+
+        ClearReadOnlyAttributes (root);
+        Directory.Delete (root, true);
+    }
+
+    private static void ClearReadOnlyAttributes (string rootPath)
+    {
+        foreach (string entryPath in Directory.EnumerateFileSystemEntries (rootPath, "*", SearchOption.AllDirectories))
+        {
+            try
+            {
+                File.SetAttributes (entryPath, FileAttributes.Normal);
+            }
+            catch
+            {
+                // Best effort only.
+            }
+        }
+
+        try
+        {
+            File.SetAttributes (rootPath, FileAttributes.Normal);
+        }
+        catch
+        {
+            // Best effort only.
+        }
+    }
+
+    private static string FormatEntry ((string Category, string Label, string Path, bool IsCustom) entry)
+    {
+        return $"[yellow]custom[/] {Spectre.Console.Markup.Escape (entry.Category)} | {Spectre.Console.Markup.Escape (entry.Label)} | {Spectre.Console.Markup.Escape (entry.Path)}";
+    }
+
+    private string FormatOutcome ((string Category, string Label, string Path, bool IsCustom) entry)
+    {
+        string status = _rootExisted ? "[green]deleted[/]" : "[grey70]already absent[/]";
+
+        return $"{status} {Spectre.Console.Markup.Escape (entry.Category)} | {Spectre.Console.Markup.Escape (entry.Label)} | {Spectre.Console.Markup.Escape (entry.Path)}";
+    }
+
+    private string BuildOutcomeMarkup ()
+    {
+        string status = _rootExisted ? "[green]deleted[/]" : "[grey70]already absent[/]";
+
+        return $"[green]Deleted workspace root:[/] {Spectre.Console.Markup.Escape (Paths.WorkspaceRoot)}\n" +
+            $"[green]Deleted data root:[/] {Spectre.Console.Markup.Escape (Paths.DataRoot)}\n" +
+            $"[green]Deleted config root:[/] {Spectre.Console.Markup.Escape (Paths.ConfigRoot)}\n" +
+            $"[grey70]Status:[/] {status}";
+    }
+}

@@ -35,6 +35,10 @@ Use this folder for CLI-specific implementation notes and local history about:
 - [CLI flow diagram](../../../docs/specs/diagrams/2026-04-25-cli-flows-and-architecture.md)
 - [Boot sequence diagram](../../../docs/specs/diagrams/boot-sequence.md)
 
+## Local files
+
+- [Local changelog](local-changelog.md)
+
 ## Current code anchors
 
 - `Program.cs`

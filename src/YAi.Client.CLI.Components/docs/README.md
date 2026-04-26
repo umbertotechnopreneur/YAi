@@ -32,7 +32,11 @@ Use this folder for component-local notes about:
 
 - [Shared docs index](../../../docs/README.md)
 - [Documentation governance](../../../docs/DOCUMENTATION-GOVERNANCE.md)
-- [Filesystem skill specs](../../../docs/specs/yai_filesystem_skill_specs/README.md)
+- [Filesystem skill pack](../../../docs/specs/active/packs/filesystem-skill/README.md)
+
+## Local files
+
+- [Local changelog](local-changelog.md)
 
 ## Current code anchors
 

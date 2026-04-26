@@ -1,136 +1,223 @@
 # YAi!
 
-YAi! is a local-first AI agent runtime for developers and technical operators who need assistant workflows they can inspect, approve, audit, and trust.
+![Status: active development](https://img.shields.io/badge/status-active%20development-1f6feb)
+![Runtime: .NET 10](https://img.shields.io/badge/runtime-.NET%2010-512bd4)
+![Trust: local-first](https://img.shields.io/badge/trust-local--first-2da44e)
+![License: AGPLv3 only](https://img.shields.io/badge/license-AGPLv3%20only-8b0000)
 
-Inspired by OpenClaw-style skills and flows, YAi! keeps execution local, separates planning from enforcement, uses typed operations instead of raw shell commands, and requires explicit approval before risky changes.
+**Trust-first AI agents for builders who do not trust magic.**
 
-For the longer trust statement, see [MANIFEST.md](MANIFEST.md). If that trust posture fits how you like to build, join the project by reading [CONTRIBUTING.md](CONTRIBUTING.md) and sending improvements that keep the runtime local, explicit, and auditable. YAi! is built around security, ownership, and deterministic execution, so the user stays in control of files, memory, and workflows.
+YAi! is a local-first AI agent runtime for developers, founders, consultants, and technical operators who want AI assistance without giving up control of their machine, memory, or workflows.
 
-agent runtime for cautious builders
-agent runtime for local automation
-agent runtime for auditable AI-assisted operations
-agent runtime for developers who hate magic
+It borrows the useful ideas from OpenClaw-style skills and workflows, then hardens the dangerous parts: execution is explicit, approvals are visible, write-capable actions cross a boundary, and the runtime keeps an audit trail instead of pretending everything went fine.
 
-Local-first agent runtime inspired by OpenClaw, built for high-control environments where security, auditability, and deterministic execution are paramount. Compatible with OpenClaw skills and flow, while enforcing stricter local governance and execution boundaries.
+> **AI should propose. The runtime should verify. The human should approve.**
 
-This project is a local-first agent system designed for environments where security and control cannot be delegated. It follows an OpenClaw-like model for skills and workflow compatibility, but runs under tighter local constraints, with stronger permission boundaries, improved auditability, and a more predictable execution model. The goal is to preserve interoperability with the OpenClaw ecosystem while making local trust, safety, and operational control the default.
+## At a glance
 
-YAi! is intended to remain multiplatform across Windows, macOS, and Linux. When you add, rename, or remove configuration files, memory files, skill files, workspace files, or the local SQLite storage path, keep the path inventory used by `--show-paths`, `--show-cli-path`, and `--add-to-path`, the workspace security files under `workspace/config`, and the reset backup location used by `--gonuclear` in sync with the code and documentation.
+| Area | Current shape |
+| --- | --- |
+| Focus | Trust-first local runtime for AI-assisted workflows |
+| Current runtime | .NET 10 CLI plus the shared YAi.Persona runtime library |
+| Built-in tools | `system_info` and `filesystem` |
+| Safety model | Approval gates, workspace boundaries, explicit mutation, and structured audit output |
+| Packaging | Windows artifact publishing with checksums, manifests, and verification scripts |
+| Docs | Shared governed docs under [docs/README.md](docs/README.md) plus project-local docs under `src/*/docs/` |
 
-> YAi!
->
-> Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.
->
-> Website: https://umbertogiacobbi.biz
-> Email: hello@umbertogiacobbi.biz
->
-> This file is part of YAi!.
->
-> YAi! is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License version 3 as published by the Free Software Foundation.
->
-> YAi! is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
->
-> You should have received a copy of the GNU Affero General Public License along with YAi!. If not, see <https://www.gnu.org/licenses/>.
+For the full trust posture, read [MANIFEST.md](MANIFEST.md).
 
-## What this repository is for
+## Why YAi! feels different
 
-- A C# and .NET-based local companion for assistant workflows, controlled automation, task execution, PATH inspection, and Windows PATH registration via CLI.
-- A system that keeps the user in charge of decisions instead of hiding behavior behind background automation.
-- A codebase that stays close to portable skill and workflow ideas so features can move between ecosystems with minimal friction.
-- A built-in skill system that starts with `system_info`, seeds bundled `SKILL.md` files into the runtime workspace, and keeps the first tool loop fully local and auditable.
-- A linear workflow runtime that resolves step outputs into later steps, gates write-capable actions behind explicit approval, and records structured audit output for each run.
-- An optional app-lock and encrypted secret store that protects local provider credentials before sensitive workflows run.
+- It is local-first by design, not as a marketing footnote.
+- It separates planning from enforcement so the model does not become the policy engine.
+- It prefers typed runtime operations over arbitrary shell output.
+- It treats risky mutation as an approval problem, not a prompt-engineering problem.
+- It keeps memory, prompts, skills, and audit trails inspectable on disk.
+- It aims to stay multiplatform across Windows, macOS, and Linux.
 
-## Design Goals
+## What exists today
 
-- Local-first by default
-- Security and governance first
-- Deterministic behavior where possible
-- Explicit approvals for risky operations
-- Transparent files, settings, and workflows
-- Easy-to-audit behavior for public or regulated environments
+YAi! is already more than a slogan. The current repo includes:
 
-## Repository Layout
+- a .NET 10 CLI that supports bootstrap, chat-style flows, path inspection, security setup, and local runtime management
+- a shared runtime library that owns path resolution, workspace seeding, prompt assets, built-in skill loading, tool registration, approvals, and linear workflow execution
+- bundled built-in tools and skills, including `system_info` and `filesystem`
+- an optional app lock with encrypted local secret storage for provider credentials
+- packaging and verification scripts for zipped CLI artifacts, including checksum and manifest output
+- a small Aspire-hosted services surface that is ready to grow without inventing a larger topology than the repo actually has today
 
-- `src/` - main .NET solutions, services, and application projects
-- `poc-cli-intelligence-arch/cli-intelligence/` - companion CLI/runtime experiments, docs, and skill-related assets
-- `docs/` - shared documentation, governance, specs, operations, and history. Start at [docs/README.md](docs/README.md)
-- `src/*/docs/` - project-local documentation for individual implementation surfaces
-- `workspace/` - packaged markdown templates copied into the CLI output and then seeded into the user workspace on first run
-- `workspace/skills/` - packaged built-in skills copied into the CLI output and then seeded into the user workspace on first run
+## Trust model in one minute
 
-## Getting Started
+YAi! optimizes for **trust over autonomy**.
+
+- The model can suggest actions.
+- The runtime enforces workspace boundaries and execution rules.
+- Risky or write-capable steps require approval.
+- Workflow results are structured and auditable.
+- Failures should stop the flow clearly instead of being hidden behind confident prose.
+
+If you want the long version, start with [MANIFEST.md](MANIFEST.md). If you want the implementation-facing version, start with [docs/README.md](docs/README.md).
+
+## Current project map
+
+The active workspace is centered on these surfaces:
+
+- `src/YAi.Client.CLI/` - the current CLI entry point and user-facing runtime surface
+- `src/YAi.Persona/` - the shared runtime library behind workspace paths, prompts, skills, tools, approvals, and workflows
+- `src/YAi.Persona.Tests/` - deterministic tests for the runtime and safety boundaries
+- `src/YAi.Resources/` - bundled templates, prompts, skills, and reference assets packaged into the CLI runtime
+- `src/YAi.Tools.ResourceSigner/` - resource signing tooling used by the trust pipeline
+- `src/YAi.Services/` - Aspire AppHost
+- `src/YAi.Services.Core/` - current backend service surface
+- `src/YAi.Services.Defaults/` and `src/YAi.Services.Telemetry/` - shared hosting and telemetry support
+
+The source of truth for shared docs lives under [docs/README.md](docs/README.md). Project-local implementation notes live under `src/*/docs/`.
+
+## Quick start
 
 ### Prerequisites
 
-- .NET 10 SDK on Windows, macOS, or Linux
-- PowerShell 7 (`pwsh`) or another compatible shell for local scripts and workflows
+- .NET 10 SDK
+- PowerShell 7 (`pwsh`) for the repo scripts
 
-### Build the main solution
+### Build the solution
 
 ```powershell
 dotnet build src/YAi.slnx
 ```
 
-### Build the companion CLI
+### Run the CLI help
 
 ```powershell
-dotnet build src/YAi.Client.CLI/YAi.Client.CLI.csproj
+dotnet run --project src/YAi.Client.CLI -- --help
 ```
 
-### Package CLI release artifacts
+### Bootstrap the local runtime workspace
+
+```powershell
+dotnet run --project src/YAi.Client.CLI -- --bootstrap
+```
+
+That seeds the packaged workspace templates and bundled skills into the user workspace without overwriting existing files.
+
+### Try the safety and path surfaces
+
+```powershell
+dotnet run --project src/YAi.Client.CLI -- --show-paths
+dotnet run --project src/YAi.Client.CLI -- --security status
+```
+
+## Common first commands
+
+| Command | What it is good for |
+| --- | --- |
+| `dotnet run --project src/YAi.Client.CLI -- --help` | See the CLI surface quickly |
+| `dotnet run --project src/YAi.Client.CLI -- --bootstrap` | Seed the local runtime workspace and model setup |
+| `dotnet run --project src/YAi.Client.CLI -- --show-paths` | Inspect the active asset, workspace, config, log, and data roots |
+| `dotnet run --project src/YAi.Client.CLI -- --security setup-lock` | Encrypt provider credentials at rest behind the app lock |
+| `dotnet run --project src/YAi.Client.CLI -- --talk` | Start the interactive chat-style runtime flow |
+
+## CLI highlights
+
+The current CLI already exposes practical local runtime flows:
+
+- `--bootstrap` initializes the local runtime workspace and model selection flow
+- `--show-paths` shows the resolved asset, workspace, config, logs, and data roots
+- `--show-cli-path` inspects whether the CLI is visible on PATH
+- `--add-to-path` updates the current user PATH on Windows
+- `--security setup-lock` enables the local app lock and encrypts provider secrets at rest
+- `--ask`, `--translate`, and `--talk` run the current prompt-driven interaction flows
+- `--gonuclear` performs an explicit, high-friction reset flow with optional backup creation first
+
+For the CLI-specific operational detail, see [src/YAi.Client.CLI/README.md](src/YAi.Client.CLI/README.md).
+
+## Packaging and release checks
+
+Build Windows CLI artifacts with:
 
 ```powershell
 pwsh ./scripts/Publish-YAiCliArtifacts.ps1
 ```
 
-The packaging script publishes zipped Windows CLI artifacts under `artifacts/cli/<utc-timestamp>/`.
-Each zip name includes the product, target variant, RID, version from `Directory.Build.props`, and the UTC packaging timestamp.
+The packaging flow writes zipped artifacts under `artifacts/cli/<utc-timestamp>/` and includes:
 
-By default the script attempts:
+- artifact zip files
+- `.zip.sha256` checksum sidecars
+- batch-level `checksums.sha256`
+- `release-manifest.json`
+- `release-manifest.json.sig` and `public-key.yai.pem` when signing keys are available
 
-- framework-dependent `win-x64` and `win-arm64` publishes
-- self-contained `win-x64` and `win-arm64` publishes
-- best-effort NativeAOT `win-x64` and `win-arm64` publishes
+By default the script targets:
 
-NativeAOT is currently treated as experimental because the CLI UI stack still depends on RazorConsole and Terminal.Gui surfaces that may not publish cleanly under AOT. Baseline framework-dependent and self-contained artifacts still complete when AOT fails.
+- framework-dependent `win-x64` and `win-arm64`
+- self-contained `win-x64` and `win-arm64`
+- NativeAOT `win-x64` and `win-arm64` when prerequisites are installed
 
 Useful switches:
 
-- `--help` to show what the packaging script does, which variants it builds, and all available switches
-- `-SkipAot` to skip NativeAOT attempts
-- `-Variant FrameworkDependent`, `-Variant SelfContained`, or `-Variant Aot` to package only selected variants
-- repeat `-Variant` when selecting more than one variant, for example `-Variant SelfContained -Variant Aot`
-- `-RuntimeIdentifier win-x64` or `-RuntimeIdentifier win-arm64` to limit the target architecture
-- `-KeepPublishFolders` to preserve the published folders alongside the generated zip files
+- `--help`
+- `-SkipAot`
+- `-Variant FrameworkDependent`, `-Variant SelfContained`, or `-Variant Aot`
+- `-RuntimeIdentifier win-x64` or `-RuntimeIdentifier win-arm64`
+- `-KeepPublishFolders`
+- `-ReleaseSignatureAlgorithm Ed25519` only when you intentionally need legacy Ed25519 detached signatures
 
-When `Aot` is selected, the script now runs a NativeAOT prerequisite preflight first. If the required Visual Studio C++ workloads are missing, the script reports that clearly and skips the AOT publish instead of failing late inside `dotnet publish`.
+Verify a release batch with:
 
-From the solution root, run [jump-cli-output.ps1](jump-cli-output.ps1) to jump into the CLI output folder. Use `--release` for `bin/Release/net10.0` and `--run` to launch the compiled app from that folder with no extra arguments.
+```powershell
+pwsh ./scripts/Test-YAiCliArtifacts.ps1 -ArtifactRoot ./artifacts/cli/<utc-timestamp>
+```
 
-Versioning is centralized in [Directory.Build.props](Directory.Build.props). Use [scripts/Set-YAiVersion.ps1](scripts/Set-YAiVersion.ps1) with `-Version 1.2.3` or `-Timestamp` to update every assembly together, then verify the result with `dotnet run --project src/YAi.Client.CLI -- --version`.
+The publish and verify scripts now default to `RSA-PSS-SHA256` for detached manifest signatures so the default release flow matches the currently validated signing path. Use `-SignatureAlgorithm Ed25519` only when you need to verify an older Ed25519-signed batch.
 
-If you are exploring the CLI-focused runtime, also check the `poc-cli-intelligence-arch/cli-intelligence/` folder for its own solution and documentation.
+The verifier recomputes hashes, verifies the detached manifest signature when present, and checks that each zip can be opened without corruption.
+
+## Security and local control
+
+YAi! is built for environments where control matters.
+
+- Do not commit secrets, tokens, or private endpoints.
+- Use `--security setup-lock` when you want local provider credentials encrypted at rest.
+- Keep `workspace/config/security.json` and `workspace/config/secrets.json` out of shared workspace snapshots.
+- When you change config files, memory files, skill files, workspace files, or local SQLite paths, keep the CLI path inventory and reset paths in sync with code and docs.
+- Review any feature that touches file mutation, automation, or external providers as a trust-boundary change, not just a UX change.
+
+## Documentation
+
+The repo now has a governed documentation system instead of a flat pile of notes.
+
+- Start at [docs/README.md](docs/README.md)
+- Read the placement rules in [docs/DOCUMENTATION-GOVERNANCE.md](docs/DOCUMENTATION-GOVERNANCE.md)
+- Use [docs/history/README.md](docs/history/README.md) for shared documentation history and migration records
+- Use project-local `src/*/docs/README.md` files for implementation-owned notes
 
 ## Contributing
 
-Contributions are welcome if they improve clarity, safety, correctness, or usability. If the project mission resonates, join the project by reading [CONTRIBUTING.md](CONTRIBUTING.md), checking [MANIFEST.md](MANIFEST.md), and sending fixes, docs, tests, or workflow ideas that keep YAi! trustworthy.
+Contributions are welcome when they improve clarity, safety, correctness, performance, or usability without weakening the trust model.
 
-**Repository**
+Start with:
 
-[https://github.com/umbertotechnopreneur/YAi](https://github.com/umbertotechnopreneur/YAi)
+- [CONTRIBUTING.md](CONTRIBUTING.md)
+- [MANIFEST.md](MANIFEST.md)
+- [docs/README.md](docs/README.md)
+
+For larger changes, align the approach first. YAi! benefits more from durable decisions than from fast, noisy feature churn.
 
 ## Status
 
-This project is under active development. Public-facing APIs, workflows, and conventions may evolve.
+YAi! is under active development. The core direction is stable, but workflows, commands, docs, and internal structure will continue to tighten as the trust model matures.
 
-## Security
+## Repository
 
-- Do not commit secrets, tokens, or private endpoints.
-- Use `dotnet run --project src/YAi.Client.CLI -- --security setup-lock` to enable the local app lock and encrypt the OpenRouter secret at rest.
-- Keep `workspace/config/security.json` and `workspace/config/secrets.json` out of any shared or published workspace snapshots.
-- Prefer reversible changes and explicit operations.
-- Review any code that touches file access, automation, or external services carefully.
+[https://github.com/umbertotechnopreneur/YAi](https://github.com/umbertotechnopreneur/YAi)
+
+## Founder links and inspiration
+
+iAViews was part of the inspiration that moved me to invest in YAi! and push it forward as a trust-first local agent runtime.
+
+- iAViews: [https://www.iaviews.biz/](https://www.iaviews.biz/)
+- Website: [https://umbertogiacobbi.biz/](https://umbertogiacobbi.biz/)
+- LinkedIn: [https://www.linkedin.com/in/umbertogiacobbi/](https://www.linkedin.com/in/umbertogiacobbi/)
 
 ## License
 
@@ -138,4 +225,4 @@ YAi! is licensed under the GNU Affero General Public License v3.0 only.
 
 Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.
 
-See [LICENSE](./LICENSE) and [NOTICE.md](./NOTICE.md) for details.
+See [LICENSE](LICENSE), [NOTICE.md](NOTICE.md), and [CONTRIBUTING.md](CONTRIBUTING.md) for the current repository terms and contribution expectations.

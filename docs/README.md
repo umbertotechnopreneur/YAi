@@ -39,9 +39,13 @@ This document may include content generated, refined, or reviewed with the assis
 - `docs/operations/` holds operational procedures.
 - `docs/inbox/` is a short-lived holding area for drafts that are not classified yet.
 
+Shared doc areas that accumulate their own local history can also carry an area-level `changelog.md` alongside the area's `README.md`.
+
 ## Project-local documentation
 
 These folders hold implementation notes owned by one project:
+
+Each project-local docs folder can also carry a `local-changelog.md` file for history that belongs with one implementation surface rather than the shared docs history.
 
 - [YAi.Client.CLI docs](../src/YAi.Client.CLI/docs/README.md)
 - [YAi.Client.CLI.Components docs](../src/YAi.Client.CLI.Components/docs/README.md)
@@ -56,8 +60,6 @@ These folders hold implementation notes owned by one project:
 
 ## Migration note
 
-The repo is moving from a flat and partly ad hoc docs layout to a governed structure.
+The shared docs tree now treats `docs/specs/active/` as the source of truth for living shared specs.
 
-That migration is in progress.
-
-Some current spec packs still live in their original folders under `docs/specs/` until they are moved deliberately. New documentation should follow the governed structure immediately.
+New documentation should follow the governed structure directly instead of adding new flat files under `docs/specs/`.

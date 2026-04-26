@@ -35,6 +35,10 @@ Use this folder for resource-project-local notes about:
 - [Operations docs](../../../docs/operations/README.md)
 - [Resource signing and verification](../../../docs/operations/resource-signing-and-verification.md)
 
+## Local files
+
+- [Local changelog](local-changelog.md)
+
 ## Current code anchors
 
 - `reference/`

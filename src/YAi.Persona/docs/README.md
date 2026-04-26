@@ -34,8 +34,12 @@ Use this folder for runtime-library details about:
 - [Shared docs index](../../../docs/README.md)
 - [Documentation governance](../../../docs/DOCUMENTATION-GOVERNANCE.md)
 - [Workspace memory pack](../../../docs/specs/active/packs/workspace-memory/README.md)
-- [MVP dogfood pack](../../../docs/specs/yai_mvp_dogfood_specs/README.md)
-- [Skill chaining spec](../../../docs/specs/yai_skill_chaining_cerbero_schema_specs/yai_skill_chaining_cerbero_schema_spec.md)
+- [Workflow MVP dogfood pack](../../../docs/specs/active/packs/mvp-dogfood/README.md)
+- [Skill execution and Cerbero pack](../../../docs/specs/active/packs/skill-execution/README.md)
+
+## Local files
+
+- [Local changelog](local-changelog.md)
 
 ## Current code anchors
 

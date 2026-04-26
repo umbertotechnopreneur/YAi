@@ -29,6 +29,7 @@ Examples:
 
 Current documents:
 
+- [Area changelog](changelog.md)
 - [Resource signing and verification](resource-signing-and-verification.md)
 
 Architecture and product behavior do not belong here unless the document is mainly an operator procedure.

@@ -19,6 +19,11 @@ This document may include content generated, refined, or reviewed with the assis
 
 # Documentation Taxonomy Foundation
 
+## At a glance
+
+- Started the governed YAi docs taxonomy with shared governance, history scaffolding, inbox routing, and project-local docs folders.
+- Kept this record in shared history because it explains the repo-wide documentation classification model, not one project's local docs or one shared area's ongoing content.
+
 ## Summary
 
 This migration starts the new documentation structure without immediately moving every existing spec pack.

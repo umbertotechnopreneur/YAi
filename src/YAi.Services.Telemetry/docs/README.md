@@ -30,4 +30,8 @@ Use this folder only when telemetry-specific helper types, constants, or local i
 - [Shared docs index](../../../docs/README.md)
 - [Documentation governance](../../../docs/DOCUMENTATION-GOVERNANCE.md)
 
+## Local files
+
+- [Local changelog](local-changelog.md)
+
 When this project grows real behavior, its docs should stay local to that implementation surface.

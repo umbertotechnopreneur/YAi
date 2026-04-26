@@ -19,6 +19,11 @@ This document may include content generated, refined, or reviewed with the assis
 
 # Resource Signing Doc Reclassification
 
+## At a glance
+
+- Moved and renamed the resource-signing guide into `docs/operations/resource-signing-and-verification.md`.
+- Kept this record in shared history because it explains a taxonomy reclassification in the docs system, while day-to-day procedure changes now belong in the operations-area changelog.
+
 ## Summary
 
 The former `docs/official-resource-signing.md` file was renamed and moved to `docs/operations/resource-signing-and-verification.md`.

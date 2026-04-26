@@ -35,6 +35,10 @@ Typical topics:
 - [Shared docs index](../../../docs/README.md)
 - [Documentation governance](../../../docs/DOCUMENTATION-GOVERNANCE.md)
 
+## Local files
+
+- [Local changelog](local-changelog.md)
+
 ## Current code anchors
 
 - `Extensions.cs`

@@ -19,6 +19,47 @@ This document may include content generated, refined, or reviewed with the assis
 
 # YAi Specs Changelog
 
+Use this file for changes that affect the shared docs taxonomy, shared history model, or cross-project documentation structure.
+
+## Example entry
+
+Use this shape when a change belongs here instead of a project-local or shared-area changelog.
+
+```markdown
+## YYYY-MM-DD
+
+### Added
+
+- New shared structures, governed areas, or migration records.
+
+### Changed
+
+- Cross-project documentation rules, placement, or history-model changes.
+```
+
+## 2026-04-27
+
+### Added
+
+- first real entries in the project-local changelog files under `src/*/docs/local-changelog.md`
+- an operations area changelog at `docs/operations/changelog.md`
+- a reference-docs area changelog at `docs/specs/reference/changelog.md`
+- a migration record for the first owned changelog entries at `docs/history/migrations/2026-04-27-owned-changelog-first-entries.md`
+- an active-specs area changelog at `docs/specs/active/changelog.md`
+- a changelog template singleton at `docs/specs/active/singletons/yai-changelog-entry-templates.md`
+- a migration record for the active-area changelog and entry templates at `docs/history/migrations/2026-04-27-active-area-changelog-and-entry-templates.md`
+
+### Changed
+
+- project-local changelog files now record concrete owned documentation work instead of only seed notes
+- the docs system now has a three-tier history model: top-level shared history, shared-area changelogs, and project-local changelogs
+- the active-spec area now mirrors operations and reference by carrying its own area-level changelog
+- older pre-template changelog entries were tightened toward the shared two-bullet shape
+- the changelog template singleton now includes a small routing table for project-local, shared-area, and top-level history choices
+- migration records under `docs/history/migrations/` now open with a short two-bullet at-a-glance summary so they scan closer to the changelog style without losing the detailed sections below
+- shared-area changelogs now include a short example block so contributors can see the expected entry shape where they edit
+- the top-level specs changelog now includes a matching example block and the history index now opens with tighter scope guidance
+
 ## 2026-04-26
 
 ### Added
@@ -33,6 +74,14 @@ This document may include content generated, refined, or reviewed with the assis
 - a migration record for the workspace-memory pack rewrite at `docs/history/migrations/2026-04-26-workspace-memory-pack-migration.md`
 - a reclassified operations guide at `docs/operations/resource-signing-and-verification.md`
 - a migration record for the resource-signing doc move at `docs/history/migrations/2026-04-26-resource-signing-doc-reclassification.md`
+- grounded packs for filesystem skill, workflow MVP dogfood, and skill execution under `docs/specs/active/packs/`
+- two more grounded diagrams under `docs/specs/diagrams/`
+- normalized reference docs under `docs/specs/reference/`
+- migration records for the remaining pack rewrites and reference-doc normalization
+- grounded singleton specs under `docs/specs/active/singletons/`
+- a migration record for the active singleton move
+- project-local changelog files under `src/*/docs/local-changelog.md`
+- a migration record for project-local changelog seeding
 
 ### Changed
 
@@ -40,6 +89,10 @@ This document may include content generated, refined, or reviewed with the assis
 - documentation naming now uses semantic names for living docs and date-prefixed names only for historical records
 - the original workspace-memory draft pack was condensed into four grounded files and moved into the governed active-pack structure
 - the former root-level resource-signing guide was moved into `docs/operations/` and renamed to match its real job
+- the remaining legacy shared packs were collapsed into smaller, code-grounded active packs instead of being preserved as larger concept-era file trees
+- the human-facing docs were moved from `docs/specs/human/` into the shared reference area with cleaner names and more grounded wording
+- the remaining flat singleton specs were rewritten into the governed active-singleton area and tightened around the current repo state
+- project-local docs now use `README.md` for the local index and `local-changelog.md` for project-owned history that does not need a shared top-level entry
 
 ### Notes
 

@@ -24,30 +24,31 @@ specs:
       - PromotionService
       - memory workspace layout
   - id: filesystem-skill-pack
-    title: YAi Filesystem Skill Concept Specification
+    title: YAi Filesystem Skill Pack
     status: active
     type: pack
-    area: operations
+    area: filesystem
     audience: maintainers
     owner: shared
-    file: docs/specs/yai_filesystem_skill_specs/README.md
+    file: docs/specs/active/packs/filesystem-skill/README.md
     affectedProjects:
       - YAi.Persona
       - YAi.Client.CLI.Components
       - YAi.Resources
     affectedSurfaces:
       - FilesystemTool
-      - workflow approval flow
+      - WorkspaceBoundaryService
+      - WorkflowApprovalService
+      - approval card surfaces
       - bundled filesystem skill assets
-    migrationTarget: docs/specs/active/packs/filesystem-skill/
   - id: mvp-dogfood-pack
-    title: YAi MVP Dogfood Specification Pack
+    title: YAi Workflow MVP Dogfood Pack
     status: active
     type: pack
     area: workflow
     audience: maintainers
     owner: shared
-    file: docs/specs/yai_mvp_dogfood_specs/README.md
+    file: docs/specs/active/packs/mvp-dogfood/README.md
     affectedProjects:
       - YAi.Persona
       - YAi.Persona.Tests
@@ -55,18 +56,18 @@ specs:
     affectedSurfaces:
       - WorkflowExecutor
       - WorkflowVariableResolver
+      - SkillResult
       - WorkflowAuditService
       - SystemInfoTool
       - FilesystemTool
-    migrationTarget: docs/specs/active/packs/mvp-dogfood/
   - id: skill-chaining-cerbero-pack
-    title: YAi Skill Chaining, Cerbero, and Schema Specification
+    title: YAi Skill Execution and Cerbero Pack
     status: active
     type: pack
     area: execution
     audience: maintainers
     owner: shared
-    file: docs/specs/yai_skill_chaining_cerbero_schema_specs/yai_skill_chaining_cerbero_schema_spec.md
+    file: docs/specs/active/packs/skill-execution/README.md
     affectedProjects:
       - YAi.Persona
       - YAi.Persona.Tests
@@ -74,9 +75,10 @@ specs:
     affectedSurfaces:
       - SkillLoader
       - ToolRegistry
+      - SkillResult
       - WorkflowExecutor
-      - command safety analysis
-    migrationTarget: docs/specs/active/packs/skill-execution/
+      - MinimalSkillSchemaValidator
+      - RegexCommandSafetyAnalyzer
   - id: minimal-unit-testing-addendum
     title: YAi Minimal Unit Testing Addendum
     status: active
@@ -84,7 +86,7 @@ specs:
     area: testing
     audience: maintainers
     owner: shared
-    file: docs/specs/yai_minimal_unit_testing_addendum.md
+    file: docs/specs/active/singletons/yai-minimal-unit-testing-addendum.md
     affectedProjects:
       - YAi.Persona.Tests
       - YAi.Persona
@@ -92,7 +94,7 @@ specs:
       - SkillLoader tests
       - WorkflowExecutor tests
       - VariableResolver tests
-    migrationTarget: docs/specs/active/singletons/yai-minimal-unit-testing-addendum.md
+      - deterministic tool tests
   - id: mvp-stabilization-recommendations
     title: YAi MVP Stabilization Recommendations
     status: active
@@ -100,7 +102,7 @@ specs:
     area: workflow
     audience: maintainers
     owner: shared
-    file: docs/specs/yai_mvp_stabilization_recommendations.md
+    file: docs/specs/active/singletons/yai-mvp-stabilization-recommendations.md
     affectedProjects:
       - YAi.Persona
       - YAi.Persona.Tests
@@ -110,7 +112,7 @@ specs:
       - FilesystemTool
       - approval flow
       - audit flow
-    migrationTarget: docs/specs/active/singletons/yai-mvp-stabilization-recommendations.md
+      - workspace boundary rules
   - id: risk-complexity-review-spec
     title: YAi Risk and Complexity Code Review Spec
     status: active
@@ -118,7 +120,7 @@ specs:
     area: review
     audience: maintainers
     owner: shared
-    file: docs/specs/yai_risk_complexity_code_review_spec.md
+    file: docs/specs/active/singletons/yai-risk-complexity-code-review-spec.md
     affectedProjects:
       - YAi.Persona
       - YAi.Persona.Tests
@@ -127,7 +129,31 @@ specs:
       - WorkflowExecutor
       - approval services
       - CLI approval presenters
-    migrationTarget: docs/specs/active/singletons/yai-risk-complexity-code-review-spec.md
+      - WorkflowVariableResolver
+      - RegexCommandSafetyAnalyzer
+  - id: changelog-entry-templates
+    title: YAi Changelog Entry Templates
+    status: active
+    type: singleton
+    area: documentation
+    audience: maintainers
+    owner: shared
+    file: docs/specs/active/singletons/yai-changelog-entry-templates.md
+    affectedProjects:
+      - YAi.Client.CLI
+      - YAi.Client.CLI.Components
+      - YAi.Persona
+      - YAi.Persona.Tests
+      - YAi.Resources
+      - YAi.Services
+      - YAi.Services.Core
+      - YAi.Services.Defaults
+      - YAi.Services.Telemetry
+      - YAi.Tools.ResourceSigner
+    affectedSurfaces:
+      - local changelog files
+      - shared-area changelog files
+      - docs history structure
   - id: cli-flows-diagram
     title: YAi CLI Flows and Architecture
     status: active
@@ -185,17 +211,48 @@ specs:
     area: product
     audience: broad
     owner: shared
-    file: docs/specs/human/20260426-yai-in-plain-english.md
-    migrationTarget: docs/specs/reference/yai-plain-english.md
+    file: docs/specs/reference/yai-plain-english.md
   - id: skill-protection-overview
-    title: How YAi Protects Its Built-In Skills
+    title: How YAi Checks Its Built-In Skills
     status: active
     type: reference
     area: trust
     audience: broad
     owner: shared
-    file: docs/specs/human/how-we-protect-the-skills.md
-    migrationTarget: docs/specs/reference/how-we-protect-the-skills.md
+    file: docs/specs/reference/how-yai-checks-built-in-skills.md
+  - id: filesystem-create-file-approval-flow
+    title: Filesystem Create-File Approval Flow
+    status: active
+    type: diagram
+    area: filesystem
+    audience: maintainers
+    owner: shared
+    file: docs/specs/diagrams/filesystem-create-file-approval-flow.md
+    affectedProjects:
+      - YAi.Persona
+      - YAi.Client.CLI.Components
+    affectedSurfaces:
+      - WorkflowExecutor
+      - WorkflowApprovalService
+      - FilesystemTool
+      - ApprovalCard
+  - id: linear-workflow-dogfood-flow
+    title: Linear Workflow Dogfood Flow
+    status: active
+    type: diagram
+    area: workflow
+    audience: maintainers
+    owner: shared
+    file: docs/specs/diagrams/linear-workflow-dogfood-flow.md
+    affectedProjects:
+      - YAi.Persona
+      - YAi.Persona.Tests
+    affectedSurfaces:
+      - WorkflowExecutor
+      - WorkflowVariableResolver
+      - SystemInfoTool
+      - FilesystemTool
+      - WorkflowAuditService
   - id: resource-signing-procedure
     title: Resource Signing and Verification
     status: active

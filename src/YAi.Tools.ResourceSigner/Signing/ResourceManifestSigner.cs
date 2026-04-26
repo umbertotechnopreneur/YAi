@@ -11,7 +11,6 @@
  * Signs manifest.yai.json with the maintainer private key.
  */
 
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -84,9 +83,23 @@ public sealed class ResourceManifestSigner
 
         // Sign
         byte[] signature;
-        int signResult = TrySign(manifest.Algorithm, privateKeyPem, passphrase, manifestBytes, out signature);
+        string errorCode;
+        string errorMessage;
+        int signResult = DetachedSignatureOperations.TrySign(
+            manifest.Algorithm,
+            privateKeyPem,
+            passphrase,
+            manifestBytes,
+            out signature,
+            out errorCode,
+            out errorMessage);
+
         if (signResult != 0)
+        {
+            Console.Error.WriteLine($"[{errorCode}] {errorMessage}");
+
             return signResult;
+        }
 
         // Write manifest (BOM-free — verifier and JsonSerializer must agree on exact bytes)
         try
@@ -111,127 +124,5 @@ public sealed class ResourceManifestSigner
         }
 
         return 0;
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Private
-    // ─────────────────────────────────────────────────────────────────────────
-
-    private static int TrySign(
-        string algorithm,
-        string privateKeyPem,
-        char[]? passphrase,
-        byte[] data,
-        out byte[] signature)
-    {
-        signature = [];
-
-        if (string.Equals(algorithm, "Ed25519", StringComparison.OrdinalIgnoreCase))
-        {
-            return TrySignEd25519(privateKeyPem, passphrase, data, out signature);
-        }
-
-        if (string.Equals(algorithm, "RSA-PSS-SHA256", StringComparison.OrdinalIgnoreCase))
-        {
-            return TrySignRsaPss(privateKeyPem, passphrase, data, out signature);
-        }
-
-        Console.Error.WriteLine($"[signing_algorithm_unsupported] Algorithm '{algorithm}' is not supported.");
-        return SigningExitCodes.SigningAlgorithmUnsupported;
-    }
-
-    private static int TrySignEd25519(string pem, char[]? passphrase, byte[] data, out byte[] signature)
-    {
-        signature = [];
-        try
-        {
-            using ECDsa ecdsa = ECDsa.Create();
-            if (passphrase is { Length: > 0 })
-            {
-                string pass = new(passphrase);
-                try
-                {
-                    ecdsa.ImportFromEncryptedPem(pem, pass);
-                }
-                finally
-                {
-                    // Overwrite the local string — best effort; strings are immutable in .NET
-                    // but we avoid storing it any longer than necessary.
-                    pass = string.Empty;
-                }
-            }
-            else
-            {
-                ecdsa.ImportFromPem(pem);
-            }
-
-            signature = ecdsa.SignData(data, HashAlgorithmName.SHA512, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
-            return 0;
-        }
-        catch (CryptographicException ex)
-        {
-            if (ex.Message.Contains("passphrase", StringComparison.OrdinalIgnoreCase)
-                || ex.Message.Contains("password", StringComparison.OrdinalIgnoreCase)
-                || ex.Message.Contains("decrypt", StringComparison.OrdinalIgnoreCase))
-            {
-                Console.Error.WriteLine("[signing_key_decryption_failed] Failed to decrypt private key. Check your passphrase.");
-                return SigningExitCodes.SigningKeyDecryptionFailed;
-            }
-
-            Console.Error.WriteLine($"[signing_unexpected_error] Cryptographic error: {ex.Message}");
-            return SigningExitCodes.SigningUnexpectedError;
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[signing_unexpected_error] {ex.Message}");
-            return SigningExitCodes.SigningUnexpectedError;
-        }
-    }
-
-    private static int TrySignRsaPss(string pem, char[]? passphrase, byte[] data, out byte[] signature)
-    {
-        signature = [];
-        try
-        {
-            using RSA rsa = RSA.Create();
-            if (passphrase is { Length: > 0 })
-            {
-                string pass = new(passphrase);
-                try
-                {
-                    rsa.ImportFromEncryptedPem(pem, pass);
-                }
-                finally
-                {
-                    pass = string.Empty;
-                }
-            }
-            else
-            {
-                rsa.ImportFromPem(pem);
-            }
-
-            byte[] hash = SHA256.HashData(data);
-            signature = rsa.SignHash(hash, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
-            return 0;
-        }
-        catch (CryptographicException ex)
-        {
-            if (ex.Message.Contains("passphrase", StringComparison.OrdinalIgnoreCase)
-                || ex.Message.Contains("password", StringComparison.OrdinalIgnoreCase)
-                || ex.Message.Contains("decrypt", StringComparison.OrdinalIgnoreCase))
-            {
-                Console.Error.WriteLine("[signing_key_decryption_failed] Failed to decrypt private key. Check your passphrase.");
-                return SigningExitCodes.SigningKeyDecryptionFailed;
-            }
-
-            Console.Error.WriteLine($"[signing_unexpected_error] Cryptographic error: {ex.Message}");
-            return SigningExitCodes.SigningUnexpectedError;
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[signing_unexpected_error] {ex.Message}");
-            return SigningExitCodes.SigningUnexpectedError;
-        }
     }
 }

@@ -21,7 +21,8 @@ This document may include content generated, refined, or reviewed with the assis
 
 This area is for living shared specifications.
 
+- [Area changelog](changelog.md) tracks history local to the active-spec surface.
 - [Spec packs](packs/README.md) hold numbered multi-file sets.
 - [Singleton specs](singletons/README.md) hold single active guidance files.
 
-Some current packs still live in older `docs/specs/` folders during migration. New active specs should use this structure.
+New and maintained active specs should use this structure directly.

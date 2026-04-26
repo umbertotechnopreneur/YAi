@@ -22,6 +22,8 @@ If the owner or lifecycle is unclear, prefer the shared inbox under `docs/inbox/
 
 - Put cross-project contracts, workflows, safety models, and architecture specs under the shared `docs/` tree.
 - Put project-specific implementation details under that project's local `docs/` folder.
+- Put project-local change history that belongs to one implementation surface in `src/<Project>/docs/local-changelog.md`.
+- Put shared-area-local history that belongs to one shared docs area in `<area>/changelog.md` and keep it linked from that area's `README.md`.
 - Put plain-English and stakeholder-facing explanations under the shared reference area.
 - Put operational procedures under `docs/operations/`.
 - Put migrations, review records, and archived material under historical or history areas.
@@ -42,7 +44,9 @@ If the owner or lifecycle is unclear, prefer the shared inbox under `docs/inbox/
 ## Maintenance rules
 
 - Update the relevant shared or project docs index when adding a new document area.
+- When you add project-local history, link `local-changelog.md` from that project's `docs/README.md`.
 - Update history or manifest files when a major spec is added, reclassified, archived, or substantially rewritten.
+- Use the shared changelog guidance in `docs/specs/active/singletons/yai-changelog-entry-templates.md` when writing new changelog entries.
 - Prefer linking to the shared source of truth over duplicating the same contract in several places.
 
 ## Scope boundary

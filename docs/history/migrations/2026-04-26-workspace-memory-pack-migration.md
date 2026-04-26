@@ -19,6 +19,11 @@ This document may include content generated, refined, or reviewed with the assis
 
 # Workspace Memory Pack Migration
 
+## At a glance
+
+- Replaced the original workspace-memory draft pack with a shorter grounded active pack under `docs/specs/active/packs/workspace-memory/`.
+- Kept this record in shared history because it explains a shared spec migration and rewrite, not the ongoing content history of the active pack itself.
+
 ## Summary
 
 The original workspace-memory draft pack was replaced with a shorter active pack under `docs/specs/active/packs/workspace-memory/`.

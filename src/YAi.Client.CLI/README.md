@@ -67,14 +67,23 @@ Packaging
 - Run `pwsh ./scripts/Publish-YAiCliArtifacts.ps1` from the repository root to build zipped Windows release artifacts.
 - Run `pwsh ./scripts/Publish-YAiCliArtifacts.ps1 --help` to print the script purpose, switches, and examples.
 - The script writes each run to `artifacts/cli/<utc-timestamp>/` and names each zip with the variant, RID, version, and UTC packaging timestamp.
-- Default output includes framework-dependent and self-contained packages for `win-x64` and `win-arm64`, plus best-effort NativeAOT attempts for the same RIDs.
+- Each successful artifact also gets a companion `.zip.sha256` checksum file, and each batch gets `checksums.sha256` plus `release-manifest.json`.
+- When the YAi signing key is available, the batch also includes `release-manifest.json.sig` and `public-key.yai.pem` so the release metadata can be authenticity-verified.
+- Detached manifest signing now defaults to `RSA-PSS-SHA256`, which is the current validated release-signing path.
+- Default output includes framework-dependent and self-contained packages for `win-x64` and `win-arm64`, plus NativeAOT packages for the same RIDs when prerequisites are installed.
 - Use `-SkipAot` when you only want the baseline release artifacts.
 - Use `-Variant FrameworkDependent`, `-Variant SelfContained`, or `-Variant Aot` to restrict the publish matrix.
-- Repeat `-Variant` to choose more than one publish mode in the same run, for example `-Variant SelfContained -Variant Aot`.
+- Pass multiple variants as a comma-separated list to choose more than one publish mode in the same run, for example `-Variant SelfContained,Aot`.
 - Use `-RuntimeIdentifier win-x64` or `-RuntimeIdentifier win-arm64` to restrict the target architecture.
+- Pass multiple runtime identifiers as a comma-separated list, for example `-RuntimeIdentifier win-x64,win-arm64`.
 - Use `-KeepPublishFolders` if you want the unzipped publish directories preserved next to the generated zip files.
-- NativeAOT is currently experimental for this CLI because the RazorConsole and Terminal.Gui UI stack is not yet hardened for guaranteed AOT publishing.
-- The script now performs a NativeAOT prerequisite preflight and reports missing Visual Studio C++ workloads before any AOT publish begins.
+- Use `-SkipDetachedSignature` when you intentionally want an unsigned local artifact batch.
+- Use `-ReleaseSignatureAlgorithm Ed25519` only when you intentionally need a legacy Ed25519-signed batch instead of the default RSA batch.
+- NativeAOT packaging is supported when the required Visual Studio C++ workloads and Windows SDK libraries are installed.
+- The script now performs a NativeAOT prerequisite preflight and reports missing Visual Studio C++ workloads or Windows SDK libraries before any AOT publish begins.
+- Run `pwsh ./scripts/Test-YAiCliArtifacts.ps1 -ArtifactRoot ./artifacts/cli/<utc-timestamp>` to verify the manifest signature when present, confirm that the SHA-256 values still match, and confirm that the generated ZIP files are readable.
+- The verifier also defaults to `RSA-PSS-SHA256`; use `-SignatureAlgorithm Ed25519` only for older Ed25519-signed batches.
+- Use `-AllowUnsigned` with the verifier only for older or intentionally unsigned batches that do not include `release-manifest.json.sig` and `public-key.yai.pem`.
 
 Environment
 

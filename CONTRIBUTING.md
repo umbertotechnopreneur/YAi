@@ -1,10 +1,23 @@
 # Contributing to YAi!
 
+**Help strengthen a trust-first local agent runtime without weakening the trust boundary.**
+
 Thank you for taking the time to improve this project.
 
-YAi is intended to stay local-first, explicit, safe by default, and multiplatform across Windows, macOS, and Linux. Contributions are welcome, and if the mission resonates, join the project by sending fixes, docs, tests, or workflow ideas that strengthen the trust model rather than weaken it. The root [MANIFEST.md](MANIFEST.md) captures the project's trust posture, and changes should continue to favor security, ownership, and determinism over hidden automation. When you add, rename, or remove configuration files, memory files, skill files, workspace files, or the SQLite storage path, keep the path inventory used by `--show-paths` and `--gonuclear` in sync with the code and docs.
+YAi! is intended to stay local-first, explicit, safe by default, and multiplatform across Windows, macOS, and Linux. The best contributions make the runtime safer, clearer, more deterministic, or easier to inspect.
+
+If the mission resonates, send fixes, docs, tests, or workflow ideas that strengthen the trust model rather than weaken it. The root [MANIFEST.md](MANIFEST.md) captures the trust posture, and [docs/README.md](docs/README.md) is the main entry point for the governed docs system.
+
+When you add, rename, or remove configuration files, memory files, skill files, workspace files, or the SQLite storage path, keep the path inventory used by `--show-paths`, `--show-cli-path`, `--add-to-path`, and `--gonuclear` in sync with the code and docs.
 
 Project repository: [https://github.com/umbertotechnopreneur/YAi](https://github.com/umbertotechnopreneur/YAi)
+
+## Contribution mindset
+
+- Strengthen trust boundaries rather than hiding more automation.
+- Prefer explicit and reversible behavior over clever shortcuts.
+- Keep user-owned files, memory, and secrets inspectable and local.
+- Choose clarity and maintainability over novelty for its own sake.
 
 > YAi!
 >
@@ -26,9 +39,9 @@ Project repository: [https://github.com/umbertotechnopreneur/YAi](https://github
 Please read the repository documentation first, especially:
 
 - [README.md](README.md)
-- any project-specific docs under `docs/`
-- any workspace or agent instructions under `workspace/`
-- the existing code style and naming patterns in the repository
+- [docs/README.md](docs/README.md)
+- relevant project-local docs under `src/*/docs/`
+- the existing code style, repo instructions, and naming patterns in the area you are changing
 
 For large changes, open an issue or discussion first so the approach can be aligned before implementation starts.
 

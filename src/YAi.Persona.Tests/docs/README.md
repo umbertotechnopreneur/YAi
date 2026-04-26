@@ -31,7 +31,11 @@ Use this folder for local testing notes about:
 
 - [Shared docs index](../../../docs/README.md)
 - [Documentation governance](../../../docs/DOCUMENTATION-GOVERNANCE.md)
-- [Minimal unit testing addendum](../../../docs/specs/yai_minimal_unit_testing_addendum.md)
+- [Minimal unit testing addendum](../../../docs/specs/active/singletons/yai-minimal-unit-testing-addendum.md)
+
+## Local files
+
+- [Local changelog](local-changelog.md)
 
 ## Current code anchors
 

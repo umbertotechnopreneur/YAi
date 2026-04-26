@@ -24,11 +24,8 @@ Use numbered packs when one larger area needs a guided reading order or staged i
 Current active packs:
 
 - [Workspace memory](workspace-memory/README.md)
-
-Other pack areas already identified for migration in later phases are:
-
-- filesystem skill
-- MVP workflow dogfood
-- skill chaining and execution safety
+- [Filesystem skill](filesystem-skill/README.md)
+- [Workflow MVP dogfood](mvp-dogfood/README.md)
+- [Skill execution and Cerbero](skill-execution/README.md)
 
 Keep pack filenames numeric and stable.

@@ -85,6 +85,7 @@ Examples:
 - testing strategy addendums
 - stabilization recommendations
 - focused review specs
+- small documentation-maintenance guides such as changelog entry templates
 
 ### `docs/specs/reference/`
 
@@ -117,6 +118,8 @@ Examples:
 - release packaging
 - migration scripts
 
+If this area starts collecting its own ongoing history, place it in `docs/operations/changelog.md` and link it from the area README.
+
 ### `docs/history/`
 
 Use this for documentation history, decision tracking, and surface impact tracking.
@@ -126,6 +129,8 @@ This area answers:
 - what changed,
 - why it changed,
 - and which projects or code surfaces were affected.
+
+When a shared doc area has ongoing local history that is still narrower than the whole taxonomy, use an area-local `changelog.md` in that folder rather than pushing every change into the top-level history layer.
 
 ### `docs/inbox/`
 
@@ -142,6 +147,10 @@ Project-local docs should explain:
 - what the project owns now,
 - which shared specs it implements,
 - and where to find deeper local notes.
+
+When a project needs ongoing local history, place it in `src/<Project>/docs/local-changelog.md` and keep the entries focused on implementation-local changes.
+
+Use the lightweight patterns in [specs/active/singletons/yai-changelog-entry-templates.md](specs/active/singletons/yai-changelog-entry-templates.md) when adding or revising changelog entries.
 
 Project-local docs must not become a second source of truth for cross-project contracts.
 

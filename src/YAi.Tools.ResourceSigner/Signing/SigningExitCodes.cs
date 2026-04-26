@@ -26,6 +26,11 @@ public static class SigningExitCodes
     public const int SigningAlgorithmUnsupported = 14;
     public const int SigningManifestWriteFailed = 15;
     public const int SigningSignatureWriteFailed = 16;
+    public const int SigningSignatureInvalid = 17;
+    public const int SigningPublicKeyMissing = 18;
+    public const int SigningFileMissing = 19;
+    public const int SigningFileReadFailed = 20;
+    public const int SigningSignatureReadFailed = 21;
     public const int SigningUnexpectedError = 99;
     public const int InvalidArguments = 1;
 }

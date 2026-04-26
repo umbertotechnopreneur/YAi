@@ -115,6 +115,7 @@ public sealed class WarmMemoryResolver
         string? language = null)
     {
         List<MemorySearchResult> results = [];
+        HashSet<string> loadedFiles = new(GetPathComparer());
         string queryLower = (userInput ?? string.Empty).ToLowerInvariant ();
 
         // 1. Project memory: match by current directory name
@@ -123,7 +124,7 @@ public sealed class WarmMemoryResolver
             string dirName = Path.GetFileName (
                 currentDirectory.TrimEnd (Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
 
-            TryAddProjectMemory (results, dirName, "current directory match");
+            TryAddProjectMemory(results, loadedFiles, dirName, "current directory match");
 
             // Also try parent directory for monorepo layouts
             string? parentDir = Path.GetDirectoryName (
@@ -136,7 +137,7 @@ public sealed class WarmMemoryResolver
                 if (!string.IsNullOrWhiteSpace (parentName) &&
                     !string.Equals (dirName, parentName, StringComparison.OrdinalIgnoreCase))
                 {
-                    TryAddProjectMemory (results, parentName, "parent directory match");
+                    TryAddProjectMemory(results, loadedFiles, parentName, "parent directory match");
                 }
             }
         }
@@ -151,7 +152,7 @@ public sealed class WarmMemoryResolver
                 string slug = Path.GetFileNameWithoutExtension (projectFile);
 
                 if (queryLower.Contains (slug, StringComparison.OrdinalIgnoreCase))
-                    TryAddProjectMemory (results, slug, $"keyword '{slug}' in query");
+                    TryAddProjectMemory(results, loadedFiles, slug, $"keyword '{slug}' in query");
             }
         }
 
@@ -162,12 +163,12 @@ public sealed class WarmMemoryResolver
 
             if (shellLower.Contains ("pwsh") || shellLower.Contains ("powershell"))
             {
-                TryAddDomainMemory (results, "powershell", "active shell: PowerShell");
-                TryAddDomainMemory (results, "windows", "active shell: PowerShell → windows");
+                TryAddDomainMemory(results, loadedFiles, "powershell", "active shell: PowerShell");
+                TryAddDomainMemory(results, loadedFiles, "windows", "active shell: PowerShell → windows");
             }
             else if (shellLower.Contains ("bash") || shellLower.Contains ("zsh") || shellLower.Contains ("sh"))
             {
-                TryAddDomainMemory (results, "linux", "active shell: bash/zsh");
+                TryAddDomainMemory(results, loadedFiles, "linux", "active shell: bash/zsh");
             }
         }
 
@@ -177,11 +178,11 @@ public sealed class WarmMemoryResolver
             string? hit = keywords.FirstOrDefault (kw => queryLower.Contains (kw, StringComparison.OrdinalIgnoreCase));
 
             if (hit is not null)
-                TryAddDomainMemory (results, domain, $"keyword '{hit}' in query");
+                TryAddDomainMemory(results, loadedFiles, domain, $"keyword '{hit}' in query");
         }
 
         // 5. Tag-based matching across all memory files
-        ResolveByTags (results, queryLower);
+        ResolveByTags(results, loadedFiles, queryLower);
 
         _logger.LogDebug (
             "WarmMemoryResolver resolved {Count} warm files for query (lang={Language})",
@@ -197,51 +198,58 @@ public sealed class WarmMemoryResolver
 
     private void TryAddProjectMemory (
         List<MemorySearchResult> results,
+        HashSet<string> loadedFiles,
         string projectName,
         string reason)
     {
         string slug = SanitizeSlug (projectName);
         string filePath = Path.Combine (_paths.MemoryRoot, "projects", $"{slug}.md");
 
-        AddMemoryFile (results, filePath, $"Project Memory: {projectName}", reason,
+        AddMemoryFile(results, loadedFiles, filePath, $"Project Memory: {projectName}", reason,
             matchedProject: projectName, score: 0.85);
     }
 
     private void TryAddDomainMemory (
         List<MemorySearchResult> results,
+        HashSet<string> loadedFiles,
         string domain,
         string reason)
     {
         string filePath = Path.Combine (_paths.MemoryRoot, "domains", $"{domain}.md");
-        AddMemoryFile (results, filePath, $"Domain Memory: {domain}", reason, score: 0.70);
+        AddMemoryFile(results, loadedFiles, filePath, $"Domain Memory: {domain}", reason, score: 0.70);
     }
 
     private void AddMemoryFile (
         List<MemorySearchResult> results,
+        HashSet<string> loadedFiles,
         string filePath,
         string label,
         string reason,
         string? matchedProject = null,
         double score = 0.70)
     {
-        if (!File.Exists (filePath))
+        string normalizedPath = Path.GetFullPath(filePath);
+
+        if (!File.Exists(normalizedPath))
             return;
 
-        if (results.Any (r => string.Equals (r.Label, label, StringComparison.OrdinalIgnoreCase)))
+        if (loadedFiles.Contains(normalizedPath))
             return;
 
         try
         {
-            string raw = File.ReadAllText (filePath);
+            string raw = File.ReadAllText(normalizedPath);
             MemoryDocument doc = _parser.Parse (raw);
 
-            if (doc.IsCold)
+            if (!doc.IsWarm)
             {
                 _logger.LogDebug (
-                    "WarmMemoryResolver: skipping COLD file '{FilePath}'", filePath);
+                    "WarmMemoryResolver: skipping non-WARM file '{FilePath}'", normalizedPath);
 
                 return;
             }
+
+            loadedFiles.Add(normalizedPath);
 
             results.Add (new MemorySearchResult
             {
@@ -268,7 +276,7 @@ public sealed class WarmMemoryResolver
         }
     }
 
-    private void ResolveByTags (List<MemorySearchResult> results, string queryLower)
+    private void ResolveByTags(List<MemorySearchResult> results, HashSet<string> loadedFiles, string queryLower)
     {
         if (!Directory.Exists (_paths.MemoryRoot))
             return;
@@ -277,10 +285,15 @@ public sealed class WarmMemoryResolver
         {
             try
             {
-                string raw = File.ReadAllText (filePath);
+                string normalizedPath = Path.GetFullPath(filePath);
+
+                if (loadedFiles.Contains(normalizedPath))
+                    continue;
+
+                string raw = File.ReadAllText(normalizedPath);
                 MemoryDocument doc = _parser.Parse (raw);
 
-                if (doc.IsCold || doc.Tags.Count == 0)
+                if (!doc.IsWarm || doc.Tags.Count == 0)
                     continue;
 
                 string? matchedTag = doc.Tags.FirstOrDefault (
@@ -294,6 +307,8 @@ public sealed class WarmMemoryResolver
 
                 if (results.Any (r => string.Equals (r.Label, label, StringComparison.OrdinalIgnoreCase)))
                     continue;
+
+                loadedFiles.Add(normalizedPath);
 
                 results.Add (new MemorySearchResult
                 {
@@ -326,6 +341,13 @@ public sealed class WarmMemoryResolver
             name.ToLowerInvariant ()
                 .Select (c => char.IsLetterOrDigit (c) || c == '-' ? c : '-'))
             .Trim ('-');
+    }
+
+    private static StringComparer GetPathComparer()
+    {
+        return OperatingSystem.IsWindows()
+            ? StringComparer.OrdinalIgnoreCase
+            : StringComparer.Ordinal;
     }
 
     /// <summary>

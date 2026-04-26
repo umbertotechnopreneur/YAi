@@ -1,23 +1,11 @@
-**Document title:** <span style="color:#1E90FF">UmbertoGiacobbiDotBiz</span> YAi Workflow MVP Dogfood Pack ✨  
-**Prepared by:** Umberto Giacobbi  
-**Organization:** <span style="color:#1E90FF">UmbertoGiacobbiDotBiz</span> 🚀  
-- **Intended use:** The active shared specification pack for the current minimal workflow scenario that chains system info, variable resolution, approval, filesystem write, and audit.  
-
-## Author Profile
-
-Umberto Giacobbi is a founder, consultant, advisor, developer, and operator with international experience across Italy, Switzerland, the United States, Indonesia, and Vietnam. His work spans projects in Europe, the US, and Southeast Asia, with a focus on practical execution, strategic thinking, and technology-led business building.
-
-## Contact Information
-
-- **Email:** [hello@umbertogiacobbi.biz](mailto:hello@umbertogiacobbi.biz)  
-- **LinkedIn:** [linkedin.com/in/umbertogiacobbi](https://www.linkedin.com/in/umbertogiacobbi/)  
-- **Website:** [umbertogiacobbi.biz](https://umbertogiacobbi.biz)  
-
-## AI Use and Responsibility Notice
-
-This document may include content generated, refined, or reviewed with the assistance of one or more AI models. It should be reviewed and validated before external distribution or operational use. Final responsibility for its verification, interpretation, and application remains with the author(s) and the organization.
-
 # YAi Workflow MVP Dogfood Pack
+
+| Field | Value |
+| --- | --- |
+| Purpose | Active shared specification pack for the current minimal workflow scenario that chains system info, variable resolution, approval, filesystem write, and audit |
+| Audience | Maintainers and contributors |
+| Status | Active |
+| Last reviewed | 2026-04-27 |
 
 This pack replaces the earlier dogfood draft set with a smaller description of the workflow slice that the code and tests already exercise.
 

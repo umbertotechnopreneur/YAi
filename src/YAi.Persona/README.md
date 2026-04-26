@@ -1,6 +1,15 @@
 # YAi.Persona
 
+| Field | Value |
+| --- | --- |
+| Purpose | Shared runtime library behind the YAi CLI and future hosts |
+| Audience | Maintainers and contributors |
+| Status | Active |
+| Last reviewed | 2026-04-27 |
+
 The `YAi.Persona` project is the shared runtime library behind the YAi! CLI. It owns path resolution, workspace seeding, prompt asset loading, OpenRouter catalog and balance caching, app-lock and secret storage, skill loading, tool registration, and the linear workflow runtime.
+
+For runtime-library implementation notes, see [docs/README.md](docs/README.md).
 
 ## What is this project / folder
 

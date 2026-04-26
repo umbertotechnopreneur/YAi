@@ -44,6 +44,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using Spectre.Console;
 using YAi.Client.CLI.Components;
+using YAi.Client.CLI.Components.Input;
+using YAi.Client.CLI.Components.Rendering;
 using YAi.Client.CLI.Components.Screens;
 using YAi.Client.CLI.Services;
 using YAi.Persona.Extensions;
@@ -193,7 +195,9 @@ try
 
 	// Handoff to the service layer: the CLI now orchestrates around Persona-owned state.
 	CliServices svc = ResolveCliServices(sp);
-	BuildAppHeaderState(appPaths, svc.OpenRouterClient);
+	BuildAppHeaderState(appPaths, svc.OpenRouterClient,
+		isAppLockEnabled: appLockService.IsAppLockEnabled,
+		isUnlocked: appLockService.IsUnlocked);
 	BootstrapState? bootstrapState = svc.Config.LoadBootstrapState();
 
 	if (RequiresCompletedBootstrap(cmd) && bootstrapState?.IsCompleted != true)
@@ -227,7 +231,13 @@ try
 		return;
 	}
 
-	BuildAppHeaderState(appPaths, svc.OpenRouterClient);
+	BuildAppHeaderState(appPaths, svc.OpenRouterClient,
+		personaName: bootstrapState?.AgentName,
+		personaEmoji: bootstrapState?.AgentEmoji,
+		isBootstrapped: bootstrapState?.IsCompleted,
+		isAppLockEnabled: appLockService.IsAppLockEnabled,
+		isUnlocked: appLockService.IsUnlocked,
+		cacheEnabled: svc.OpenRouterClient.CacheEnabled);
 
 	Log.Information("OpenRouter model: {Model}", svc.OpenRouterClient.CurrentModel);
 	Log.Information("OpenRouter verbosity: {Verbosity}", svc.OpenRouterClient.CurrentVerbosity);
@@ -1025,7 +1035,7 @@ static void WriteBanner()
 		"[cyan1]║      YAi!      ║[/]\n" +
 		"[cyan1]╚════════════════╝[/]\n\n" +
 		"[grey70]Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.[/]\n" +
-		"[deepskyblue1]Website: [link=https://umbertogiacobbi.biz/YAi][underline]umbertogiacobbi.biz/YAi[/][/]\n" +
+		"[deepskyblue1]Website: [link=https://umbertogiacobbi.biz/YAi][underline]umbertogiacobbi.biz/YAi[/][/][/]\n" +
 		"[springgreen2]Email: hello@umbertogiacobbi.biz[/]"))
 	{
 		Border = BoxBorder.Rounded,
@@ -1336,7 +1346,7 @@ static void PrintHelp()
 	table.AddRow("[red1]--gonuclear[/]", "☢️ Confirm and permanently delete the workspace, data, and config roots. Cannot be undone.");
 	table.AddRow("[orchid1]--lenna[/]", "🖼️ Run the Lenna citation script and exit.");
 	table.AddRow("[turquoise2]--security <command>[/]", "🔐 Manage app lock and encrypted local secrets.");
-	table.AddRow("[deepskyblue1]--ask <text>[/]", "💬 Send a single prompt to the model. Requires a completed bootstrap.");
+	table.AddRow("[deepskyblue1]--ask [[text]][/]", "💬 Send one prompt, or open the multiline editor when text is omitted. Requires a completed bootstrap.");
 	table.AddRow("[orange1]--translate <text>[/]", "🌍 Translate or rewrite text with persona prompts. Requires a completed bootstrap.");
 	table.AddRow("[mediumspringgreen]--talk[/]", "🗣️ Start the interactive REPL. Requires a completed bootstrap.");
 	table.AddRow("[grey70]-h, --help[/]", "❓ Show this help and exit.");
@@ -1366,6 +1376,8 @@ static void PrintHelp()
 	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --lenna[/]")));
 	AnsiConsole.WriteLine();
 	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --ask \"Hello\"[/]")));
+	AnsiConsole.WriteLine();
+	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --ask[/]")));
 	AnsiConsole.WriteLine();
 	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --talk[/]")));
 	AnsiConsole.WriteLine();
@@ -1534,27 +1546,127 @@ static string GetAssistantLabelMarkup(string? assistantName = null)
 /// </summary>
 static string GetUserPromptMarkup(string userName)
 {
-	return $"{GetSpeakerLabelMarkup(userName, "orange1")} [grey70]>[/] ";
+	return $"{GetUserSpeakerLabelMarkup(userName)} [grey70]>[/] ";
 }
 
 /// <summary>
-/// Writes a formatted assistant response line.
+/// Builds the user speaker label markup without the live prompt arrow.
 /// </summary>
-static void WriteAssistantLine(string message, string? assistantName = null)
+static string GetUserSpeakerLabelMarkup(string userName)
 {
-	AnsiConsole.MarkupLine($"{GetAssistantLabelMarkup(assistantName)} {Markup.Escape(message)}");
+	return GetSpeakerLabelMarkup(userName, "orange1");
+}
+
+/// <summary>
+/// Builds the plain-text prompt prefix used for editor layout and continuation indentation.
+/// </summary>
+static string GetUserPromptText(string userName)
+{
+	return $"{userName}: > ";
+}
+
+/// <summary>
+/// Writes an inline response panel using the shared response view state.
+/// </summary>
+static void WriteInlineResponse(ResponseViewState responseState)
+{
+	AnsiConsole.Write(new Panel(new Markup(ResponseMarkupRenderer.BuildInlineMarkup(responseState)))
+	{
+		Border = BoxBorder.Rounded,
+		BorderStyle = new Style(ResponseMarkupRenderer.GetAccentColor(responseState)),
+		Expand = true,
+		Header = new PanelHeader($"[bold]{Markup.Escape(ResponseMarkupRenderer.BuildPanelTitle(responseState))}[/]"),
+		Padding = new Padding(1, 0, 1, 0)
+	});
+}
+
+/// <summary>
+/// Builds one transcript entry for a user-authored prompt.
+/// </summary>
+static ConversationTranscriptEntryViewState BuildUserTranscriptEntry(string userName, string bodyText, string title = "Your prompt")
+{
+	return new ConversationTranscriptEntryViewState
+	{
+		Title = title,
+		SpeakerMarkup = GetUserSpeakerLabelMarkup(userName),
+		BodyText = bodyText
+	};
+}
+
+/// <summary>
+/// Builds one transcript entry for an assistant-authored response.
+/// </summary>
+static ConversationTranscriptEntryViewState BuildResponseTranscriptEntry(ResponseViewState responseState)
+{
+	return new ConversationTranscriptEntryViewState
+	{
+		Title = ResponseMarkupRenderer.BuildPanelTitle(responseState),
+		ResponseState = responseState
+	};
+}
+
+/// <summary>
+/// Builds the shared response-screen state for one completed model turn.
+/// </summary>
+static ResponseViewState BuildResponseViewState(
+	string title,
+	OpenRouterClient openrouter,
+	OpenRouterResponse response,
+	string bodyText,
+	string variant = "assistant",
+	string? noticeText = null,
+	string noticeVariant = "warning",
+	int? durationMs = null,
+	string? assistantName = null)
+{
+	return new ResponseViewState
+	{
+		Title = title,
+		SpeakerMarkup = GetAssistantLabelMarkup(assistantName),
+		ModelProvider = openrouter.CurrentProvider,
+		ModelName = openrouter.CurrentModel,
+		LifecyclePhase = string.Equals(variant, "error", StringComparison.OrdinalIgnoreCase)
+			? "error"
+			: "received",
+		Variant = variant,
+		BodyText = bodyText,
+		NoticeText = noticeText,
+		NoticeVariant = noticeVariant,
+		PromptTokens = response.PromptTokens,
+		CompletionTokens = response.CompletionTokens,
+		TotalTokens = response.TotalTokens,
+		DurationMs = durationMs ?? response.DurationMs,
+		RawJson = response.RawJson,
+		CanCopyText = OperatingSystem.IsWindows() && !string.IsNullOrWhiteSpace(bodyText)
+	};
 }
 
 /// <summary>
 /// Creates the current header snapshot shown above interactive screens.
+/// Persona, security, and cache values fall back to the previous <see cref="AppHeaderState.Current"/>
+/// snapshot when not explicitly supplied.
 /// </summary>
-static AppHeaderState BuildAppHeaderState(AppPaths appPaths, OpenRouterClient openrouter)
+static AppHeaderState BuildAppHeaderState(
+	AppPaths appPaths,
+	OpenRouterClient openrouter,
+	string? personaName = null,
+	string? personaEmoji = null,
+	bool? isBootstrapped = null,
+	bool? isAppLockEnabled = null,
+	bool? isUnlocked = null,
+	bool? cacheEnabled = null)
 {
 	return AppHeaderState.Create(
 		Environment.CurrentDirectory,
 		openrouter.CurrentProvider,
 		openrouter.CurrentModel,
-		DateTimeOffset.Now);
+		DateTimeOffset.Now,
+		personaName: personaName,
+		personaEmoji: personaEmoji,
+		isBootstrapped: isBootstrapped,
+		isAppLockEnabled: isAppLockEnabled,
+		isUnlocked: isUnlocked,
+		cacheEnabled: cacheEnabled);
 }
 
 /// <summary>
@@ -1562,7 +1674,7 @@ static AppHeaderState BuildAppHeaderState(AppPaths appPaths, OpenRouterClient op
 /// </summary>
 static void WriteAppHeader(AppHeaderState header)
 {
-	AnsiConsole.Write(new Panel(new Markup(header.ToMarkup()))
+	AnsiConsole.Write(new Panel(new Markup(AppHeaderMarkupRenderer.BuildMarkup(header)))
 	{
 		Border = BoxBorder.Rounded,
 		BorderStyle = new Style(Color.Cyan1),
@@ -1576,10 +1688,10 @@ static void WriteAppHeader(AppHeaderState header)
 /// </summary>
 static void WriteStatusBar(StatusBarState statusBar)
 {
-	AnsiConsole.Write(new Panel(new Markup(statusBar.ToMarkup()))
+	AnsiConsole.Write(new Panel(new Markup(StatusBarMarkupRenderer.BuildMarkup(statusBar)))
 	{
 		Border = BoxBorder.Rounded,
-		BorderStyle = new Style(statusBar.GetAccentColor()),
+		BorderStyle = new Style(StatusBarMarkupRenderer.GetAccentColor(statusBar)),
 		Expand = true,
 		Padding = new Padding(1, 0, 1, 0)
 	});
@@ -1605,6 +1717,64 @@ static Task<T> RunThinkingAsync<T>(Func<Task<T>> action)
 		.Spinner(Spinner.Known.Dots)
 		.SpinnerStyle(new Style(Color.Cyan1))
 		.StartAsync("[cyan]thinking...[/]", _ => action());
+}
+
+/// <summary>
+/// Shows the reusable response screen for one completed model turn.
+/// </summary>
+static Task<ResponseScreenResult> ShowResponseScreenAsync(
+	AppPaths appPaths,
+	OpenRouterClient openrouter,
+	ResponseViewState responseState,
+	StatusBarState statusBarState)
+{
+	ResponseScreenParameters screenParameters = new()
+	{
+		HeaderState = BuildAppHeaderState(appPaths, openrouter),
+		StatusBarState = statusBarState,
+		ResponseState = responseState,
+		AllowDismissWithEscape = true
+	};
+
+	return new ResponseScreenHost(screenParameters)
+		.RunAsync();
+}
+
+/// <summary>
+/// Runs the combined conversation transcript and prompt screen for one turn.
+/// </summary>
+static Task<ConversationPromptScreenResult> ShowConversationPromptScreenAsync(
+	AppPaths appPaths,
+	OpenRouterClient openrouter,
+	string title,
+	string instructionsMarkup,
+	string emptyStateMarkup,
+	StatusBarState statusBarState,
+	string promptMarkup,
+	string promptText,
+	IReadOnlyList<string> historyEntries,
+	IReadOnlyList<ConversationTranscriptEntryViewState> transcriptEntries,
+	string? initialText = null,
+	bool allowCancelWithEscape = true,
+	string? personaName = null)
+{
+	ConversationPromptScreenParameters screenParameters = new()
+	{
+		Title = title,
+		InstructionsMarkup = instructionsMarkup,
+		EmptyStateMarkup = emptyStateMarkup,
+		HeaderState = BuildAppHeaderState(appPaths, openrouter, personaName: personaName),
+		StatusBarState = statusBarState,
+		PromptMarkup = promptMarkup,
+		PromptText = promptText,
+		InitialText = initialText,
+		AllowCancelWithEscape = allowCancelWithEscape,
+		HistoryEntries = historyEntries,
+		TranscriptEntries = transcriptEntries
+	};
+
+	return new ConversationPromptScreenHost(screenParameters)
+		.RunAsync();
 }
 
 /// <summary>
@@ -1656,18 +1826,39 @@ static async Task DoBootstrapAsync(
 	// Major handoff into YAi.Persona: bootstrap conversation, extraction, and persistence all live there.
 	try
 	{
+		bool useConversationScreen = !Console.IsInputRedirected && !Console.IsOutputRedirected;
+		string bootstrapInstructionsMarkup = "[grey70]Your AI assistant is waking up for the first time. Type [bold]done[/] or [bold]exit[/] when you are ready to finish.[/]";
+		string bootstrapEmptyStateMarkup = "[grey70]The transcript will appear here after the opening message or your first prompt.[/]";
+		StatusBarState bootstrapStatusBar = StatusBarState.Local("idle", "bootstrap", navigationHint: "Esc · exit");
+		List<ConversationTranscriptEntryViewState> transcriptEntries = [];
+		List<string> promptHistoryEntries = [.. LoadPromptHistoryEntries(history)];
+		string userName = runtime.UserName ?? "You";
+		string promptMarkup = GetUserPromptMarkup(userName);
+		string promptText = GetUserPromptText(userName);
+		MultilinePromptEditor? promptEditor = useConversationScreen ? null : new MultilinePromptEditor(promptHistoryEntries);
+
 		ClearConsole(clearScrollback: true);
 		await new BannerScreenHost().RunAsync();
 		AnsiConsole.WriteLine();
-		WriteAppHeader(BuildAppHeaderState(appPaths, openrouter));
-		AnsiConsole.WriteLine();
-		AnsiConsole.MarkupLine("[bold cyan]First-run setup[/]");
-		AnsiConsole.MarkupLine("[grey70]Your AI assistant is waking up for the first time. Type [bold]done[/] or [bold]exit[/] when you are ready to finish.[/]");
-		AnsiConsole.WriteLine();
+
+		if (!useConversationScreen)
+		{
+			WriteAppHeader(BuildAppHeaderState(appPaths, openrouter, personaName: runtime.AgentName));
+			AnsiConsole.WriteLine();
+			AnsiConsole.MarkupLine("[bold cyan]First-run setup[/]");
+			AnsiConsole.MarkupLine(bootstrapInstructionsMarkup);
+			AnsiConsole.MarkupLine("[grey70]Press [bold]Enter[/] to send, use [bold]Shift+Enter[/] for a new line, and use [bold]Up/Down[/] at the top or bottom edge to browse prompt history without losing your draft.[/]");
+			AnsiConsole.WriteLine();
+		}
+
 		await ShowOpenRouterBalanceAsync(openRouterBalance, false, false);
 		AnsiConsole.WriteLine();
-		WriteStatusBar(StatusBarState.Local("idle", "bootstrap"));
-		AnsiConsole.WriteLine();
+
+		if (!useConversationScreen)
+		{
+			WriteStatusBar(bootstrapStatusBar);
+			AnsiConsole.WriteLine();
+		}
 
 		// Build the initial system context from BOOTSTRAP.md + workspace files.
 		List<OpenRouterChatMessage> systemMessages = bootstrapSvc.BuildBootstrapSystemMessages();
@@ -1688,29 +1879,74 @@ static async Task DoBootstrapAsync(
 			AnsiConsole.WriteLine();
 
 			OpenRouterResponse opening = await RunThinkingAsync(() => bootstrapSvc.GetOpeningMessageAsync(kickoffMessages, CancellationToken.None)).ConfigureAwait(false);
-			string openingText = opening.Text ?? string.Empty;
+			string openingText = string.IsNullOrWhiteSpace(opening.Text)
+				? "No response provided."
+				: opening.Text ?? string.Empty;
+			ResponseViewState openingState = BuildResponseViewState(
+				"Bootstrap opening",
+				openrouter,
+				opening,
+				openingText,
+				variant: string.IsNullOrWhiteSpace(opening.Text) ? "warning" : "assistant",
+				assistantName: runtime.AgentName);
 
-			if (!string.IsNullOrWhiteSpace(openingText))
+			if (useConversationScreen)
 			{
-				WriteAssistantLine(openingText, runtime.AgentName);
-				AnsiConsole.WriteLine();
-				WriteStatusBar(StatusBarState.Local("idle", "bootstrap", opening.PromptTokens, opening.CompletionTokens, opening.TotalTokens));
-				AnsiConsole.WriteLine();
-
-				conversation.Add(new OpenRouterChatMessage { Role = "assistant", Content = openingText });
-				sessionEntries.Add(new HistoryEntry { Prompt = "(Begin)", Response = openingText, Mode = "bootstrap" });
+				transcriptEntries.Add(BuildResponseTranscriptEntry(openingState));
+				bootstrapStatusBar = StatusBarState.Local("idle", "bootstrap", opening.PromptTokens, opening.CompletionTokens, opening.TotalTokens, lastDurationMs: openingState.DurationMs, navigationHint: "Esc · exit");
 			}
+			else
+			{
+				WriteInlineResponse(openingState);
+				AnsiConsole.WriteLine();
+				WriteStatusBar(StatusBarState.Local("idle", "bootstrap", opening.PromptTokens, opening.CompletionTokens, opening.TotalTokens, lastDurationMs: openingState.DurationMs));
+				AnsiConsole.WriteLine();
+			}
+
+			conversation.Add(new OpenRouterChatMessage { Role = "assistant", Content = openingText });
+			sessionEntries.Add(new HistoryEntry { Prompt = "(Begin)", Response = openingText, Mode = "bootstrap" });
 		}
 		catch (Exception ex)
 		{
 			ReportRecoverableException(ex, "Bootstrap: failed to get opening message", "Bootstrap: failed to get opening message — continuing to input loop");
 		}
 
-			// Conversational loop: the CLI collects turns, while bootstrapSvc owns the model exchange.
+		// Conversational loop: the CLI collects turns, while bootstrapSvc owns the model exchange.
 		while (true)
 		{
-			AnsiConsole.Markup(GetUserPromptMarkup(runtime.UserName ?? "You"));
-			string? line = Console.ReadLine();
+			string? line;
+
+			if (useConversationScreen)
+			{
+				ConversationPromptScreenResult screenResult = await ShowConversationPromptScreenAsync(
+					appPaths,
+					openrouter,
+					"First-run setup",
+					bootstrapInstructionsMarkup,
+					bootstrapEmptyStateMarkup,
+					bootstrapStatusBar,
+					promptMarkup,
+					promptText,
+					promptHistoryEntries,
+					transcriptEntries,
+					allowCancelWithEscape: true,
+					personaName: runtime.AgentName).ConfigureAwait(false);
+
+				if (screenResult.IsCanceled)
+				{
+					break;
+				}
+
+				line = screenResult.Prompt;
+			}
+			else
+			{
+				line = promptEditor!.Read(new MultilinePromptEditorOptions
+				{
+					PromptMarkup = promptMarkup,
+					PromptText = promptText
+				});
+			}
 
 			if (line == null)
 			{
@@ -1719,7 +1955,7 @@ static async Task DoBootstrapAsync(
 
 			string trimmed = line.Trim();
 
-			if (string.IsNullOrEmpty(trimmed))
+			if (string.IsNullOrWhiteSpace(line))
 			{
 				continue;
 			}
@@ -1730,10 +1966,20 @@ static async Task DoBootstrapAsync(
 				break;
 			}
 
+			if (useConversationScreen)
+			{
+				promptHistoryEntries.Add(line);
+				transcriptEntries.Add(BuildUserTranscriptEntry(userName, line));
+			}
+			else
+			{
+				promptEditor!.RememberPrompt(line);
+			}
+
 			// Build messages: system context + conversation so far + new user turn.
 			List<OpenRouterChatMessage> messages = new List<OpenRouterChatMessage>(systemMessages);
 			messages.AddRange(conversation);
-			messages.Add(new OpenRouterChatMessage { Role = "user", Content = trimmed });
+			messages.Add(new OpenRouterChatMessage { Role = "user", Content = line });
 
 			try
 			{
@@ -1741,17 +1987,35 @@ static async Task DoBootstrapAsync(
 				AnsiConsole.WriteLine();
 
 				OpenRouterResponse resp = await RunThinkingAsync(() => bootstrapSvc.SendBootstrapTurnAsync(messages, CancellationToken.None)).ConfigureAwait(false);
-				string reply = resp.Text ?? string.Empty;
+				string reply = string.IsNullOrWhiteSpace(resp.Text)
+					? "No response provided."
+					: resp.Text ?? string.Empty;
 
-				WriteAssistantLine(reply, runtime.AgentName);
-				AnsiConsole.WriteLine();
-				WriteStatusBar(StatusBarState.Local("idle", "bootstrap", resp.PromptTokens, resp.CompletionTokens, resp.TotalTokens));
-				AnsiConsole.WriteLine();
+				ResponseViewState responseState = BuildResponseViewState(
+					"Bootstrap response",
+					openrouter,
+					resp,
+					reply,
+					variant: string.IsNullOrWhiteSpace(resp.Text) ? "warning" : "assistant",
+					assistantName: runtime.AgentName);
 
-				conversation.Add(new OpenRouterChatMessage { Role = "user", Content = trimmed });
+				if (useConversationScreen)
+				{
+					transcriptEntries.Add(BuildResponseTranscriptEntry(responseState));
+					bootstrapStatusBar = StatusBarState.Local("idle", "bootstrap", resp.PromptTokens, resp.CompletionTokens, resp.TotalTokens, lastDurationMs: responseState.DurationMs, navigationHint: "Esc · exit");
+				}
+				else
+				{
+					WriteInlineResponse(responseState);
+					AnsiConsole.WriteLine();
+					WriteStatusBar(StatusBarState.Local("idle", "bootstrap", resp.PromptTokens, resp.CompletionTokens, resp.TotalTokens, lastDurationMs: responseState.DurationMs));
+					AnsiConsole.WriteLine();
+				}
+
+				conversation.Add(new OpenRouterChatMessage { Role = "user", Content = line });
 				conversation.Add(new OpenRouterChatMessage { Role = "assistant", Content = reply });
 
-				sessionEntries.Add(new HistoryEntry { Prompt = trimmed, Response = reply, Mode = "bootstrap" });
+				sessionEntries.Add(new HistoryEntry { Prompt = line, Response = reply, Mode = "bootstrap" });
 			}
 			catch (Exception ex)
 			{
@@ -1834,6 +2098,16 @@ static async Task DoDreamAsync(DreamingService dreamingService)
 static async Task DoAskAsync(AppPaths appPaths, PromptBuilder promptBuilder, OpenRouterClient openrouter, ToolRegistry toolRegistry, HistoryService history, AppConfig appConfig, string prompt)
 {
 	// Prompt building and tool execution are Persona responsibilities; this file only orchestrates the turn.
+	PromptEditorScreenResult promptResult = await ResolveAskPromptAsync(appPaths, openrouter, history, appConfig, prompt).ConfigureAwait(false);
+
+	if (promptResult.IsCanceled)
+	{
+		AnsiConsole.MarkupLine("[yellow]⚠ Ask canceled.[/]");
+		return;
+	}
+
+	prompt = promptResult.Prompt;
+
 	if (string.IsNullOrWhiteSpace(prompt))
 	{
 		AnsiConsole.MarkupLine("[yellow]⚠ No prompt provided.[/]");
@@ -1843,30 +2117,35 @@ static async Task DoAskAsync(AppPaths appPaths, PromptBuilder promptBuilder, Ope
 	List<OpenRouterChatMessage> conversation = [];
 	try
 	{
-		WriteAppHeader(BuildAppHeaderState(appPaths, openrouter));
-		AnsiConsole.WriteLine();
-		WriteStatusBar(StatusBarState.Network("sending", "ask"));
-		AnsiConsole.WriteLine();
-
+		DateTimeOffset askStart = DateTimeOffset.Now;
 		(OpenRouterResponse response, bool guardHit) = await RunChatTurnWithToolsAsync("ask", prompt, promptBuilder, openrouter, toolRegistry, conversation);
-		string responseText = response.Text ?? string.Empty;
+		int askDurationMs = (int)(DateTimeOffset.Now - askStart).TotalMilliseconds;
+		string responseText = string.IsNullOrWhiteSpace(response.Text)
+			? "No response provided."
+			: response.Text ?? string.Empty;
+		ResponseViewState responseState = BuildResponseViewState(
+			"Ask response",
+			openrouter,
+			response,
+			responseText,
+			variant: string.IsNullOrWhiteSpace(response.Text) ? "warning" : "assistant",
+			noticeText: guardHit ? "Tool call loop reached the guard limit." : null,
+			durationMs: askDurationMs,
+			assistantName: AppHeaderState.Current.PersonaName);
 
-		if (guardHit)
+		if (!Console.IsInputRedirected && !Console.IsOutputRedirected)
 		{
-			AnsiConsole.MarkupLine("[yellow]⚠ Tool call loop reached the guard limit.[/]");
-		}
-
-		if (string.IsNullOrWhiteSpace(responseText))
-		{
-			AnsiConsole.MarkupLine("[yellow]⚠ No response provided.[/]");
+			await ShowResponseScreenAsync(
+				appPaths,
+				openrouter,
+				responseState,
+				StatusBarState.Local("idle", "ask", response.PromptTokens, response.CompletionTokens, response.TotalTokens, lastDurationMs: askDurationMs))
+				.ConfigureAwait(false);
 		}
 		else
 		{
-			WriteAssistantLine(responseText);
+			WriteInlineResponse(responseState);
 		}
-
-		WriteStatusBar(StatusBarState.Local("idle", "ask", response.PromptTokens, response.CompletionTokens, response.TotalTokens));
-		AnsiConsole.WriteLine();
 
 		RecordHistoryEntry(history, appConfig, prompt, responseText, "ask");
 	}
@@ -1874,6 +2153,43 @@ static async Task DoAskAsync(AppPaths appPaths, PromptBuilder promptBuilder, Ope
 	{
 		ReportRecoverableException(ex, "Ask workflow failed", "Ask workflow failed");
 	}
+}
+
+/// <summary>
+/// Resolves the ask prompt, falling back to the reusable prompt editor when no inline text is supplied.
+/// </summary>
+static async Task<PromptEditorScreenResult> ResolveAskPromptAsync(AppPaths appPaths, OpenRouterClient openrouter, HistoryService history, AppConfig appConfig, string prompt)
+{
+	if (!string.IsNullOrWhiteSpace(prompt))
+	{
+		return new PromptEditorScreenResult
+		{
+			Prompt = prompt
+		};
+	}
+
+	if (Console.IsInputRedirected || Console.IsOutputRedirected)
+	{
+		return new PromptEditorScreenResult();
+	}
+
+	string userName = appConfig.App.UserName ?? Environment.UserName;
+	PromptEditorScreenParameters screenParameters = new()
+	{
+		Title = "Ask prompt",
+		InstructionsMarkup = "[grey70]Paste or type the full prompt. The editor preserves the current draft while you browse older prompts, and the submitted text is sent exactly as written.[/]",
+		HeaderState = BuildAppHeaderState(appPaths, openrouter),
+		StatusBarState = StatusBarState.Local("idle", "ask", navigationHint: "Esc · cancel"),
+		PromptMarkup = GetUserPromptMarkup(userName),
+		PromptText = GetUserPromptText(userName),
+		InitialText = prompt,
+		AllowCancelWithEscape = true,
+		HistoryEntries = LoadPromptHistoryEntries(history)
+	};
+
+	return await new PromptEditorScreenHost(screenParameters)
+		.RunAsync()
+		.ConfigureAwait(false);
 }
 
 /// <summary>
@@ -1891,15 +2207,35 @@ static async Task DoTranslateAsync(AppPaths appPaths, PromptBuilder promptBuilde
 	List<OpenRouterChatMessage> messages = promptBuilder.BuildMessages("translate", text);
 	try
 	{
-		WriteAppHeader(BuildAppHeaderState(appPaths, openrouter));
-		AnsiConsole.WriteLine();
-		WriteStatusBar(StatusBarState.Network("sending", "translate"));
-		AnsiConsole.WriteLine();
-
+		DateTimeOffset translateStart = DateTimeOffset.Now;
 		OpenRouterResponse resp = await RunThinkingAsync(() => openrouter.SendChatAsync(messages, CancellationToken.None)).ConfigureAwait(false);
-		WriteAssistantLine(resp.Text ?? string.Empty);
-		WriteStatusBar(StatusBarState.Local("idle", "translate", resp.PromptTokens, resp.CompletionTokens, resp.TotalTokens));
-		AnsiConsole.WriteLine();
+		int translateDurationMs = (int)(DateTimeOffset.Now - translateStart).TotalMilliseconds;
+		string responseText = string.IsNullOrWhiteSpace(resp.Text)
+			? "No response provided."
+			: resp.Text ?? string.Empty;
+		ResponseViewState responseState = BuildResponseViewState(
+			"Translate response",
+			openrouter,
+			resp,
+			responseText,
+			variant: string.IsNullOrWhiteSpace(resp.Text) ? "warning" : "assistant",
+			durationMs: translateDurationMs,
+			assistantName: AppHeaderState.Current.PersonaName);
+
+		if (!Console.IsInputRedirected && !Console.IsOutputRedirected)
+		{
+			await ShowResponseScreenAsync(
+				appPaths,
+				openrouter,
+				responseState,
+				StatusBarState.Local("idle", "translate", resp.PromptTokens, resp.CompletionTokens, resp.TotalTokens, lastDurationMs: translateDurationMs))
+				.ConfigureAwait(false);
+		}
+		else
+		{
+			WriteInlineResponse(responseState);
+		}
+
 		RecordHistoryEntry(history, appConfig, text, resp.Text, "translate");
 	}
 	catch (Exception ex)
@@ -1914,47 +2250,114 @@ static async Task DoTranslateAsync(AppPaths appPaths, PromptBuilder promptBuilde
 static async Task DoTalkAsync(AppPaths appPaths, PromptBuilder promptBuilder, OpenRouterClient openrouter, ToolRegistry toolRegistry, HistoryService history, AppConfig appConfig)
 {
 	// Talk is the long-lived REPL; tool calls and response generation come from Persona services.
-	WriteAppHeader(BuildAppHeaderState(appPaths, openrouter));
-	AnsiConsole.WriteLine();
-	AnsiConsole.MarkupLine("[bold cyan]🗣️ Entering talk REPL[/] [grey70](type 'exit' to quit)[/]");
-	WriteStatusBar(StatusBarState.Local("idle", "talk"));
-	AnsiConsole.WriteLine();
+	bool useConversationScreen = !Console.IsInputRedirected && !Console.IsOutputRedirected;
+	string assistantName = string.IsNullOrWhiteSpace(appConfig.App.Name) ? (AppHeaderState.Current.PersonaName ?? "YAi") : appConfig.App.Name;
+	string talkInstructionsMarkup = "[grey70]Type [bold]exit[/] when you want to leave the conversation.[/]";
+	string talkEmptyStateMarkup = "[grey70]Your conversation transcript will appear here after your first turn.[/]";
+	StatusBarState talkStatusBar = StatusBarState.Local("idle", "talk", navigationHint: "Esc · exit");
+	List<ConversationTranscriptEntryViewState> transcriptEntries = [];
+	List<string> promptHistoryEntries = [.. LoadPromptHistoryEntries(history)];
+	string userName = appConfig.App.UserName ?? Environment.UserName;
+	string promptMarkup = GetUserPromptMarkup(userName);
+	string promptText = GetUserPromptText(userName);
+	MultilinePromptEditor? promptEditor = useConversationScreen ? null : new MultilinePromptEditor(promptHistoryEntries);
+
+	if (!useConversationScreen)
+	{
+		WriteAppHeader(BuildAppHeaderState(appPaths, openrouter, personaName: assistantName));
+		AnsiConsole.WriteLine();
+		AnsiConsole.MarkupLine("[bold cyan]🗣️ Entering talk REPL[/] [grey70](type 'exit' to quit)[/]");
+		AnsiConsole.MarkupLine("[grey70]Press [bold]Enter[/] to send, use [bold]Shift+Enter[/] for a new line, and use [bold]Up/Down[/] at the top or bottom edge to browse prompt history without losing your draft.[/]");
+		WriteStatusBar(StatusBarState.Local("idle", "talk", navigationHint: "exit · quit"));
+		AnsiConsole.WriteLine();
+	}
+
 	List<OpenRouterChatMessage> conversation = new List<OpenRouterChatMessage>();
 	List<HistoryEntry> sessionEntries = new List<HistoryEntry>();
 
 	while (true)
 	{
-		AnsiConsole.Markup(GetUserPromptMarkup(appConfig.App.UserName ?? Environment.UserName));
-		string? line = Console.ReadLine();
+		string? line;
+
+		if (useConversationScreen)
+		{
+			ConversationPromptScreenResult screenResult = await ShowConversationPromptScreenAsync(
+				appPaths,
+				openrouter,
+				"Talk conversation",
+				talkInstructionsMarkup,
+				talkEmptyStateMarkup,
+				talkStatusBar,
+				promptMarkup,
+				promptText,
+				promptHistoryEntries,
+				transcriptEntries,
+				allowCancelWithEscape: true,
+				personaName: assistantName).ConfigureAwait(false);
+
+			if (screenResult.IsCanceled)
+			{
+				break;
+			}
+
+			line = screenResult.Prompt;
+		}
+		else
+		{
+			line = promptEditor!.Read(new MultilinePromptEditorOptions
+			{
+				PromptMarkup = promptMarkup,
+				PromptText = promptText
+			});
+		}
+
 		if (line == null || line.Trim().ToLowerInvariant() == "exit") break;
 		if (string.IsNullOrWhiteSpace(line)) continue;
 
 		string userInput = line ?? string.Empty;
+
+		if (useConversationScreen)
+		{
+			promptHistoryEntries.Add(userInput);
+			transcriptEntries.Add(BuildUserTranscriptEntry(userName, userInput));
+		}
+		else
+		{
+			promptEditor!.RememberPrompt(userInput);
+		}
 
 		try
 		{
 			WriteStatusBar(StatusBarState.Network("sending", "talk"));
 			AnsiConsole.WriteLine();
 
+			DateTimeOffset talkStart = DateTimeOffset.Now;
 			(OpenRouterResponse assistantResponse, bool guardHit) = await RunChatTurnWithToolsAsync("talk", userInput, promptBuilder, openrouter, toolRegistry, conversation);
-			string assistantReply = assistantResponse.Text ?? string.Empty;
+			int talkDurationMs = (int)(DateTimeOffset.Now - talkStart).TotalMilliseconds;
+			string assistantReply = string.IsNullOrWhiteSpace(assistantResponse.Text)
+				? "No response provided."
+				: assistantResponse.Text ?? string.Empty;
+			ResponseViewState responseState = BuildResponseViewState(
+				"Talk response",
+				openrouter,
+				assistantResponse,
+				assistantReply,
+				variant: string.IsNullOrWhiteSpace(assistantResponse.Text) ? "warning" : "assistant",
+				noticeText: guardHit ? "Tool call loop reached the guard limit." : null,
+				durationMs: talkDurationMs,
+				assistantName: assistantName);
 
-			if (guardHit)
+			if (useConversationScreen)
 			{
-				AnsiConsole.MarkupLine("[yellow]⚠ Tool call loop reached the guard limit.[/]");
-			}
-
-			if (string.IsNullOrWhiteSpace(assistantReply))
-			{
-				AnsiConsole.MarkupLine("[yellow]⚠ No response provided.[/]");
+				transcriptEntries.Add(BuildResponseTranscriptEntry(responseState));
+				talkStatusBar = StatusBarState.Local("idle", "talk", assistantResponse.PromptTokens, assistantResponse.CompletionTokens, assistantResponse.TotalTokens, lastDurationMs: talkDurationMs, navigationHint: "Esc · exit");
 			}
 			else
 			{
-				WriteAssistantLine(assistantReply);
+				WriteInlineResponse(responseState);
+				WriteStatusBar(StatusBarState.Local("idle", "talk", assistantResponse.PromptTokens, assistantResponse.CompletionTokens, assistantResponse.TotalTokens, lastDurationMs: talkDurationMs, navigationHint: "exit · quit"));
+				AnsiConsole.WriteLine();
 			}
-
-			WriteStatusBar(StatusBarState.Local("idle", "talk", assistantResponse.PromptTokens, assistantResponse.CompletionTokens, assistantResponse.TotalTokens));
-			AnsiConsole.WriteLine();
 
 			HistoryEntry entry = new HistoryEntry
 			{
@@ -1981,6 +2384,21 @@ static async Task DoTalkAsync(AppPaths appPaths, PromptBuilder promptBuilder, Op
 	WriteStatusBar(StatusBarState.Local("done", "talk session"));
 	AnsiConsole.WriteLine();
 	AnsiConsole.MarkupLine("[grey70]Exiting REPL[/]");
+}
+
+/// <summary>
+/// Loads recent prompt history in oldest-to-newest order for the reusable multiline editor.
+/// </summary>
+static IReadOnlyList<string> LoadPromptHistoryEntries(HistoryService history, int maxEntries = 100)
+{
+	List<string> prompts = history.LoadRecentHistory(maxEntries)
+		.Select(entry => entry.Prompt)
+		.Where(prompt => !string.IsNullOrWhiteSpace(prompt))
+		.Select(prompt => prompt!)
+		.Reverse()
+		.ToList();
+
+	return prompts;
 }
 
 /// <summary>

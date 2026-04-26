@@ -1,0 +1,62 @@
+@*
+    YAi!
+
+    Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.
+    Website: https://umbertogiacobbi.biz
+    Email: hello@umbertogiacobbi.biz
+
+    YAi.Client.CLI.Components
+    ResponsePanel — reusable assistant response surface with metadata and action hints
+*@
+
+@namespace YAi.Client.CLI.Components
+
+@using Microsoft.AspNetCore.Components
+@using RazorConsole.Components
+@using YAi.Client.CLI.Components.Rendering
+
+<Panel Title="@_panelTitle">
+    <Rows>
+        <RawMarkup Content="@_speakerMarkup" />
+        <RawMarkup Content="@_phaseMarkup" />
+
+        @if (!string.IsNullOrWhiteSpace (_noticeMarkup))
+        {
+            <Newline />
+            <RawMarkup Content="@_noticeMarkup" />
+        }
+
+        <Newline />
+        <RawMarkup Content="@_bodyMarkup" />
+        <Newline />
+        <RawMarkup Content="@_metadataMarkup" />
+        <RawMarkup Content="@_actionMarkup" />
+    </Rows>
+</Panel>
+
+@code {
+    [Parameter, EditorRequired]
+    public ResponseViewState State { get; set; } = new ();
+
+    [Parameter]
+    public bool ShowRawJson { get; set; }
+
+    private string _actionMarkup = string.Empty;
+    private string _bodyMarkup = string.Empty;
+    private string _metadataMarkup = string.Empty;
+    private string _noticeMarkup = string.Empty;
+    private string _panelTitle = string.Empty;
+    private string _phaseMarkup = string.Empty;
+    private string _speakerMarkup = string.Empty;
+
+    protected override void OnParametersSet ()
+    {
+        _panelTitle = ResponseMarkupRenderer.BuildPanelTitle (State, ShowRawJson);
+        _speakerMarkup = ResponseMarkupRenderer.BuildSpeakerMarkup (State);
+        _phaseMarkup = ResponseMarkupRenderer.BuildPhaseMarkup (State);
+        _noticeMarkup = ResponseMarkupRenderer.BuildNoticeMarkup (State);
+        _bodyMarkup = ResponseMarkupRenderer.BuildBodyMarkup (State, ShowRawJson);
+        _metadataMarkup = ResponseMarkupRenderer.BuildMetadataMarkup (State);
+        _actionMarkup = ResponseMarkupRenderer.BuildActionMarkup (State, ShowRawJson);
+    }
+}

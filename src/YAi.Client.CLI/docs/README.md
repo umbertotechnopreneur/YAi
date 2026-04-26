@@ -1,23 +1,11 @@
-**Document title:** <span style="color:#1E90FF">UmbertoGiacobbiDotBiz</span> YAi.Client.CLI Docs ✨  
-**Prepared by:** Umberto Giacobbi  
-**Organization:** <span style="color:#1E90FF">UmbertoGiacobbiDotBiz</span> 🚀  
-- **Intended use:** The local documentation index for the YAi CLI process, command dispatch, and bootstrap orchestration surface.  
-
-## Author Profile
-
-Umberto Giacobbi is a founder, consultant, advisor, developer, and operator with international experience across Italy, Switzerland, the United States, Indonesia, and Vietnam. His work spans projects in Europe, the US, and Southeast Asia, with a focus on practical execution, strategic thinking, and technology-led business building.
-
-## Contact Information
-
-- **Email:** [hello@umbertogiacobbi.biz](mailto:hello@umbertogiacobbi.biz)  
-- **LinkedIn:** [linkedin.com/in/umbertogiacobbi](https://www.linkedin.com/in/umbertogiacobbi/)  
-- **Website:** [umbertogiacobbi.biz](https://umbertogiacobbi.biz)  
-
-## AI Use and Responsibility Notice
-
-This document may include content generated, refined, or reviewed with the assistance of one or more AI models. It should be reviewed and validated before external distribution or operational use. Final responsibility for its verification, interpretation, and application remains with the author(s) and the organization.
-
 # YAi.Client.CLI Docs
+
+| Field | Value |
+| --- | --- |
+| Purpose | Local documentation index for the YAi CLI process, command dispatch, and bootstrap orchestration surface |
+| Audience | Project maintainers and contributors |
+| Status | Active |
+| Last reviewed | 2026-04-27 |
 
 ## What belongs here
 
@@ -25,7 +13,9 @@ Use this folder for CLI-specific implementation notes and local history about:
 
 - command parsing and dispatch in `Program.cs`
 - bootstrap orchestration from the CLI process
+- prompt-editor orchestration for `--bootstrap`, `--ask`, and `--talk` in `Program.cs`
 - banner, splash, and terminal presentation helpers
+- shared header/footer chrome state in `AppHeaderState.cs` and `StatusBarState.cs`
 - local launch helpers such as `jump-cli-output.ps1`
 
 ## Shared docs this project depends on
@@ -42,6 +32,8 @@ Use this folder for CLI-specific implementation notes and local history about:
 ## Current code anchors
 
 - `Program.cs`
+- `AppHeaderState.cs`
+- `StatusBarState.cs`
 - `appsettings.json`
 - `lenna.ps1`
 - `yai_logo_ansi_800x600.ps1`

@@ -2,9 +2,10 @@
 
 @using Microsoft.AspNetCore.Components
 @using RazorConsole.Components
+@using YAi.Client.CLI.Components.Rendering
 
 <Panel Expand="true">
-    <RawMarkup Content="@HeaderState.ToMarkup()" />
+    <RawMarkup Content="@AppHeaderMarkupRenderer.BuildMarkup(HeaderState)" />
 </Panel>
 
 @code {

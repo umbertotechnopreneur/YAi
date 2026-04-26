@@ -126,7 +126,7 @@ The current CLI already exposes practical local runtime flows:
 - `--show-cli-path` inspects whether the CLI is visible on PATH
 - `--add-to-path` updates the current user PATH on Windows
 - `--security setup-lock` enables the local app lock and encrypts provider secrets at rest
-- `--ask`, `--translate`, and `--talk` run the current prompt-driven interaction flows
+- `--ask`, `--translate`, and `--talk` run the current prompt-driven interaction flows, with `--ask` falling back to the multiline prompt editor when no inline text is provided
 - `--gonuclear` performs an explicit, high-friction reset flow with optional backup creation first
 
 For the CLI-specific operational detail, see [src/YAi.Client.CLI/README.md](src/YAi.Client.CLI/README.md).
@@ -172,6 +172,8 @@ The publish and verify scripts now default to `RSA-PSS-SHA256` for detached mani
 
 The verifier recomputes hashes, verifies the detached manifest signature when present, and checks that each zip can be opened without corruption.
 
+For public release readiness before a tagged release, artifact publish, or repository announcement, use [docs/operations/public-release-checklist.md](docs/operations/public-release-checklist.md).
+
 ## Security and local control
 
 YAi! is built for environments where control matters.
@@ -203,21 +205,38 @@ Start with:
 
 For larger changes, align the approach first. YAi! benefits more from durable decisions than from fast, noisy feature churn.
 
+For provenance, AI contribution, contributor terms, commercial options, support, and security reporting, use the policy pages linked below.
+
 ## Status
 
 YAi! is under active development. The core direction is stable, but workflows, commands, docs, and internal structure will continue to tighten as the trust model matures.
 
+Today the repo is best understood as:
+
+- a usable .NET 10 local-first CLI runtime
+- a growing shared runtime library with explicit safety boundaries
+- an actively evolving project where commands and docs are real, but still being refined for broader public release
+
+## Project Terms And Provenance
+
+YAi! is created and maintained by Umberto Giacobbi / UmbertoGiacobbiDotBiz.
+
+The project includes original work in this repository together with selected architectural concepts, implementation patterns, and conventions originating from prior work developed under the Infrastruttura name. AI tools may assist with development, but the maintainer remains responsible for authorship decisions, review, integration, and release.
+
+Use these documents as the canonical public references:
+
+- [LICENSE](LICENSE) for the license text
+- [NOTICE.md](NOTICE.md) for copyright and prior-work notice
+- [IP_PROVENANCE.md](IP_PROVENANCE.md) for provenance and background IP context
+- [AI_CONTRIBUTION_POLICY.md](AI_CONTRIBUTION_POLICY.md) for AI-assisted contribution requirements
+- [CONTRIBUTOR_LICENSE_AGREEMENT.md](CONTRIBUTOR_LICENSE_AGREEMENT.md) for contributor licensing terms
+- [COMMERCIAL.md](COMMERCIAL.md) for commercial licensing and private support options
+- [SUPPORT.md](SUPPORT.md) for community and commercial support paths
+- [SECURITY.md](SECURITY.md) for security reporting expectations
+
 ## Repository
 
 [https://github.com/umbertotechnopreneur/YAi](https://github.com/umbertotechnopreneur/YAi)
-
-## Founder links and inspiration
-
-iAViews was part of the inspiration that moved me to invest in YAi! and push it forward as a trust-first local agent runtime.
-
-- iAViews: [https://www.iaviews.biz/](https://www.iaviews.biz/)
-- Website: [https://umbertogiacobbi.biz/](https://umbertogiacobbi.biz/)
-- LinkedIn: [https://www.linkedin.com/in/umbertogiacobbi/](https://www.linkedin.com/in/umbertogiacobbi/)
 
 ## License
 
@@ -225,4 +244,13 @@ YAi! is licensed under the GNU Affero General Public License v3.0 only.
 
 Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.
 
-See [LICENSE](LICENSE), [NOTICE.md](NOTICE.md), and [CONTRIBUTING.md](CONTRIBUTING.md) for the current repository terms and contribution expectations.
+See [LICENSE](LICENSE), [NOTICE.md](NOTICE.md), [CONTRIBUTING.md](CONTRIBUTING.md), [IP_PROVENANCE.md](IP_PROVENANCE.md), [AI_CONTRIBUTION_POLICY.md](AI_CONTRIBUTION_POLICY.md), [COMMERCIAL.md](COMMERCIAL.md), [SUPPORT.md](SUPPORT.md), and [SECURITY.md](SECURITY.md) for the current repository terms, support model, and contribution expectations.
+
+## Contact
+
+- Website: [https://umbertogiacobbi.biz/](https://umbertogiacobbi.biz/)
+- Infrastruttura: [https://umbertogiacobbi.biz/infrastruttura](https://umbertogiacobbi.biz/infrastruttura)
+- GitHub: [https://github.com/umbertotechnopreneur](https://github.com/umbertotechnopreneur)
+- LinkedIn: [https://www.linkedin.com/in/umbertogiacobbi/](https://www.linkedin.com/in/umbertogiacobbi/)
+- Preferred email: [hello@umbertogiacobbi.biz](mailto:hello@umbertogiacobbi.biz)
+- Time zone: Indochina Time (Vietnam/Hanoi)

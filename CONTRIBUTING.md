@@ -8,6 +8,8 @@ YAi! is intended to stay local-first, explicit, safe by default, and multiplatfo
 
 If the mission resonates, send fixes, docs, tests, or workflow ideas that strengthen the trust model rather than weaken it. The root [MANIFEST.md](MANIFEST.md) captures the trust posture, and [docs/README.md](docs/README.md) is the main entry point for the governed docs system.
 
+For provenance, AI contribution, and licensing terms, see [IP_PROVENANCE.md](IP_PROVENANCE.md), [AI_CONTRIBUTION_POLICY.md](AI_CONTRIBUTION_POLICY.md), and [CONTRIBUTOR_LICENSE_AGREEMENT.md](CONTRIBUTOR_LICENSE_AGREEMENT.md).
+
 When you add, rename, or remove configuration files, memory files, skill files, workspace files, or the SQLite storage path, keep the path inventory used by `--show-paths`, `--show-cli-path`, `--add-to-path`, and `--gonuclear` in sync with the code and docs.
 
 Project repository: [https://github.com/umbertotechnopreneur/YAi](https://github.com/umbertotechnopreneur/YAi)
@@ -33,6 +35,42 @@ Project repository: [https://github.com/umbertotechnopreneur/YAi](https://github
 > YAi! is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
 >
 > You should have received a copy of the GNU Affero General Public License along with YAi!. If not, see <https://www.gnu.org/licenses/>.
+
+## Contributor License Agreement
+
+By submitting a non-trivial contribution to YAi!, you agree that your contribution may only be accepted after signing the project's Contributor License Agreement.
+
+The CLA is intended to allow the project maintainer to distribute contributions as part of YAi! under the community open-source license and, where applicable, under separate commercial, proprietary, or enterprise licensing terms.
+
+Small documentation fixes, typo corrections, and issue comments may be accepted without a CLA at the maintainer's discretion.
+
+The CLA text is provided as a draft and should be reviewed by qualified legal counsel before being relied upon for commercial licensing.
+
+## AI-Assisted Contributions
+
+AI-assisted contributions are permitted, but the human contributor remains fully responsible for the submitted work.
+
+Do not submit generated code that you do not understand, cannot explain, or have not tested.
+
+Do not use AI tools to reproduce proprietary, confidential, or license-incompatible code.
+
+The maintainer may reject low-effort, unclear, overgenerated, unreviewed, or provenance-ambiguous AI-generated pull requests.
+
+## Intellectual Property and Provenance
+
+YAi! includes original work by Umberto Giacobbi / UmbertoGiacobbiDotBiz, AI-assisted implementation work reviewed and integrated by the maintainer, and prior architectural work originating from Infrastruttura, a codebase and technical framework developed since 2020.
+
+External contributors must only submit work they have the right to contribute.
+
+By submitting a contribution, you confirm that:
+
+- you have the right to submit the contribution;
+- the contribution does not contain proprietary, confidential, or license-incompatible code;
+- the contribution does not include secrets, credentials, private endpoints, customer data, or private business information;
+- if AI tools were used, you reviewed, understood, tested, and take responsibility for the generated work;
+- the contribution is compatible with the project license and contribution terms.
+
+The maintainer may reject contributions that create licensing uncertainty, unclear provenance, or excessive AI-generated code that cannot be reasonably reviewed.
 
 ## Before You Start
 
@@ -260,3 +298,12 @@ Report it privately through the maintainer contact path once that is defined for
 Be respectful, direct, and constructive.
 
 This project values clarity, professionalism, and useful contributions over volume.
+
+## Contact
+
+- Website: [https://umbertogiacobbi.biz/](https://umbertogiacobbi.biz/)
+- Infrastruttura: [https://umbertogiacobbi.biz/infrastruttura](https://umbertogiacobbi.biz/infrastruttura)
+- GitHub: [https://github.com/umbertotechnopreneur](https://github.com/umbertotechnopreneur)
+- LinkedIn: [https://www.linkedin.com/in/umbertogiacobbi/](https://www.linkedin.com/in/umbertogiacobbi/)
+- Preferred email: [hello@umbertogiacobbi.biz](mailto:hello@umbertogiacobbi.biz)
+- Time zone: Indochina Time (Vietnam/Hanoi)

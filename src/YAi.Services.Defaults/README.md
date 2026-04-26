@@ -1,6 +1,15 @@
 # YAi.Services.Defaults
 
+| Field | Value |
+| --- | --- |
+| Purpose | Shared Aspire hosting defaults used by YAi service projects |
+| Audience | Maintainers and contributors |
+| Status | Active |
+| Last reviewed | 2026-04-27 |
+
 This shared project contains the Aspire service defaults used by the YAi! backend host projects. `Extensions.cs` wires up OpenTelemetry, service discovery, standard HTTP resilience, and development health endpoints.
+
+For project-local implementation notes, see [docs/README.md](docs/README.md).
 
 ## What is this project / folder
 

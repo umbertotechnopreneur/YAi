@@ -1,23 +1,11 @@
-**Document title:** <span style="color:#1E90FF">UmbertoGiacobbiDotBiz</span> YAi Documentation Index ✨  
-**Prepared by:** Umberto Giacobbi  
-**Organization:** <span style="color:#1E90FF">UmbertoGiacobbiDotBiz</span> 🚀  
-- **Intended use:** The main entry point for shared YAi documentation, including governance, specs, operations, and history.  
-
-## Author Profile
-
-Umberto Giacobbi is a founder, consultant, advisor, developer, and operator with international experience across Italy, Switzerland, the United States, Indonesia, and Vietnam. His work spans projects in Europe, the US, and Southeast Asia, with a focus on practical execution, strategic thinking, and technology-led business building.
-
-## Contact Information
-
-- **Email:** [hello@umbertogiacobbi.biz](mailto:hello@umbertogiacobbi.biz)  
-- **LinkedIn:** [linkedin.com/in/umbertogiacobbi](https://www.linkedin.com/in/umbertogiacobbi/)  
-- **Website:** [umbertogiacobbi.biz](https://umbertogiacobbi.biz)  
-
-## AI Use and Responsibility Notice
-
-This document may include content generated, refined, or reviewed with the assistance of one or more AI models. It should be reviewed and validated before external distribution or operational use. Final responsibility for its verification, interpretation, and application remains with the author(s) and the organization.
-
 # YAi Documentation Index
+
+| Field | Value |
+| --- | --- |
+| Purpose | Main entry point for shared YAi documentation |
+| Audience | Maintainers, contributors, and technical readers |
+| Status | Active |
+| Last reviewed | 2026-04-27 |
 
 ## Start here
 
@@ -28,6 +16,8 @@ This document may include content generated, refined, or reviewed with the assis
 - [Reference docs](specs/reference/README.md)
 - [Historical docs](specs/historical/README.md)
 - [Spec manifest](spec-manifest.yml)
+
+If you are new to the repository, read the root [README.md](../README.md) first for product context, runtime scope, and the current quick-start path.
 
 ## Shared documentation areas
 
@@ -43,9 +33,7 @@ Shared doc areas that accumulate their own local history can also carry an area-
 
 ## Project-local documentation
 
-These folders hold implementation notes owned by one project:
-
-Each project-local docs folder can also carry a `local-changelog.md` file for history that belongs with one implementation surface rather than the shared docs history.
+These folders hold implementation notes owned by one project. A project-local docs folder may also carry a `local-changelog.md` file when the history belongs to one implementation surface rather than the shared docs history.
 
 - [YAi.Client.CLI docs](../src/YAi.Client.CLI/docs/README.md)
 - [YAi.Client.CLI.Components docs](../src/YAi.Client.CLI.Components/docs/README.md)
@@ -63,3 +51,5 @@ Each project-local docs folder can also carry a `local-changelog.md` file for hi
 The shared docs tree now treats `docs/specs/active/` as the source of truth for living shared specs.
 
 New documentation should follow the governed structure directly instead of adding new flat files under `docs/specs/`.
+
+For licensing, support, provenance, and security reporting, use the root policy pages rather than duplicating those details inside the docs tree.

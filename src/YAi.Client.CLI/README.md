@@ -1,6 +1,15 @@
 # YAi.Client.CLI
 
+| Field | Value |
+| --- | --- |
+| Purpose | User-facing command-line client for the YAi local runtime |
+| Audience | Users, maintainers, and contributors |
+| Status | Active |
+| Last reviewed | 2026-04-27 |
+
 Command-line client for interacting with the YAi Persona services (bootstrap, show-banner, manifesto, ask, translate, talk).
+
+For CLI-local implementation notes, see [docs/README.md](docs/README.md).
 
 Prerequisites
 - .NET 10 SDK on Windows, macOS, or Linux
@@ -35,7 +44,7 @@ Quick usage
 - `--help` — show the colored Spectre.Console help screen.
 - `--version` — show the banner splash from `BannerScreen.razor`, then the compiled CLI and assembly version, and exit.
 - Unrecognized arguments fail fast with the banner, a short explanation, and the help screen.
-- `--bootstrap` — initialize runtime workspace and copy identity templates into the user data root. If no OpenRouter model is configured, the CLI prompts you to choose one first. After preflight passes at startup, the CLI shows the current OpenRouter balance first, then continues into the boot flow. On first launch, the bootstrap intro clears the screen and scrollback, then tries to print the centered 800x600 YAi logo splash before the workspace setup message, falling back to the banner when the script cannot be rendered.
+- `--bootstrap` — initialize runtime workspace and copy identity templates into the user data root. If no OpenRouter model is configured, the CLI prompts you to choose one first. After preflight passes at startup, the CLI shows the current OpenRouter balance first, then continues into the boot flow. On first launch, the bootstrap intro clears the screen and scrollback, then tries to print the centered 800x600 YAi logo splash before the workspace setup message, falling back to the banner when the script cannot be rendered. Bootstrap input now accepts multi-line paste as one turn, sends on `Enter`, uses `Shift+Enter` to insert a newline, and restores the current draft when you browse prompt history with `Up` and `Down`. Interactive bootstrap now runs through a combined conversation screen that keeps the transcript, response metadata, and next prompt on one host surface, while non-screen fallback output still uses the shared inline response panel.
 - `--show-banner` — show the CLI banner splash and the top app header, then exit. This does not require an OpenRouter key.
 - `--manifesto` — show the CLI banner splash, then the manifesto excerpt with the repository link at the bottom, and exit. This does not require an OpenRouter key.
 - `--show-paths` — show the resolved asset, workspace, memory, data, config, and logs paths, including the workspace security and secret-store files.
@@ -47,15 +56,17 @@ Quick usage
 - `--security change-passphrase` — change the unlock passphrase and re-encrypt local secrets.
 - `--gonuclear` — show the custom data wipe screen, optionally create a zip backup with the workspace/data/config folder structure first, then delete the user data root and all custom runtime state. The backup archive is written outside the deleted roots under `%LOCALAPPDATA%\YAi\backups\yyyyMMdd\`.
 - `--lenna` — run the Lenna citation script and exit. This does not require an OpenRouter key.
-- `--ask "text"` — single-shot prompt; requires a completed bootstrap, a configured OpenRouter secret or `YAI_OPENROUTER_API_KEY`, and a selected OpenRouter model. When app lock is enabled, the CLI prompts for the unlock passphrase first.
-- `--translate "text"` — translation-style prompt using persona prompts; requires a completed bootstrap, a configured OpenRouter secret or `YAI_OPENROUTER_API_KEY`, and a selected OpenRouter model. When app lock is enabled, the CLI prompts for the unlock passphrase first.
-- `--talk` — interactive REPL (type `exit` to quit); requires a completed bootstrap, a configured OpenRouter secret or `YAI_OPENROUTER_API_KEY`, and a selected OpenRouter model. When app lock is enabled, the CLI prompts for the unlock passphrase first.
+- `--ask [text]` — single-shot prompt when text is provided, or the reusable multiline prompt editor when text is omitted; requires a completed bootstrap, a configured OpenRouter secret or `YAI_OPENROUTER_API_KEY`, and a selected OpenRouter model. When app lock is enabled, the CLI prompts for the unlock passphrase first. The interactive ask editor sends on `Enter`, uses `Shift+Enter` for a newline, restores the current draft when you browse prompt history with `Up` and `Down`, and cancels with `Esc`. Interactive ask responses now open the reusable response screen, where `Enter` continues, `Esc` closes, `C` copies the formatted response on Windows, and `J` toggles raw JSON when the active turn exposes it. Redirected or other non-screen ask output now uses the same shared inline response panel and metadata layout instead of the old single-line assistant output.
+- `--translate "text"` — translation-style prompt using persona prompts; requires a completed bootstrap, a configured OpenRouter secret or `YAI_OPENROUTER_API_KEY`, and a selected OpenRouter model. When app lock is enabled, the CLI prompts for the unlock passphrase first. Interactive translate responses now use the same reusable response screen and action hints as `--ask`, and non-screen fallback output now uses the same shared inline response panel and metadata layout.
+- `--talk` — interactive REPL (type `exit` to quit); requires a completed bootstrap, a configured OpenRouter secret or `YAI_OPENROUTER_API_KEY`, and a selected OpenRouter model. When app lock is enabled, the CLI prompts for the unlock passphrase first. Talk input now accepts multi-line paste as one turn, sends on `Enter`, uses `Shift+Enter` to insert a newline, and restores the current draft when you browse prompt history with `Up` and `Down`. Interactive talk now runs through a combined conversation screen that keeps the transcript, response metadata, and next prompt on one host surface, while non-screen fallback output still uses the shared inline response panel.
 
 Chat display
 
 - Chat prompts now render the user and assistant names with two-tone labels, such as `umber:` and `YAi!:`, and the CLI shows a `thinking...` spinner while waiting for the model.
-- Screen-based flows render a reusable top app header with the current location, current date/time, the active model provider and model name, and a clickable link to [umbertogiacobbi.biz/YAi](https://umbertogiacobbi.biz/YAi).
-- Chat and bootstrap turns also render a reusable status bar that shows local or network activity, sent and received token counts in different colors, and the current local date and time.
+- Interactive ask and translate responses render through the reusable response screen, while redirected or other non-screen ask and translate output reuses the shared inline response panel.
+- Interactive talk and bootstrap now render through a combined conversation screen that reuses the same response state and metadata formatting for transcript entries, while non-screen fallback output still uses the shared inline response panel.
+- Screen-based flows render a reusable top app header with persona identity when available, a shortened workspace path, the active model provider and model name, bootstrap and app-lock state, cache state, current date/time, and a clickable link to [umbertogiacobbi.biz/YAi](https://umbertogiacobbi.biz/YAi).
+- Chat and bootstrap turns also render a reusable status bar that uses emoji-coded scope and activity, shows sent and received token counts in different colors, includes the total token count and last response duration when available, and keeps the current local date/time plus navigation hints such as the talk REPL exit cue.
 
 Versioning
 
@@ -147,6 +158,12 @@ Ask a one-shot question (requires `YAI_OPENROUTER_API_KEY`):
 ```powershell
 $env:YAI_OPENROUTER_API_KEY = "<your-key>"
 dotnet run --project src/YAi.Client.CLI -- --ask "What's the weather in Milan?"
+```
+
+Open the multiline ask editor:
+
+```powershell
+dotnet run --project src/YAi.Client.CLI -- --ask
 ```
 
 Start interactive REPL:

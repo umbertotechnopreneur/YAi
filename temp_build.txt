@@ -1,3 +1,12 @@
+YAi Local Diagnostic Snapshot
+Purpose: Temporary captured local build output for troubleshooting a failed CLI build.
+Audience: Maintainers.
+Status: Point-in-time snapshot, not canonical documentation.
+Last reviewed: 2026-04-27.
+Canonical references: README.md, src/YAi.Client.CLI/README.md, and docs/operations/public-release-checklist.md.
+
+--- Captured output follows ---
+
   Individuazione dei progetti da ripristinare...
   Tutti i progetti sono aggiornati per il ripristino.
   YAi.Persona -> e:\YAi!\src\YAi.Persona\bin\Debug\net10.0\YAi.Persona.dll

@@ -1,0 +1,180 @@
+@*
+    YAi!
+
+    Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.
+    Website: https://umbertogiacobbi.biz
+    Email: hello@umbertogiacobbi.biz
+
+    YAi.Client.CLI.Components
+    ResponseScreen — RazorConsole host for the reusable response panel
+*@
+
+@using System.Diagnostics
+@using Microsoft.Extensions.Hosting
+@using RazorConsole.Components
+
+@inject IHostApplicationLifetime AppLifetime
+@inject RazorScreenResult<ResponseScreenResult> Result
+@inject ResponseScreenParameters ScreenParams
+
+<Rows>
+    <AppHeader State="@ScreenParams.HeaderState" />
+
+    <ResponsePanel State="@ScreenParams.ResponseState"
+                   ShowRawJson="@_showRawJson" />
+
+    <StatusBar State="@_statusBarState" />
+
+    <Newline />
+</Rows>
+
+@code {
+    private bool _copiedToClipboard;
+    private bool _responseLoopStarted;
+    private bool _showRawJson;
+    private bool _viewedRawJson;
+    private StatusBarState _statusBarState = StatusBarState.Local ("idle", "response");
+
+    protected override void OnInitialized ()
+    {
+        _statusBarState = BuildStatusBarState (ScreenParams.StatusBarState.Detail);
+    }
+
+    protected override Task OnAfterRenderAsync (bool firstRender)
+    {
+        if (firstRender && !_responseLoopStarted)
+        {
+            _responseLoopStarted = true;
+            return StartResponseLoopAsync ();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private StatusBarState BuildStatusBarState (string? detail)
+    {
+        return ScreenParams.StatusBarState with
+        {
+            Detail = detail,
+            NavigationHint = BuildNavigationHint ()
+        };
+    }
+
+    private string BuildNavigationHint ()
+    {
+        List<string> hints =
+        [
+            "Enter · continue"
+        ];
+
+        if (ScreenParams.ResponseState.CanCopyText)
+        {
+            hints.Add ("C · copy");
+        }
+
+        if (ScreenParams.ResponseState.CanInspectRawJson)
+        {
+            hints.Add (_showRawJson ? "J · formatted" : "J · raw JSON");
+        }
+
+        if (ScreenParams.AllowDismissWithEscape)
+        {
+            hints.Add ("Esc · close");
+        }
+
+        return string.Join (" · ", hints);
+    }
+
+    private void CloseScreen (bool closedWithEscape)
+    {
+        Result.SetResult (new ResponseScreenResult
+        {
+            ClosedWithEscape = closedWithEscape,
+            ViewedRawJson = _viewedRawJson,
+            CopiedToClipboard = _copiedToClipboard
+        });
+
+        AppLifetime.StopApplication ();
+    }
+
+    private async Task StartResponseLoopAsync ()
+    {
+        await Task.Yield ();
+
+        if (Console.IsInputRedirected || Console.IsOutputRedirected)
+        {
+            CloseScreen (closedWithEscape: false);
+            return;
+        }
+
+        while (true)
+        {
+            ConsoleKeyInfo key = Console.ReadKey (intercept: true);
+
+            if (key.Key == ConsoleKey.Enter)
+            {
+                CloseScreen (closedWithEscape: false);
+                return;
+            }
+
+            if (ScreenParams.AllowDismissWithEscape && key.Key == ConsoleKey.Escape)
+            {
+                CloseScreen (closedWithEscape: true);
+                return;
+            }
+
+            if (key.Key == ConsoleKey.J && ScreenParams.ResponseState.CanInspectRawJson)
+            {
+                _showRawJson = !_showRawJson;
+                _viewedRawJson |= _showRawJson;
+                _statusBarState = BuildStatusBarState (_showRawJson ? "showing raw json" : ScreenParams.StatusBarState.Detail);
+                await InvokeAsync (StateHasChanged);
+                continue;
+            }
+
+            if (key.Key == ConsoleKey.C && ScreenParams.ResponseState.CanCopyText)
+            {
+                bool copied = await TryCopyResponseTextAsync (ScreenParams.ResponseState.BodyText).ConfigureAwait (false);
+                _copiedToClipboard |= copied;
+                _statusBarState = BuildStatusBarState (copied ? "copied response" : "clipboard unavailable");
+                await InvokeAsync (StateHasChanged);
+            }
+        }
+    }
+
+    private static async Task<bool> TryCopyResponseTextAsync (string text)
+    {
+        if (!OperatingSystem.IsWindows () || string.IsNullOrWhiteSpace (text))
+        {
+            return false;
+        }
+
+        try
+        {
+            ProcessStartInfo startInfo = new ()
+            {
+                FileName = "clip",
+                RedirectStandardInput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using Process? process = Process.Start (startInfo);
+
+            if (process is null)
+            {
+                return false;
+            }
+
+            await process.StandardInput.WriteAsync (text).ConfigureAwait (false);
+            process.StandardInput.Close ();
+            await process.WaitForExitAsync ().ConfigureAwait (false);
+
+            return process.ExitCode == 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+}

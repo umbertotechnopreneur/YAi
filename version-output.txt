@@ -1,3 +1,12 @@
+YAi Local Diagnostic Snapshot
+Purpose: Captured local version-command output for maintainer troubleshooting and release verification.
+Audience: Maintainers.
+Status: Point-in-time snapshot, not canonical documentation.
+Last reviewed: 2026-04-27.
+Canonical references: README.md and docs/operations/public-release-checklist.md.
+
+--- Captured output follows ---
+
 E:\YAi!\src\YAi.Persona\Services\Tools\Filesystem\IApprovalCardPresenter.cs(51,28): warning CS0108: 'IApprovalCardPresenter.ShowCardAsync(OperationStep, CancellationToken)' nasconde il membro ereditato 'IOperationApprovalPresenter.ShowCardAsync(OperationStep, CancellationToken)'. Se questo comportamento è intenzionale, usare la parola chiave new. [E:\YAi!\src\YAi.Persona\YAi.Persona.csproj]
 E:\YAi!\src\YAi.Persona\Services\Tools\Filesystem\IApprovalCardPresenter.cs(66,10): warning CS0108: 'IApprovalCardPresenter.ReportStepResultAsync(OperationStep, CancellationToken)' nasconde il membro ereditato 'IOperationApprovalPresenter.ReportStepResultAsync(OperationStep, CancellationToken)'. Se questo comportamento è intenzionale, usare la parola chiave new. [E:\YAi!\src\YAi.Persona\YAi.Persona.csproj]
 Unhandled exception. System.IO.IOException: Handle non valido.

@@ -89,7 +89,7 @@ public sealed class WorkspaceBoundaryService
         string normalizedRoot = Normalize (workspaceRoot);
         string normalizedPath = Normalize (path);
 
-        if (!normalizedPath.StartsWith (normalizedRoot, StringComparison.OrdinalIgnoreCase))
+        if (!IsWithinWorkspace (normalizedPath, normalizedRoot))
         {
             _logger.LogError (
                 "Workspace boundary violation: '{Path}' is outside workspace root '{Root}'.",
@@ -128,7 +128,7 @@ public sealed class WorkspaceBoundaryService
         string normalizedRoot = Normalize (workspaceRoot);
         string normalizedPath = Normalize (path);
 
-        if (!normalizedPath.StartsWith (normalizedRoot, StringComparison.OrdinalIgnoreCase))
+        if (!IsWithinWorkspace (normalizedPath, normalizedRoot))
         {
             violations.Add (
                 $"Step {stepId}: path '{path}' is outside workspace root '{workspaceRoot}'.");
@@ -142,6 +142,33 @@ public sealed class WorkspaceBoundaryService
     #endregion
 
     #region Private helpers
+
+    private static bool IsWithinWorkspace (string normalizedPath, string normalizedRoot)
+    {
+        string relativePath = Path.GetRelativePath (normalizedRoot, normalizedPath);
+
+        if (string.Equals (relativePath, ".", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (string.Equals (relativePath, "..", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (relativePath.StartsWith ($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (relativePath.StartsWith ($"..{Path.AltDirectorySeparatorChar}", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return !Path.IsPathRooted (relativePath);
+    }
 
     private static string Normalize (string path)
         => Path.GetFullPath (path).TrimEnd (_separators);

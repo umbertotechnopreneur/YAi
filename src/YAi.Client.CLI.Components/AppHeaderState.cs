@@ -19,13 +19,12 @@
  * with YAi!. If not, see <https://www.gnu.org/licenses/>.
  *
  * YAi.Client.CLI.Components
- * Shared top header state for the CLI chrome
+ * Shared top header state for the CLI chrome (pure data model, no rendering)
  */
 
 #region Using directives
 
-using System.Globalization;
-using Spectre.Console;
+// no additional using directives required
 
 #endregion
 
@@ -63,49 +62,73 @@ public sealed record class AppHeaderState
     /// <summary>Gets the public site URL used for the clickable link.</summary>
     public string SiteUrl { get; init; } = "https://umbertogiacobbi.biz/YAi";
 
+    /// <summary>Gets the persona name shown alongside the brand when a bootstrap is completed.</summary>
+    public string? PersonaName { get; init; }
+
+    /// <summary>Gets the persona emoji shown with the agent name, or a default robot emoji when absent.</summary>
+    public string? PersonaEmoji { get; init; }
+
+    /// <summary>Gets a value indicating whether the workspace bootstrap has been completed; <c>null</c> means not yet determined.</summary>
+    public bool? IsBootstrapped { get; init; }
+
+    /// <summary>Gets a value indicating whether app lock is currently enabled.</summary>
+    public bool IsAppLockEnabled { get; init; }
+
+    /// <summary>Gets a value indicating whether the current session is unlocked.</summary>
+    public bool IsUnlocked { get; init; }
+
+    /// <summary>Gets a value indicating whether OpenRouter prompt caching is enabled.</summary>
+    public bool CacheEnabled { get; init; }
+
+    /// <summary>Gets the current OpenRouter verbosity label.</summary>
+    public string? Verbosity { get; init; }
+
     /// <summary>
-    /// Creates a new app header state for the current session.
+    /// Creates a new app header state for the current session, preserving any existing persona
+    /// and security values from <see cref="Current"/> when new values are not explicitly provided.
     /// </summary>
-    /// <param name="location">The location to display.</param>
+    /// <param name="location">The working directory to display.</param>
     /// <param name="modelProvider">The model provider name.</param>
     /// <param name="modelName">The model identifier.</param>
-    /// <param name="timestamp">Optional timestamp override.</param>
-    /// <returns>The constructed header state.</returns>
+    /// <param name="timestamp">Optional timestamp override; defaults to now.</param>
+    /// <param name="personaName">Optional persona name. Falls back to <see cref="Current"/> when null.</param>
+    /// <param name="personaEmoji">Optional persona emoji. Falls back to <see cref="Current"/> when null.</param>
+    /// <param name="isBootstrapped">Optional bootstrap completion flag. Falls back to <see cref="Current"/> when null.</param>
+    /// <param name="isAppLockEnabled">Whether app lock is enabled. Falls back to <see cref="Current"/> when null.</param>
+    /// <param name="isUnlocked">Whether the session is unlocked. Falls back to <see cref="Current"/> when null.</param>
+    /// <param name="cacheEnabled">Whether prompt caching is enabled. Falls back to <see cref="Current"/> when null.</param>
+    /// <param name="verbosity">Optional verbosity label. Falls back to <see cref="Current"/> when null.</param>
+    /// <returns>The constructed header state, which also replaces <see cref="Current"/>.</returns>
     public static AppHeaderState Create(
         string location,
         string modelProvider,
         string modelName,
-        DateTimeOffset? timestamp = null)
+        DateTimeOffset? timestamp = null,
+        string? personaName = null,
+        string? personaEmoji = null,
+        bool? isBootstrapped = null,
+        bool? isAppLockEnabled = null,
+        bool? isUnlocked = null,
+        bool? cacheEnabled = null,
+        string? verbosity = null)
     {
-        AppHeaderState headerState = new AppHeaderState
+        AppHeaderState headerState = new()
         {
             Location = location,
             ModelProvider = modelProvider,
             ModelName = modelName,
-            Timestamp = timestamp ?? DateTimeOffset.Now
+            Timestamp = timestamp ?? DateTimeOffset.Now,
+            PersonaName = personaName ?? Current.PersonaName,
+            PersonaEmoji = personaEmoji ?? Current.PersonaEmoji,
+            IsBootstrapped = isBootstrapped ?? Current.IsBootstrapped,
+            IsAppLockEnabled = isAppLockEnabled ?? Current.IsAppLockEnabled,
+            IsUnlocked = isUnlocked ?? Current.IsUnlocked,
+            CacheEnabled = cacheEnabled ?? Current.CacheEnabled,
+            Verbosity = verbosity ?? Current.Verbosity
         };
 
         Current = headerState;
 
         return headerState;
-    }
-
-    /// <summary>
-    /// Renders the header as Spectre.Console markup.
-    /// </summary>
-    /// <returns>The markup string.</returns>
-    public string ToMarkup()
-    {
-        string timeMarkup = Timestamp.ToLocalTime().ToString("ddd dd MMM yyyy HH:mm:ss", CultureInfo.InvariantCulture);
-
-        return
-            $"[cyan1]▰[/][deepskyblue1]▰[/][turquoise2]▰[/][springgreen2]▰[/][yellow1]▰[/][orange1]▰[/]\n" +
-            $"[bold cyan1]YAi![/] [grey70]::[/] [white]app shell[/] [grey70]::[/] " +
-            $"[link={SiteUrl}][underline springgreen2]{Markup.Escape(SiteLabel)}[/][/]\n" +
-            $"[grey70]current location:[/] [white]{Markup.Escape(Location)}[/] [grey70]·[/] " +
-            $"[grey70]model provider:[/] [springgreen2]{Markup.Escape(ModelProvider)}[/] [grey70]·[/] " +
-            $"[grey70]model:[/] [cyan1]{Markup.Escape(ModelName)}[/] [grey70]·[/] " +
-            $"[grey70]date/time:[/] [grey70]{timeMarkup}[/]\n" +
-            $"[orange1]▰[/][yellow1]▰[/][springgreen2]▰[/][turquoise2]▰[/][deepskyblue1]▰[/][cyan1]▰[/]";
     }
 }

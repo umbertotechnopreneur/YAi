@@ -37,6 +37,7 @@ namespace YAi.Persona.Tests;
 /// <summary>
 /// Tests for <see cref="AppLockService"/> and passphrase-backed secret protection.
 /// </summary>
+[Collection ("AppPaths environment")]
 public sealed class AppLockServiceTests : IDisposable
 {
     #region Fields

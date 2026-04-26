@@ -1,18 +1,17 @@
-<div align="center">
+# YAi! Manifesto
 
-# YAi! Manifesto 🛡️  
-## Trust-first AI agents for builders who do not trust magic.
+| Field | Value |
+| --- | --- |
+| Purpose | Public statement of product principles, trust model, and long-term intent for YAi |
+| Audience | Users, contributors, partners, and maintainers |
+| Status | Active |
+| Last reviewed | 2026-04-27 |
 
-**OpenClaw optimizes for autonomy.**  
-**YAi! optimizes for trust.**
+YAi! is a trust-first local agent runtime for developers, founders, consultants, and technical operators who want AI assistance without surrendering control of their machine, their memory, or their workflows.
 
-YAi! is an OpenClaw-inspired local agent runtime for developers, founders, consultants, and technical operators who want AI assistance without surrendering control of their machine, their memory, or their workflows.
+OpenClaw optimizes for autonomy. YAi! optimizes for trust.
 
-We believe AI agents should be powerful, but also inspectable.  
-Fast, but not reckless.  
-Helpful, but never silently dangerous.
-
----
+This document explains the principles behind that position. For the current repository surface and operational entrypoints, start with [README.md](README.md) and [docs/README.md](docs/README.md).
 
 ## Why YAi! exists
 
@@ -32,8 +31,6 @@ So YAi! starts from one principle:
 
 CrossModel Labs is backed by **Microsoft for Startups**, and YAi! follows the same core mission: make AI more useful by making it more trustworthy.
 
----
-
 ## About the founder
 
 **Umberto Giacobbi** is a senior technology advisor, founder, and software architect with 25+ years of experience building systems across Europe, the US, and Southeast Asia. He works across AI, legaltech, cloud architecture, backend platforms, and product strategy, with a strong focus on practical execution and operational trust.
@@ -42,9 +39,7 @@ More about Umberto: **[umbertogiacobbi.biz](https://umbertogiacobbi.biz)**
 
 ---
 
-# The 10 problems we want to fix
-
-</div>
+## The 10 problems we want to fix
 
 ---
 

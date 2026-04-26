@@ -1,6 +1,15 @@
 # YAi.Resources
 
+| Field | Value |
+| --- | --- |
+| Purpose | Canonical bundled assets, templates, skills, and signing material used by YAi |
+| Audience | Maintainers and contributors |
+| Status | Active |
+| Last reviewed | 2026-04-27 |
+
 This project packages the reference assets that ship with YAi!, including the markdown templates and bundled skills copied into the CLI output, plus the signing material used to verify them at runtime.
+
+For asset-local implementation notes, see [docs/README.md](docs/README.md).
 
 ## What is this project / folder
 

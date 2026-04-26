@@ -1,6 +1,15 @@
 # YAi.Services
 
+| Field | Value |
+| --- | --- |
+| Purpose | Aspire AppHost and orchestration entry point for the YAi solution |
+| Audience | Maintainers and contributors |
+| Status | Active |
+| Last reviewed | 2026-04-27 |
+
 This project is the Aspire AppHost for the YAi! solution. `AppHost.cs` boots the orchestration host and registers `YAi.Services.Core` as the current application resource, while the shared service defaults project supplies common hosting behavior.
+
+For AppHost-local implementation notes, see [docs/README.md](docs/README.md).
 
 ## What is this project / folder
 

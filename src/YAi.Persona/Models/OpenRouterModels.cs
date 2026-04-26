@@ -43,5 +43,7 @@ namespace YAi.Persona.Models
         public int? PromptTokens { get; set; }
         public int? CompletionTokens { get; set; }
         public int? TotalTokens { get; set; }
+        public int? DurationMs { get; set; }
+        public string? RawJson { get; set; }
     }
 }

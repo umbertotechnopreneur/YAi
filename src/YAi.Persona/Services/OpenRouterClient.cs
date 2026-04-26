@@ -256,7 +256,9 @@ public sealed class OpenRouterClient
             Text = content,
             PromptTokens = usage?.PromptTokens,
             CompletionTokens = usage?.CompletionTokens,
-            TotalTokens = usage?.TotalTokens
+            TotalTokens = usage?.TotalTokens,
+            DurationMs = (int)stopwatch.Elapsed.TotalMilliseconds,
+            RawJson = respJson
         };
     }
 

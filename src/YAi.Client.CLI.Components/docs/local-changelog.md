@@ -25,6 +25,11 @@ This file tracks component-local documentation history that should stay close to
 
 - Added the first real component-owned entry by recording the local docs index for `Screens/`, `Components/`, `AppHeaderState.cs`, and `StatusBarState.cs`.
 - Linked the component docs surface to the shared filesystem skill pack so approval-card and workflow UX dependencies point back to the shared contract instead of duplicating it locally.
+- Documented the new reusable multiline prompt editor under `Input/` together with the `PromptEditorScreen*` Razor host path that now lets CLI flows reuse one prompt-capture surface instead of duplicating console input logic.
+- Expanded the component docs index so prompt-editor, prompt-history, initial-text, cancel, and wrapped-line cursor behavior stay anchored to the owning components project instead of being implied only through `Program.cs` call sites.
+- Added the first reusable response-screen host path for ask and translate flows, including `ResponseViewState`, `ResponsePanel`, and the `ResponseScreen*` host trio so response presentation can move out of `Program.cs` without changing the shared prompt editor core.
+- Extracted shared response formatting into `Rendering/ResponseMarkupRenderer.cs` so the same `ResponseViewState` now drives both the response screen and the inline talk/bootstrap response panels.
+- Added `ConversationTranscriptEntryViewState` together with the `ConversationPromptScreen*` host path so interactive talk/bootstrap can render the live transcript and collect the next multiline prompt from one reusable RazorConsole screen.
 
 ## 2026-04-26
 

@@ -54,7 +54,8 @@ YAi! is intended to remain multiplatform across Windows, macOS, and Linux. When 
 
 - `src/` - main .NET solutions, services, and application projects
 - `poc-cli-intelligence-arch/cli-intelligence/` - companion CLI/runtime experiments, docs, and skill-related assets
-- `docs/` - design notes, guides, and supporting documentation
+- `docs/` - shared documentation, governance, specs, operations, and history. Start at [docs/README.md](docs/README.md)
+- `src/*/docs/` - project-local documentation for individual implementation surfaces
 - `workspace/` - packaged markdown templates copied into the CLI output and then seeded into the user workspace on first run
 - `workspace/skills/` - packaged built-in skills copied into the CLI output and then seeded into the user workspace on first run
 
@@ -68,7 +69,7 @@ YAi! is intended to remain multiplatform across Windows, macOS, and Linux. When 
 ### Build the main solution
 
 ```powershell
-dotnet build src/YAi.Services.slnx
+dotnet build src/YAi.slnx
 ```
 
 ### Build the companion CLI
@@ -76,6 +77,36 @@ dotnet build src/YAi.Services.slnx
 ```powershell
 dotnet build src/YAi.Client.CLI/YAi.Client.CLI.csproj
 ```
+
+### Package CLI release artifacts
+
+```powershell
+pwsh ./scripts/Publish-YAiCliArtifacts.ps1
+```
+
+The packaging script publishes zipped Windows CLI artifacts under `artifacts/cli/<utc-timestamp>/`.
+Each zip name includes the product, target variant, RID, version from `Directory.Build.props`, and the UTC packaging timestamp.
+
+By default the script attempts:
+
+- framework-dependent `win-x64` and `win-arm64` publishes
+- self-contained `win-x64` and `win-arm64` publishes
+- best-effort NativeAOT `win-x64` and `win-arm64` publishes
+
+NativeAOT is currently treated as experimental because the CLI UI stack still depends on RazorConsole and Terminal.Gui surfaces that may not publish cleanly under AOT. Baseline framework-dependent and self-contained artifacts still complete when AOT fails.
+
+Useful switches:
+
+- `--help` to show what the packaging script does, which variants it builds, and all available switches
+- `-SkipAot` to skip NativeAOT attempts
+- `-Variant FrameworkDependent`, `-Variant SelfContained`, or `-Variant Aot` to package only selected variants
+- repeat `-Variant` when selecting more than one variant, for example `-Variant SelfContained -Variant Aot`
+- `-RuntimeIdentifier win-x64` or `-RuntimeIdentifier win-arm64` to limit the target architecture
+- `-KeepPublishFolders` to preserve the published folders alongside the generated zip files
+
+When `Aot` is selected, the script now runs a NativeAOT prerequisite preflight first. If the required Visual Studio C++ workloads are missing, the script reports that clearly and skips the AOT publish instead of failing late inside `dotnet publish`.
+
+From the solution root, run [jump-cli-output.ps1](jump-cli-output.ps1) to jump into the CLI output folder. Use `--release` for `bin/Release/net10.0` and `--run` to launch the compiled app from that folder with no extra arguments.
 
 Versioning is centralized in [Directory.Build.props](Directory.Build.props). Use [scripts/Set-YAiVersion.ps1](scripts/Set-YAiVersion.ps1) with `-Version 1.2.3` or `-Timestamp` to update every assembly together, then verify the result with `dotnet run --project src/YAi.Client.CLI -- --version`.
 

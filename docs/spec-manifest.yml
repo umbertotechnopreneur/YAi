@@ -1,0 +1,214 @@
+version: 1
+updated: 2026-04-26
+specs:
+  - id: workspace-memory-pack
+    title: YAi Workspace Memory Specification Pack
+    status: active
+    type: pack
+    area: memory
+    audience: maintainers
+    owner: shared
+    file: docs/specs/active/packs/workspace-memory/README.md
+    affectedProjects:
+      - YAi.Persona
+      - YAi.Client.CLI
+      - YAi.Resources
+    affectedSurfaces:
+      - AppPaths
+      - WorkspaceProfileService
+      - MemoryFileParser
+      - WarmMemoryResolver
+      - PromptAssetService
+      - RegexRegistry
+      - CandidateStore
+      - PromotionService
+      - memory workspace layout
+  - id: filesystem-skill-pack
+    title: YAi Filesystem Skill Concept Specification
+    status: active
+    type: pack
+    area: operations
+    audience: maintainers
+    owner: shared
+    file: docs/specs/yai_filesystem_skill_specs/README.md
+    affectedProjects:
+      - YAi.Persona
+      - YAi.Client.CLI.Components
+      - YAi.Resources
+    affectedSurfaces:
+      - FilesystemTool
+      - workflow approval flow
+      - bundled filesystem skill assets
+    migrationTarget: docs/specs/active/packs/filesystem-skill/
+  - id: mvp-dogfood-pack
+    title: YAi MVP Dogfood Specification Pack
+    status: active
+    type: pack
+    area: workflow
+    audience: maintainers
+    owner: shared
+    file: docs/specs/yai_mvp_dogfood_specs/README.md
+    affectedProjects:
+      - YAi.Persona
+      - YAi.Persona.Tests
+      - YAi.Client.CLI
+    affectedSurfaces:
+      - WorkflowExecutor
+      - WorkflowVariableResolver
+      - WorkflowAuditService
+      - SystemInfoTool
+      - FilesystemTool
+    migrationTarget: docs/specs/active/packs/mvp-dogfood/
+  - id: skill-chaining-cerbero-pack
+    title: YAi Skill Chaining, Cerbero, and Schema Specification
+    status: active
+    type: pack
+    area: execution
+    audience: maintainers
+    owner: shared
+    file: docs/specs/yai_skill_chaining_cerbero_schema_specs/yai_skill_chaining_cerbero_schema_spec.md
+    affectedProjects:
+      - YAi.Persona
+      - YAi.Persona.Tests
+      - YAi.Client.CLI.Components
+    affectedSurfaces:
+      - SkillLoader
+      - ToolRegistry
+      - WorkflowExecutor
+      - command safety analysis
+    migrationTarget: docs/specs/active/packs/skill-execution/
+  - id: minimal-unit-testing-addendum
+    title: YAi Minimal Unit Testing Addendum
+    status: active
+    type: singleton
+    area: testing
+    audience: maintainers
+    owner: shared
+    file: docs/specs/yai_minimal_unit_testing_addendum.md
+    affectedProjects:
+      - YAi.Persona.Tests
+      - YAi.Persona
+    affectedSurfaces:
+      - SkillLoader tests
+      - WorkflowExecutor tests
+      - VariableResolver tests
+    migrationTarget: docs/specs/active/singletons/yai-minimal-unit-testing-addendum.md
+  - id: mvp-stabilization-recommendations
+    title: YAi MVP Stabilization Recommendations
+    status: active
+    type: singleton
+    area: workflow
+    audience: maintainers
+    owner: shared
+    file: docs/specs/yai_mvp_stabilization_recommendations.md
+    affectedProjects:
+      - YAi.Persona
+      - YAi.Persona.Tests
+      - YAi.Client.CLI
+    affectedSurfaces:
+      - WorkflowExecutor
+      - FilesystemTool
+      - approval flow
+      - audit flow
+    migrationTarget: docs/specs/active/singletons/yai-mvp-stabilization-recommendations.md
+  - id: risk-complexity-review-spec
+    title: YAi Risk and Complexity Code Review Spec
+    status: active
+    type: singleton
+    area: review
+    audience: maintainers
+    owner: shared
+    file: docs/specs/yai_risk_complexity_code_review_spec.md
+    affectedProjects:
+      - YAi.Persona
+      - YAi.Persona.Tests
+      - YAi.Client.CLI.Components
+    affectedSurfaces:
+      - WorkflowExecutor
+      - approval services
+      - CLI approval presenters
+    migrationTarget: docs/specs/active/singletons/yai-risk-complexity-code-review-spec.md
+  - id: cli-flows-diagram
+    title: YAi CLI Flows and Architecture
+    status: active
+    type: diagram
+    area: cli
+    audience: maintainers
+    owner: shared
+    file: docs/specs/diagrams/2026-04-25-cli-flows-and-architecture.md
+    affectedProjects:
+      - YAi.Client.CLI
+      - YAi.Client.CLI.Components
+      - YAi.Persona
+    affectedSurfaces:
+      - Program.cs
+      - screen hosts
+      - prompt and tool handoff
+  - id: boot-sequence-diagram
+    title: YAi Client CLI Boot Sequence
+    status: active
+    type: diagram
+    area: cli
+    audience: maintainers
+    owner: shared
+    file: docs/specs/diagrams/boot-sequence.md
+    affectedProjects:
+      - YAi.Client.CLI
+      - YAi.Persona
+    affectedSurfaces:
+      - Program.cs
+      - AppPaths
+      - ConfigService
+      - WorkspaceProfileService
+  - id: workspace-memory-runtime-flow
+    title: Workspace Memory Runtime Flow
+    status: active
+    type: diagram
+    area: memory
+    audience: maintainers
+    owner: shared
+    file: docs/specs/diagrams/workspace-memory-runtime-flow.md
+    affectedProjects:
+      - YAi.Persona
+      - YAi.Client.CLI
+      - YAi.Resources
+    affectedSurfaces:
+      - WorkspaceProfileService
+      - PromptAssetService
+      - RegexRegistry
+      - CandidateStore
+      - PromotionService
+  - id: plain-english-overview
+    title: YAi in Plain English
+    status: active
+    type: reference
+    area: product
+    audience: broad
+    owner: shared
+    file: docs/specs/human/20260426-yai-in-plain-english.md
+    migrationTarget: docs/specs/reference/yai-plain-english.md
+  - id: skill-protection-overview
+    title: How YAi Protects Its Built-In Skills
+    status: active
+    type: reference
+    area: trust
+    audience: broad
+    owner: shared
+    file: docs/specs/human/how-we-protect-the-skills.md
+    migrationTarget: docs/specs/reference/how-we-protect-the-skills.md
+  - id: resource-signing-procedure
+    title: Resource Signing and Verification
+    status: active
+    type: operations
+    area: resources
+    audience: maintainers
+    owner: shared
+    file: docs/operations/resource-signing-and-verification.md
+    affectedProjects:
+      - YAi.Resources
+      - YAi.Tools.ResourceSigner
+      - YAi.Persona
+    affectedSurfaces:
+      - reference manifest and signature
+      - resource signer tool
+      - runtime verification

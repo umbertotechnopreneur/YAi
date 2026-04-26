@@ -66,6 +66,10 @@ ClearConsole(clearScrollback: true);
 Console.OutputEncoding = Encoding.UTF8;
 Console.InputEncoding = Encoding.UTF8;
 
+// --- Phase 1: fast exits -----------------------------------------------
+// These switches do not need workspace state, DI, or secrets.
+// Help, version, banner, manifesto, and Lenna return before the heavier setup.
+
 if (IsHelpRequest(cliArgs))
 {
 PrintHelp();
@@ -105,6 +109,9 @@ if (cliArgs.Length > 0 && !IsRecognizedCommand(cmd))
 	return;
 }
 
+// --- Phase 2: guarded initialization ------------------------------------
+// From this point on, commands may touch workspace state, secrets, or the model client.
+// The next few steps hand off into YAi.Persona services and CLI screen hosts.
 RegisterGlobalExceptionHandlers();
 
 try
@@ -133,6 +140,7 @@ try
 		return;
 	}
 
+	// AppPaths owns the workspace layout and resolved paths for the CLI runtime.
 	AppPaths appPaths = new AppPaths();
 
 	if (IsShowPathsRequest(cliArgs))
@@ -149,6 +157,7 @@ try
 		.WriteTo.File(logFile)
 		.CreateLogger();
 
+	// YAi.Persona owns the app lock, bootstrap, prompt, tool, and model services.
 	ServiceCollection services = new ServiceCollection();
 	services.AddLogging(logging => logging.AddSerilog(Log.Logger, dispose: false));
 	services.AddYAiPersonaServices(appPaths);
@@ -182,6 +191,7 @@ try
 
 	await PreflightCheck.Validate().ConfigureAwait(false);
 
+	// Handoff to the service layer: the CLI now orchestrates around Persona-owned state.
 	CliServices svc = ResolveCliServices(sp);
 	BuildAppHeaderState(appPaths, svc.OpenRouterClient);
 	BootstrapState? bootstrapState = svc.Config.LoadBootstrapState();
@@ -194,7 +204,7 @@ try
 		return;
 	}
 
-	// Get the default for now
+	// Fall back to app config values until bootstrap or selection fills them in.
 	svc.Runtime.AgentName = string.IsNullOrWhiteSpace(svc.AppConfig.App.Name) ? "YAi" : svc.AppConfig.App.Name;
 	svc.Runtime.UserName = string.IsNullOrWhiteSpace(svc.AppConfig.App.UserName) ? Environment.UserName : svc.AppConfig.App.UserName;
 
@@ -228,7 +238,7 @@ try
 		await ShowComingAliveBannerAsync(isFirstRun);
 	}
 
-	// Ensure templates and runtime workspace are ready
+	// Ensure the runtime workspace exists before bootstrap or dispatch.
 	try
 	{
 		svc.Workspace.EnsureInitializedFromTemplates();
@@ -239,10 +249,9 @@ try
 		AnsiConsole.MarkupLine($"[red]✖ Workspace init error:[/] {Markup.Escape(ex.Message)}");
 	}
 
-	// ── Auto first-run bootstrap ──────────────────────────────────────────────
-	// Check bootstrap completion state before dispatching any command.
-	// When no completed state exists the bootstrap ritual runs automatically.
-	// --bootstrap can still be passed explicitly to re-run the ritual.
+	// --- Bootstrap phase ---------------------------------------------------
+	// Bootstrap is a major handoff into BootstrapInterviewService and workspace persistence.
+	// It runs automatically on first launch, or explicitly with --bootstrap.
 
 	if (isExplicitBootstrap || bootstrapState?.IsCompleted != true)
 	{
@@ -266,7 +275,8 @@ try
 		}
 	}
 
-	// Basic command dispatch
+	// --- Phase 3: command dispatch ----------------------------------------
+	// The dispatch table calls into other modules for the actual work.
 	if (cliArgs.Length == 0)
 	{
 		PrintHelp();
@@ -275,6 +285,8 @@ try
 	{
 		Log.Information("Dispatching command {Command}", normalizedCmd);
 
+		// Keep the command map close to dispatch so the flow stays easy to scan.
+		// Each handler below is a small orchestration layer over a larger module.
 		Dictionary<string, Func<Task>> dispatcher = new(StringComparer.OrdinalIgnoreCase)
 		{
 			["--ask"] = async () =>
@@ -340,6 +352,11 @@ finally
 	Log.CloseAndFlush();
 }
 
+// --- Shared helpers and request parsing ---------------------------------
+// These helpers stay local because they only classify CLI arguments.
+/// <summary>
+/// Registers process-wide exception handlers for unobserved task failures and app-domain crashes.
+/// </summary>
 static void RegisterGlobalExceptionHandlers()
 {
 	AppDomain.CurrentDomain.UnhandledException += (_, eventArgs) =>
@@ -360,6 +377,9 @@ static void RegisterGlobalExceptionHandlers()
 	};
 }
 
+/// <summary>
+/// Renders a fatal exception screen and records the failure without letting the handler throw.
+/// </summary>
 static void HandleUnhandledException(Exception exception, string title)
 {
 	try
@@ -374,6 +394,9 @@ static void HandleUnhandledException(Exception exception, string title)
 	}
 }
 
+/// <summary>
+/// Returns whether the first argument requests help output.
+/// </summary>
 static bool IsHelpRequest(string[] args)
 {
 	string? firstArg = args.FirstOrDefault();
@@ -382,6 +405,9 @@ static bool IsHelpRequest(string[] args)
 		|| string.Equals(firstArg, "-h", StringComparison.OrdinalIgnoreCase);
 }
 
+/// <summary>
+/// Returns whether the first argument requests version output.
+/// </summary>
 static bool IsVersionRequest(string[] args)
 {
 	string? firstArg = args.FirstOrDefault();
@@ -389,6 +415,9 @@ static bool IsVersionRequest(string[] args)
 	return string.Equals(firstArg, "--version", StringComparison.OrdinalIgnoreCase);
 }
 
+/// <summary>
+/// Returns whether the first argument requests the Lenna script flow.
+/// </summary>
 static bool IsLennaRequest(string[] args)
 {
 	string? firstArg = args.FirstOrDefault();
@@ -396,6 +425,9 @@ static bool IsLennaRequest(string[] args)
 	return string.Equals(firstArg, "--lenna", StringComparison.OrdinalIgnoreCase);
 }
 
+/// <summary>
+/// Returns whether the first argument requests the banner-only screen.
+/// </summary>
 static bool IsShowBannerRequest(string[] args)
 {
 	string? firstArg = args.FirstOrDefault();
@@ -403,6 +435,9 @@ static bool IsShowBannerRequest(string[] args)
 	return string.Equals(firstArg, "--show-banner", StringComparison.OrdinalIgnoreCase);
 }
 
+/// <summary>
+/// Returns whether the first argument requests the manifesto screen.
+/// </summary>
 static bool IsManifestoRequest(string[] args)
 {
 	string? firstArg = args.FirstOrDefault();
@@ -410,6 +445,9 @@ static bool IsManifestoRequest(string[] args)
 	return string.Equals(firstArg, "--manifesto", StringComparison.OrdinalIgnoreCase);
 }
 
+/// <summary>
+/// Returns whether the normalized command is supported by the CLI.
+/// </summary>
 static bool IsRecognizedCommand(string cmd)
 {
 	return cmd is "--bootstrap"
@@ -431,6 +469,9 @@ static bool IsRecognizedCommand(string cmd)
 		or "-talk";
 }
 
+/// <summary>
+/// Returns whether the first argument requests the configured path view.
+/// </summary>
 static bool IsShowPathsRequest(string[] args)
 {
 	string? firstArg = args.FirstOrDefault();
@@ -438,6 +479,9 @@ static bool IsShowPathsRequest(string[] args)
 	return string.Equals(firstArg, "--show-paths", StringComparison.OrdinalIgnoreCase);
 }
 
+/// <summary>
+/// Returns whether the first argument requests PATH registration.
+/// </summary>
 static bool IsAddToPathRequest(string[] args)
 {
 	string? firstArg = args.FirstOrDefault();
@@ -445,6 +489,9 @@ static bool IsAddToPathRequest(string[] args)
 	return string.Equals(firstArg, "--add-to-path", StringComparison.OrdinalIgnoreCase);
 }
 
+/// <summary>
+/// Returns whether the first argument requests the CLI PATH status view.
+/// </summary>
 static bool IsShowCliPathRequest(string[] args)
 {
 	string? firstArg = args.FirstOrDefault();
@@ -452,6 +499,9 @@ static bool IsShowCliPathRequest(string[] args)
 	return string.Equals(firstArg, "--show-cli-path", StringComparison.OrdinalIgnoreCase);
 }
 
+/// <summary>
+/// Returns whether the first argument requests the destructive workspace reset flow.
+/// </summary>
 static bool IsGoNuclearRequest(string[] args)
 {
 	string? firstArg = args.FirstOrDefault();
@@ -459,6 +509,9 @@ static bool IsGoNuclearRequest(string[] args)
 	return string.Equals(firstArg, "--gonuclear", StringComparison.OrdinalIgnoreCase);
 }
 
+/// <summary>
+/// Returns whether the first argument requests the security subcommands.
+/// </summary>
 static bool IsSecurityRequest(string[] args)
 {
 	string? firstArg = args.FirstOrDefault();
@@ -466,11 +519,17 @@ static bool IsSecurityRequest(string[] args)
 	return string.Equals(firstArg, "--security", StringComparison.OrdinalIgnoreCase);
 }
 
+/// <summary>
+/// Returns whether the command needs a completed bootstrap state before it can run.
+/// </summary>
 static bool RequiresCompletedBootstrap(string cmd)
 {
 	return cmd is "--ask" or "--translate" or "--talk" or "-talk";
 }
 
+/// <summary>
+/// Returns whether the command requires the app lock to be unlocked first.
+/// </summary>
 static bool RequiresUnlock(string cmd)
 {
 	return cmd is "--ask"
@@ -483,6 +542,11 @@ static bool RequiresUnlock(string cmd)
 		or "-talk";
 }
 
+// --- Security and local maintenance flows -------------------------------
+// This block owns the command-level security UI; the lock state still lives in YAi.Persona.
+/// <summary>
+/// Routes the security command to the requested app-lock action.
+/// </summary>
 static Task HandleSecurityCommandAsync(AppPaths appPaths, string[] args, IAppLockService appLockService)
 {
 	string subCommand = args.Length > 1 ? args[1].ToLowerInvariant() : string.Empty;
@@ -502,6 +566,9 @@ static Task HandleSecurityCommandAsync(AppPaths appPaths, string[] args, IAppLoc
 	};
 }
 
+/// <summary>
+/// Prompts for the app-lock passphrase when the command cannot run while locked.
+/// </summary>
 static Task<bool> EnsureUnlockIfRequiredAsync(string cmd, IAppLockService appLockService)
 {
 	if (!RequiresUnlock(cmd))
@@ -550,6 +617,9 @@ static Task<bool> EnsureUnlockIfRequiredAsync(string cmd, IAppLockService appLoc
 	}
 }
 
+/// <summary>
+/// Enables app lock and optionally imports the current OpenRouter key into encrypted storage.
+/// </summary>
 static Task HandleSetupLockAsync(IAppLockService appLockService)
 {
 	char[] firstPassphrase = SecureSecretReader.ReadHiddenPassphrase("Enter YAi unlock passphrase: ");
@@ -598,6 +668,9 @@ static Task HandleSetupLockAsync(IAppLockService appLockService)
 	}
 }
 
+/// <summary>
+/// Disables app lock after validating the current passphrase.
+/// </summary>
 static Task HandleDisableLockAsync(IAppLockService appLockService)
 {
 	char[] currentPassphrase = SecureSecretReader.ReadHiddenPassphrase("Enter current YAi unlock passphrase: ");
@@ -621,6 +694,9 @@ static Task HandleDisableLockAsync(IAppLockService appLockService)
 	}
 }
 
+/// <summary>
+/// Changes the current app-lock passphrase after confirming the new value.
+/// </summary>
 static Task HandleChangePassphraseAsync(IAppLockService appLockService)
 {
 	char[] currentPassphrase = SecureSecretReader.ReadHiddenPassphrase("Enter current YAi unlock passphrase: ");
@@ -655,6 +731,9 @@ static Task HandleChangePassphraseAsync(IAppLockService appLockService)
 	}
 }
 
+/// <summary>
+/// Displays the current app-lock status and optional diagnostics.
+/// </summary>
 static Task HandleSecurityStatusAsync(AppPaths appPaths, IAppLockService appLockService, bool showDebug)
 {
 	try
@@ -698,6 +777,9 @@ static Task HandleSecurityStatusAsync(AppPaths appPaths, IAppLockService appLock
 	}
 }
 
+/// <summary>
+/// Shows the security command usage when the subcommand is not recognized.
+/// </summary>
 static Task HandleUnknownSecurityCommandAsync()
 {
 	AnsiConsole.MarkupLine("[yellow]Usage:[/] [bold]--security setup-lock|disable-lock|change-passphrase|status[/]");
@@ -705,6 +787,9 @@ static Task HandleUnknownSecurityCommandAsync()
 	return Task.CompletedTask;
 }
 
+/// <summary>
+/// Compares two passphrases in a length-aware way.
+/// </summary>
 static bool ArePassphrasesEqual(char[] left, char[] right)
 {
 	int maxLength = Math.Max(left.Length, right.Length);
@@ -720,6 +805,11 @@ static bool ArePassphrasesEqual(char[] left, char[] right)
 	return diff == 0;
 }
 
+// --- Console, path, and banner helpers ----------------------------------
+// These are presentation helpers; they do not own business logic.
+/// <summary>
+/// Clears the terminal when output is interactive and optionally clears scrollback.
+/// </summary>
 static void ClearConsole(bool clearScrollback = false)
 {
 	if (Console.IsInputRedirected || Console.IsOutputRedirected)
@@ -744,6 +834,9 @@ static void ClearConsole(bool clearScrollback = false)
 	}
 }
 
+/// <summary>
+/// Shows the resolved workspace paths and optionally lets the user open one.
+/// </summary>
 static void RunShowPaths(AppPaths appPaths)
 {
 	IReadOnlyList<(string Category, string Label, string Path, bool IsCustom)> entries = appPaths.GetConfiguredPathEntries();
@@ -762,6 +855,9 @@ static void RunShowPaths(AppPaths appPaths)
 	PromptToOpenConfiguredPath(entries);
 }
 
+/// <summary>
+/// Shows whether the CLI install directory is visible on the current PATH.
+/// </summary>
 static void RunShowCliPath()
 {
 	(IReadOnlyList<string> userMatches, IReadOnlyList<string> processMatches, string currentExecutablePath, string currentDirectory) = CliPathManager.GetCliPathStatus();
@@ -801,6 +897,9 @@ static void RunShowCliPath()
 	}
 }
 
+/// <summary>
+/// Adds the current CLI directory to the user's PATH on Windows.
+/// </summary>
 static void RunAddToPath()
 {
 	(string OriginalUserPath, string UpdatedUserPath, IReadOnlyList<string> RemovedEntries, string CurrentDirectory, string CurrentExecutablePath) = CliPathManager.AddOrUpdateCurrentCliDirectoryOnUserPath();
@@ -841,6 +940,9 @@ static void RunAddToPath()
 	AnsiConsole.MarkupLine("[grey70]Use [bold]--show-cli-path[/] to verify where the CLI is visible on PATH.[/]");
 }
 
+/// <summary>
+/// Renders a PATH match section for either the user or process PATH.
+/// </summary>
 static void WriteCliPathMatchSection(string title, IReadOnlyList<string> matches, bool isWindowsOnly)
 {
 	AnsiConsole.MarkupLine($"[bold]{Markup.Escape(title)}[/]");
@@ -863,12 +965,18 @@ static void WriteCliPathMatchSection(string title, IReadOnlyList<string> matches
 	}
 }
 
+/// <summary>
+/// Clears the screen and renders only the main banner.
+/// </summary>
 static void RunShowBanner()
 {
 	ClearConsole();
 	WriteBanner();
 }
 
+/// <summary>
+/// Renders the banner followed by the manifesto screen.
+/// </summary>
 static async Task RunManifestoAsync()
 {
 	ClearConsole();
@@ -877,6 +985,9 @@ static async Task RunManifestoAsync()
 	WriteManifesto();
 }
 
+/// <summary>
+/// Writes the manifesto panel that explains the CLI trust model.
+/// </summary>
 static void WriteManifesto()
 {
 	string manifestoMarkup =
@@ -901,6 +1012,9 @@ static void WriteManifesto()
 	AnsiConsole.Write(Align.Center(manifestoPanel));
 }
 
+/// <summary>
+/// Renders the standard banner used by most CLI screens.
+/// </summary>
 static void WriteBanner()
 {
 	WriteAppHeader(AppHeaderState.Current);
@@ -921,6 +1035,9 @@ static void WriteBanner()
 	});
 }
 
+/// <summary>
+/// Renders the configured path table grouped by asset and custom runtime paths.
+/// </summary>
 static void WriteConfiguredPaths(IReadOnlyList<(string Category, string Label, string Path, bool IsCustom)> entries)
 {
 	IReadOnlyList<(string Category, string Label, string Path, bool IsCustom)> assetEntries = entries.Where(entry => !entry.IsCustom).ToArray();
@@ -976,6 +1093,9 @@ static void WriteConfiguredPaths(IReadOnlyList<(string Category, string Label, s
 	}
 }
 
+/// <summary>
+/// Prompts the user to open one of the configured paths.
+/// </summary>
 static void PromptToOpenConfiguredPath(IReadOnlyList<(string Category, string Label, string Path, bool IsCustom)> entries)
 {
 	(string Category, string Label, string Path, bool IsCustom) selected = AnsiConsole.Prompt(
@@ -996,6 +1116,9 @@ static void PromptToOpenConfiguredPath(IReadOnlyList<(string Category, string La
 	AnsiConsole.MarkupLine($"[yellow]⚠ {Markup.Escape(errorMessage ?? "Unable to open the selected path.")}[/]");
 }
 
+/// <summary>
+/// Opens a file or folder with the platform default program.
+/// </summary>
 static bool TryOpenPathWithDefaultProgram(string path, out string? errorMessage)
 {
 	if (!Directory.Exists(path) && !File.Exists(path))
@@ -1021,8 +1144,12 @@ static bool TryOpenPathWithDefaultProgram(string path, out string? errorMessage)
 	}
 }
 
+/// <summary>
+/// Shows the unknown-command screen and prints help.
+/// </summary>
 static async Task RunUnknownCommandAsync(string command)
 {
+	// Unknown-command handling stays in the CLI because it is purely user-facing.
 	ClearConsole();
 	await new BannerScreenHost().RunAsync().ConfigureAwait(false);
 	AnsiConsole.WriteLine();
@@ -1033,12 +1160,19 @@ static async Task RunUnknownCommandAsync(string command)
 	Environment.ExitCode = 1;
 }
 
+/// <summary>
+/// Launches the nuclear reset screen-host flow.
+/// </summary>
 static async Task RunGoNuclearAsync()
 {
+	// Nuclear reset is a screen-host driven flow in YAi.Client.CLI.Components.Screens.
 	AppPaths appPaths = new AppPaths();
 	await new NuclearResetScreenHost(appPaths).RunAsync().ConfigureAwait(false);
 }
 
+/// <summary>
+/// Renders the banner and compiled CLI version string.
+/// </summary>
 static async Task PrintVersionAsync()
 {
 	ClearConsole();
@@ -1049,6 +1183,9 @@ static async Task PrintVersionAsync()
 	AnsiConsole.MarkupLine($"[bold cyan]YAi! CLI[/] version [bold]{Markup.Escape(version)}[/]");
 }
 
+/// <summary>
+/// Returns the entry assembly informational version or a fallback assembly version.
+/// </summary>
 static string GetVersionString()
 {
 	Assembly assembly = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
@@ -1063,11 +1200,20 @@ static string GetVersionString()
 	return assembly.GetName().Version?.ToString() ?? "unknown";
 }
 
+/// <summary>
+/// Runs the bundled Lenna PowerShell script.
+/// </summary>
 static async Task RunLennaAsync()
 {
+	// The Lenna flow is delegated to the bundled PowerShell script.
 	await TryRunPowerShellScriptAsync("lenna.ps1", "Lenna", propagateExitCode: true).ConfigureAwait(false);
 }
 
+// --- Direct command renderers and external flows ------------------------
+// These helpers bridge the CLI shell to screen hosts or external scripts.
+/// <summary>
+/// Runs a bundled PowerShell script using the first available PowerShell host.
+/// </summary>
 static async Task<bool> TryRunPowerShellScriptAsync(
 	string scriptFileName,
 	string friendlyName,
@@ -1155,8 +1301,12 @@ static async Task<bool> TryRunPowerShellScriptAsync(
 	return false;
 }
 
+/// <summary>
+/// Prints the CLI command reference and common usage examples.
+/// </summary>
 static void PrintHelp()
 {
+	// Help output is local presentation, but it documents flows owned by other modules.
 	AnsiConsole.Write(new Panel(Align.Center(new Markup(
 		"[bold cyan]YAi! CLI[/]\n" +
 		"[grey70]Interactive command line client for bootstrap, banner splash, ask, translate, talk, PATH inspection, Windows PATH registration, local path review, custom data reset, and Lenna citation flows.[/]\n\n" +
@@ -1222,12 +1372,16 @@ static void PrintHelp()
 	AnsiConsole.Write(Align.Center(new Markup("[yellow]Requires:[/] [bold]--ask[/], [bold]--translate[/], [bold]--talk[/], and [bold]--bootstrap[/] need a configured OpenRouter secret or [bold]YAI_OPENROUTER_API_KEY[/] plus a completed bootstrap. [bold]--show-paths[/], [bold]--show-cli-path[/], [bold]--add-to-path[/], [bold]--security[/], and [bold]--gonuclear[/] are local maintenance flows. [bold]--add-to-path[/] is Windows-only and will fail fast on macOS/Linux. The model selector can still open without the secret when a cached catalog is available.")));
 }
 
+/// <summary>
+/// Ensures an OpenRouter model is selected before model-backed commands run.
+/// </summary>
 static async Task<bool> EnsureOpenRouterModelSelectedAsync(
 	ConfigService config,
 	AppConfig appConfig,
 	OpenRouterClient openRouterClient,
 	OpenRouterCatalogService openRouterCatalog)
 {
+	// OpenRouter model selection is owned by the dedicated screen host.
 	if (!string.IsNullOrWhiteSpace(appConfig.OpenRouter.Model))
 	{
 		return true;
@@ -1282,6 +1436,11 @@ static async Task<bool> EnsureOpenRouterModelSelectedAsync(
 	}
 }
 
+// --- Bootstrap and chat workflows ---------------------------------------
+// These are the main orchestration loops over YAi.Persona prompt, bootstrap, tool, and history services.
+/// <summary>
+/// Shows the current OpenRouter balance, then renders the balance screen.
+/// </summary>
 static async Task ShowOpenRouterBalanceAsync(
 	OpenRouterBalanceService openRouterBalance,
 	bool clearConsole = true,
@@ -1345,11 +1504,17 @@ static async Task ShowOpenRouterBalanceAsync(
 	}
 }
 
+/// <summary>
+/// Builds a colored speaker label for console output.
+/// </summary>
 static string GetSpeakerLabelMarkup(string speakerName, string colorName)
 {
 	return $"[bold {colorName}]{Markup.Escape(speakerName)}[/][grey70]:[/]";
 }
 
+/// <summary>
+/// Builds the assistant label, defaulting to YAi!.
+/// </summary>
 static string GetAssistantLabelMarkup(string? assistantName = null)
 {
 	string displayName = string.IsNullOrWhiteSpace(assistantName)
@@ -1364,16 +1529,25 @@ static string GetAssistantLabelMarkup(string? assistantName = null)
 	return GetSpeakerLabelMarkup(displayName, "cyan1");
 }
 
+/// <summary>
+/// Builds the prompt markup used for user input lines.
+/// </summary>
 static string GetUserPromptMarkup(string userName)
 {
 	return $"{GetSpeakerLabelMarkup(userName, "orange1")} [grey70]>[/] ";
 }
 
+/// <summary>
+/// Writes a formatted assistant response line.
+/// </summary>
 static void WriteAssistantLine(string message, string? assistantName = null)
 {
 	AnsiConsole.MarkupLine($"{GetAssistantLabelMarkup(assistantName)} {Markup.Escape(message)}");
 }
 
+/// <summary>
+/// Creates the current header snapshot shown above interactive screens.
+/// </summary>
 static AppHeaderState BuildAppHeaderState(AppPaths appPaths, OpenRouterClient openrouter)
 {
 	return AppHeaderState.Create(
@@ -1383,6 +1557,9 @@ static AppHeaderState BuildAppHeaderState(AppPaths appPaths, OpenRouterClient op
 		DateTimeOffset.Now);
 }
 
+/// <summary>
+/// Renders the app header panel.
+/// </summary>
 static void WriteAppHeader(AppHeaderState header)
 {
 	AnsiConsole.Write(new Panel(new Markup(header.ToMarkup()))
@@ -1394,6 +1571,9 @@ static void WriteAppHeader(AppHeaderState header)
 	});
 }
 
+/// <summary>
+/// Renders the current status bar panel.
+/// </summary>
 static void WriteStatusBar(StatusBarState statusBar)
 {
 	AnsiConsole.Write(new Panel(new Markup(statusBar.ToMarkup()))
@@ -1405,6 +1585,9 @@ static void WriteStatusBar(StatusBarState statusBar)
 	});
 }
 
+/// <summary>
+/// Runs a task behind the standard thinking spinner.
+/// </summary>
 static Task RunThinkingTaskAsync(Func<Task> action)
 {
 	return AnsiConsole.Status()
@@ -1413,6 +1596,9 @@ static Task RunThinkingTaskAsync(Func<Task> action)
 		.StartAsync("[cyan]thinking...[/]", _ => action());
 }
 
+/// <summary>
+/// Runs a task that returns a value behind the standard thinking spinner.
+/// </summary>
 static Task<T> RunThinkingAsync<T>(Func<Task<T>> action)
 {
 	return AnsiConsole.Status()
@@ -1421,8 +1607,12 @@ static Task<T> RunThinkingAsync<T>(Func<Task<T>> action)
 		.StartAsync("[cyan]thinking...[/]", _ => action());
 }
 
+/// <summary>
+/// Shows the first-run coming-alive banner after bootstrap is selected.
+/// </summary>
 static async Task ShowComingAliveBannerAsync(bool useLogoSplash)
 {
+	// Banner rendering lives here, but the visual assets come from the CLI or bundled scripts.
 	if (useLogoSplash)
 	{
 		bool rendered = await TryRunPowerShellScriptAsync(
@@ -1449,6 +1639,9 @@ static async Task ShowComingAliveBannerAsync(bool useLogoSplash)
 	AnsiConsole.WriteLine();
 }
 
+/// <summary>
+/// Runs the first-run bootstrap conversation, persists the generated profile files, and marks setup complete.
+/// </summary>
 static async Task DoBootstrapAsync(
 	AppPaths appPaths,
 	ConfigService config,
@@ -1460,6 +1653,7 @@ static async Task DoBootstrapAsync(
 	OpenRouterBalanceService openRouterBalance,
 	OpenRouterClient openrouter)
 {
+	// Major handoff into YAi.Persona: bootstrap conversation, extraction, and persistence all live there.
 	try
 	{
 		ClearConsole(clearScrollback: true);
@@ -1475,10 +1669,10 @@ static async Task DoBootstrapAsync(
 		WriteStatusBar(StatusBarState.Local("idle", "bootstrap"));
 		AnsiConsole.WriteLine();
 
-		// Build the initial system context from BOOTSTRAP.md + workspace files
+		// Build the initial system context from BOOTSTRAP.md + workspace files.
 		List<OpenRouterChatMessage> systemMessages = bootstrapSvc.BuildBootstrapSystemMessages();
 
-		// Kick off the conversation: send an initial user nudge so the model produces the opening greeting
+		// Kick off the conversation so the model produces the opening greeting.
 		List<OpenRouterChatMessage> kickoffMessages = new List<OpenRouterChatMessage>(systemMessages)
 		{
 			new() { Role = "user", Content = "(Begin)" }
@@ -1487,7 +1681,7 @@ static async Task DoBootstrapAsync(
 		List<OpenRouterChatMessage> conversation = new List<OpenRouterChatMessage>();
 		List<HistoryEntry> sessionEntries = new List<HistoryEntry>();
 
-		// Get the model's opening message
+		// Get the model's opening message through the bootstrap service.
 		try
 		{
 			WriteStatusBar(StatusBarState.Network("sending", "bootstrap"));
@@ -1512,7 +1706,7 @@ static async Task DoBootstrapAsync(
 			ReportRecoverableException(ex, "Bootstrap: failed to get opening message", "Bootstrap: failed to get opening message — continuing to input loop");
 		}
 
-		// Conversational loop
+			// Conversational loop: the CLI collects turns, while bootstrapSvc owns the model exchange.
 		while (true)
 		{
 			AnsiConsole.Markup(GetUserPromptMarkup(runtime.UserName ?? "You"));
@@ -1536,7 +1730,7 @@ static async Task DoBootstrapAsync(
 				break;
 			}
 
-			// Build messages: system context + conversation so far + new user turn
+			// Build messages: system context + conversation so far + new user turn.
 			List<OpenRouterChatMessage> messages = new List<OpenRouterChatMessage>(systemMessages);
 			messages.AddRange(conversation);
 			messages.Add(new OpenRouterChatMessage { Role = "user", Content = trimmed });
@@ -1570,22 +1764,22 @@ static async Task DoBootstrapAsync(
 		AnsiConsole.WriteLine();
 		AnsiConsole.MarkupLine("[grey70]Saving your profiles — this may take a moment...[/]");
 
-		// Extract and persist IDENTITY.md, USER.md, SOUL.md from the full conversation
+		// Extract and persist IDENTITY.md, USER.md, SOUL.md from the full conversation.
 		List<OpenRouterChatMessage> allMessages = new List<OpenRouterChatMessage>(systemMessages);
 		allMessages.AddRange(conversation);
 
 		await RunThinkingTaskAsync(() => bootstrapSvc.ExtractAndPersistFromConversationAsync(allMessages, CancellationToken.None)).ConfigureAwait(false);
 
-		// Delete the one-time BOOTSTRAP.md from the runtime workspace
+		// Delete the one-time BOOTSTRAP.md from the runtime workspace.
 		workspace.DeleteRuntimeBootstrapFile();
 
-		// Save the bootstrap transcript to history
+		// Save the bootstrap transcript to history.
 		if (appConfig.App.HistoryEnabled && sessionEntries.Count > 0)
 		{
 			history.SaveChatSession(new ChatSession { Entries = sessionEntries, Mode = "bootstrap" });
 		}
 
-		// Mark bootstrap as complete
+		// Mark bootstrap as complete.
 		BootstrapState state = new BootstrapState
 		{
 			BootstrapTimestampUtc = DateTimeOffset.UtcNow,
@@ -1609,8 +1803,12 @@ static async Task DoBootstrapAsync(
 	}
 }
 
+/// <summary>
+/// Runs the dreaming pass and reports any generated proposals.
+/// </summary>
 static async Task DoDreamAsync(DreamingService dreamingService)
 {
+	// Dreaming is delegated to the Persona service; the CLI only renders status and results.
 	AnsiConsole.MarkupLine("[bold magenta]Dreaming...[/] [grey]Analyzing recent activity for cross-session patterns.[/]");
 	AnsiConsole.WriteLine();
 
@@ -1630,8 +1828,12 @@ static async Task DoDreamAsync(DreamingService dreamingService)
 	}
 }
 
+/// <summary>
+/// Sends a one-shot prompt through the model and records the result.
+/// </summary>
 static async Task DoAskAsync(AppPaths appPaths, PromptBuilder promptBuilder, OpenRouterClient openrouter, ToolRegistry toolRegistry, HistoryService history, AppConfig appConfig, string prompt)
 {
+	// Prompt building and tool execution are Persona responsibilities; this file only orchestrates the turn.
 	if (string.IsNullOrWhiteSpace(prompt))
 	{
 		AnsiConsole.MarkupLine("[yellow]⚠ No prompt provided.[/]");
@@ -1674,8 +1876,12 @@ static async Task DoAskAsync(AppPaths appPaths, PromptBuilder promptBuilder, Ope
 	}
 }
 
+/// <summary>
+/// Sends a translation or rewrite request through the model and records the result.
+/// </summary>
 static async Task DoTranslateAsync(AppPaths appPaths, PromptBuilder promptBuilder, OpenRouterClient openrouter, HistoryService history, AppConfig appConfig, string text)
 {
+	// Translation is just a single-turn prompt flow over Persona-owned prompt templates.
 	if (string.IsNullOrWhiteSpace(text))
 	{
 		AnsiConsole.MarkupLine("[yellow]⚠ No text provided.[/]");
@@ -1702,8 +1908,12 @@ static async Task DoTranslateAsync(AppPaths appPaths, PromptBuilder promptBuilde
 	}
 }
 
+/// <summary>
+/// Runs the interactive talk loop until the user exits, keeping turn history in memory and optionally on disk.
+/// </summary>
 static async Task DoTalkAsync(AppPaths appPaths, PromptBuilder promptBuilder, OpenRouterClient openrouter, ToolRegistry toolRegistry, HistoryService history, AppConfig appConfig)
 {
+	// Talk is the long-lived REPL; tool calls and response generation come from Persona services.
 	WriteAppHeader(BuildAppHeaderState(appPaths, openrouter));
 	AnsiConsole.WriteLine();
 	AnsiConsole.MarkupLine("[bold cyan]🗣️ Entering talk REPL[/] [grey70](type 'exit' to quit)[/]");
@@ -1773,6 +1983,9 @@ static async Task DoTalkAsync(AppPaths appPaths, PromptBuilder promptBuilder, Op
 	AnsiConsole.MarkupLine("[grey70]Exiting REPL[/]");
 }
 
+/// <summary>
+/// Sends one chat turn, follows any tool calls the model requests, and stops when the model returns a plain answer or the guard limit is hit.
+/// </summary>
 static async Task<(OpenRouterResponse Response, bool GuardHit)> RunChatTurnWithToolsAsync(
 	string promptKey,
 	string userInput,
@@ -1781,6 +1994,7 @@ static async Task<(OpenRouterResponse Response, bool GuardHit)> RunChatTurnWithT
 	ToolRegistry toolRegistry,
 	List<OpenRouterChatMessage> conversation)
 {
+	// This loop keeps the CLI as the coordinator while the model/tool cycle is handled by Persona services.
 	List<OpenRouterChatMessage> messages = promptBuilder.BuildMessages(promptKey, userInput, conversation);
 	List<OpenRouterChatMessage> turnMessages =
 	[
@@ -1834,6 +2048,9 @@ static async Task<(OpenRouterResponse Response, bool GuardHit)> RunChatTurnWithT
 	return (fallbackResponse, guardHit);
 }
 
+/// <summary>
+/// Saves a single history entry when chat history is enabled.
+/// </summary>
 static void RecordHistoryEntry(HistoryService history, AppConfig appConfig, string prompt, string? response, string mode)
 {
 	if (!appConfig.App.HistoryEnabled)
@@ -1850,12 +2067,17 @@ static void RecordHistoryEntry(HistoryService history, AppConfig appConfig, stri
 	});
 }
 
+/// <summary>
+/// Shows a recoverable exception panel and writes the warning to the log.
+/// </summary>
 static void ReportRecoverableException(Exception exception, string logMessage, string panelTitle)
 {
 	new ExceptionScreenHost(exception, panelTitle).RunAsync().GetAwaiter().GetResult();
 	Log.Warning(exception, logMessage);
 }
 
+// --- Service composition -------------------------------------------------
+// This is the DI boundary: the CLI resolves Persona-owned services here and then stops caring about constructors.
 /// <summary>Resolves and groups all CLI service dependencies from the DI container.</summary>
 /// <param name="sp">The built service provider.</param>
 /// <returns>A <see cref="CliServices"/> record with all resolved services.</returns>

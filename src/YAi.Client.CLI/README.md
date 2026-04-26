@@ -17,15 +17,28 @@ Run (development)
 dotnet run --project src/YAi.Client.CLI -- --help
 ```
 
+PowerShell output helper
+
+Run the launcher from the solution root to move into the compiled output directory.
+
+```powershell
+.\jump-cli-output.ps1
+.\jump-cli-output.ps1 --release
+.\jump-cli-output.ps1 --run
+.\jump-cli-output.ps1 --release --run
+```
+
+The script defaults to `bin/Debug/net10.0`, switches to `bin/Release/net10.0` with `--release`, and launches the compiled app with no arguments when `--run` is present. Use `--help` to print the built-in usage text.
+
 Quick usage
 
 - `--help` — show the colored Spectre.Console help screen.
 - `--version` — show the banner splash from `BannerScreen.razor`, then the compiled CLI and assembly version, and exit.
 - Unrecognized arguments fail fast with the banner, a short explanation, and the help screen.
-- `--bootstrap` — initialize runtime workspace and copy identity templates into the user data root. If no OpenRouter model is configured, the CLI prompts you to choose one first. After preflight passes at startup, the CLI shows the current OpenRouter balance first, then continues into the boot flow. On first launch, the bootstrap intro clears the screen and scrollback, then prints the centered 800x600 YAi logo splash before the workspace setup message.
+- `--bootstrap` — initialize runtime workspace and copy identity templates into the user data root. If no OpenRouter model is configured, the CLI prompts you to choose one first. After preflight passes at startup, the CLI shows the current OpenRouter balance first, then continues into the boot flow. On first launch, the bootstrap intro clears the screen and scrollback, then tries to print the centered 800x600 YAi logo splash before the workspace setup message, falling back to the banner when the script cannot be rendered.
 - `--show-banner` — show the CLI banner splash and the top app header, then exit. This does not require an OpenRouter key.
 - `--manifesto` — show the CLI banner splash, then the manifesto excerpt with the repository link at the bottom, and exit. This does not require an OpenRouter key.
-- `--show-paths` — show the resolved asset, config, memory, skill, history, storage, and workspace security paths.
+- `--show-paths` — show the resolved asset, workspace, memory, data, config, and logs paths, including the workspace security and secret-store files.
 - `--show-cli-path` — show whether the CLI executable directory is already visible on PATH and where it was found.
 - `--add-to-path` — add the current CLI directory to the current user PATH on Windows, removing older YAi CLI entries when found. This fails fast on macOS and Linux.
 - `--security status` — show app-lock state, KDF settings, and secret-vault paths.
@@ -41,13 +54,27 @@ Quick usage
 Chat display
 
 - Chat prompts now render the user and assistant names with two-tone labels, such as `umber:` and `YAi!:`, and the CLI shows a `thinking...` spinner while waiting for the model.
-- Screen-based flows render a reusable top app header with the current location, current date/time, the active model provider, and a clickable link to [umbertogiacobbi.biz/YAi](https://umbertogiacobbi.biz/YAi).
+- Screen-based flows render a reusable top app header with the current location, current date/time, the active model provider and model name, and a clickable link to [umbertogiacobbi.biz/YAi](https://umbertogiacobbi.biz/YAi).
 - Chat and bootstrap turns also render a reusable status bar that shows local or network activity, sent and received token counts in different colors, and the current local date and time.
 
 Versioning
 
 - The CLI version comes from [Directory.Build.props](../../Directory.Build.props), so every project in the solution builds with the same version number.
 - Run `scripts/Set-YAiVersion.ps1 -Version 1.2.3` for a semver-style update or `scripts/Set-YAiVersion.ps1 -Timestamp` for a timestamp-derived build version.
+
+Packaging
+
+- Run `pwsh ./scripts/Publish-YAiCliArtifacts.ps1` from the repository root to build zipped Windows release artifacts.
+- Run `pwsh ./scripts/Publish-YAiCliArtifacts.ps1 --help` to print the script purpose, switches, and examples.
+- The script writes each run to `artifacts/cli/<utc-timestamp>/` and names each zip with the variant, RID, version, and UTC packaging timestamp.
+- Default output includes framework-dependent and self-contained packages for `win-x64` and `win-arm64`, plus best-effort NativeAOT attempts for the same RIDs.
+- Use `-SkipAot` when you only want the baseline release artifacts.
+- Use `-Variant FrameworkDependent`, `-Variant SelfContained`, or `-Variant Aot` to restrict the publish matrix.
+- Repeat `-Variant` to choose more than one publish mode in the same run, for example `-Variant SelfContained -Variant Aot`.
+- Use `-RuntimeIdentifier win-x64` or `-RuntimeIdentifier win-arm64` to restrict the target architecture.
+- Use `-KeepPublishFolders` if you want the unzipped publish directories preserved next to the generated zip files.
+- NativeAOT is currently experimental for this CLI because the RazorConsole and Terminal.Gui UI stack is not yet hardened for guaranteed AOT publishing.
+- The script now performs a NativeAOT prerequisite preflight and reports missing Visual Studio C++ workloads before any AOT publish begins.
 
 Environment
 
@@ -77,7 +104,7 @@ The shipped markdown templates live in `src/YAi.Resources/reference/templates` a
 
 The splash scripts `lenna.ps1` and `yai_logo_ansi_800x600.ps1` share `splash-helpers.ps1` for centered rendering and console/scrollback clearing.
 
-The first built-in skill is `system_info`. When `--ask`, `--translate`, or `--talk` runs after bootstrap, the prompt includes the available skills and tools, and the CLI can execute `[TOOL: system_info ...]` calls before producing the final answer. When app lock is enabled, the CLI unlocks before loading memory or tools.
+Bundled skills currently include `filesystem` and `system_info`. The `--ask` and `--talk` flows inject the available skills and built-in tools before the model responds, while `--translate` uses the translation prompt without that extra tool context. When app lock is enabled, the CLI unlocks before loading memory or tools.
 
 
 Examples

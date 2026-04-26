@@ -96,6 +96,31 @@ function Ensure-GitIgnore {
     }
 }
 
+function Get-TimestampSafe {
+    return (Get-Date).ToString("yyyyMMdd_HHmmss")
+}
+
+function Get-BackupPath {
+    param(
+        [string]$BaseName,
+        [string]$Extension
+    )
+
+    $backupDir = Join-Path $SecretsDir "backups"
+    New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
+
+    $timestamp = Get-TimestampSafe
+    $candidate = Join-Path $backupDir ("{0}.{1}{2}" -f $BaseName, $timestamp, $Extension)
+    $sequence = 1
+
+    while (Test-Path $candidate) {
+        $candidate = Join-Path $backupDir ("{0}.{1}.{2:00}{3}" -f $BaseName, $timestamp, $sequence, $Extension)
+        $sequence++
+    }
+
+    return $candidate
+}
+
 function Press-AnyKey {
     Write-Host ""
     Write-Host "  Press any key to return to the menu..." -ForegroundColor DarkGray
@@ -114,24 +139,31 @@ function Invoke-CreateKey {
     Assert-OpenSSL
 
     if (Test-Path $PrivateKey) {
-        Write-Host "  ERROR: A private key already exists at:" -ForegroundColor Red
-        Write-Host "         $PrivateKey" -ForegroundColor Red
-        Write-Host "  Use option [2] to delete it first." -ForegroundColor Yellow
+        $info = Get-Item $PrivateKey
+        $backupTarget = Join-Path (Join-Path $SecretsDir "backups") ("yai-signing-private-key.{0}.pem" -f (Get-TimestampSafe))
+
+        Write-Host "  Existing signing key detected" -ForegroundColor Yellow
+        Write-Host "    Private key : $PrivateKey" -ForegroundColor Yellow
+        Write-Host "    Modified    : $($info.LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss'))" -ForegroundColor Yellow
+        Write-Host "    Size        : $([math]::Round($info.Length / 1KB, 1)) KB" -ForegroundColor Yellow
+        Write-Host "    Backup      : $backupTarget" -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "  Use option [2] to back it up with a timestamped filename and delete it first." -ForegroundColor Yellow
+        Write-Host "  Then run option [1] again to create a fresh key pair." -ForegroundColor Gray
         Press-AnyKey; return
     }
 
     if (Test-Path $PublicKey) {
-        Write-Host "  ERROR: A public key already exists at:" -ForegroundColor Red
-        Write-Host "         $PublicKey" -ForegroundColor Red
-        Write-Host "  Remove it manually if you really want to regenerate." -ForegroundColor Yellow
-        Press-AnyKey; return
+        Write-Host "  Existing public key detected. It will be replaced in place." -ForegroundColor DarkGray
+        Write-Host "  Path         : $PublicKey" -ForegroundColor DarkGray
+        Write-Host ""
     }
 
-    $pass    = Read-SecurePassphrase "  Enter new passphrase"
+    $pass = Read-SecurePassphrase "  Enter new passphrase"
     $confirm = Read-SecurePassphrase "  Confirm passphrase"
 
     if ([string]::IsNullOrWhiteSpace($pass)) { Write-Host "  Passphrase cannot be empty." -ForegroundColor Red; Press-AnyKey; return }
-    if ($pass -ne $confirm)                  { Write-Host "  Passphrases do not match."   -ForegroundColor Red; Press-AnyKey; return }
+    if ($pass -ne $confirm) { Write-Host "  Passphrases do not match."   -ForegroundColor Red; Press-AnyKey; return }
 
     New-Item -ItemType Directory -Force -Path $SecretsDir   | Out-Null
     New-Item -ItemType Directory -Force -Path $ReferenceDir | Out-Null
@@ -161,7 +193,7 @@ function Invoke-CreateKey {
 
 function Invoke-DeleteKey {
     Write-Host ""
-    Write-Host "  ── Delete existing private key ──" -ForegroundColor Cyan
+    Write-Host "  ── Back up and delete existing private key ──" -ForegroundColor Cyan
     Write-Host ""
 
     if (-not (Test-Path $PrivateKey)) {
@@ -169,18 +201,35 @@ function Invoke-DeleteKey {
         Press-AnyKey; return
     }
 
-    Write-Host "  WARNING: This will permanently delete:" -ForegroundColor Red
-    Write-Host "           $PrivateKey" -ForegroundColor Red
+    $info = Get-Item $PrivateKey
+    $backupTarget = Get-BackupPath -BaseName "yai-signing-private-key" -Extension ".pem"
+
+    Write-Host "  Existing signing key" -ForegroundColor Yellow
+    Write-Host "    Private key : $PrivateKey" -ForegroundColor Yellow
+    Write-Host "    Modified    : $($info.LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss'))" -ForegroundColor Yellow
+    Write-Host "    Size        : $([math]::Round($info.Length / 1KB, 1)) KB" -ForegroundColor Yellow
+    Write-Host "    Backup      : $backupTarget" -ForegroundColor Yellow
     Write-Host ""
-    $confirm = Read-Host "  Type DELETE to confirm"
-    if ($confirm -ne "DELETE") {
+    Write-Host "  The backup is created first, then the original key is deleted." -ForegroundColor Gray
+    $confirm = Read-Host "  Back up and delete this key? [Y/N]"
+    if ($confirm.Trim().ToUpper() -ne "Y") {
         Write-Host "  Cancelled." -ForegroundColor Yellow
         Press-AnyKey; return
     }
 
-    Remove-Item $PrivateKey -Force
+    try {
+        Copy-Item -LiteralPath $PrivateKey -Destination $backupTarget -Force
+        Remove-Item -LiteralPath $PrivateKey -Force
+    }
+    catch {
+        Write-Host "  ERROR: $($_.Exception.Message)" -ForegroundColor Red
+        Press-AnyKey; return
+    }
+
+    Write-Host ""
+    Write-Host "  ✓ Backup created : $backupTarget" -ForegroundColor Green
     Write-Host "  ✓ Private key deleted." -ForegroundColor Green
-    Write-Host "  The public key and manifest/signature are still in place." -ForegroundColor Gray
+    Write-Host "  You can now create a fresh key pair with option [1]." -ForegroundColor Gray
 
     Press-AnyKey
 }
@@ -194,7 +243,8 @@ function Invoke-CheckStatus {
     if (Test-Path $PrivateKey) {
         $info = Get-Item $PrivateKey
         Write-Host "EXISTS  ($([math]::Round($info.Length/1))B, modified $($info.LastWriteTime.ToString('yyyy-MM-dd HH:mm')))" -ForegroundColor Green
-    } else {
+    }
+    else {
         Write-Host "NOT FOUND" -ForegroundColor Red
     }
 
@@ -202,7 +252,8 @@ function Invoke-CheckStatus {
     if (Test-Path $PublicKey) {
         $info = Get-Item $PublicKey
         Write-Host "EXISTS  ($([math]::Round($info.Length/1))B, modified $($info.LastWriteTime.ToString('yyyy-MM-dd HH:mm')))" -ForegroundColor Green
-    } else {
+    }
+    else {
         Write-Host "NOT FOUND" -ForegroundColor Red
     }
 
@@ -210,7 +261,8 @@ function Invoke-CheckStatus {
     if (Test-Path $ManifestFile) {
         $info = Get-Item $ManifestFile
         Write-Host "EXISTS  ($([math]::Round($info.Length/1024, 1))KB, modified $($info.LastWriteTime.ToString('yyyy-MM-dd HH:mm')))" -ForegroundColor Green
-    } else {
+    }
+    else {
         Write-Host "NOT FOUND" -ForegroundColor Yellow
     }
 
@@ -218,7 +270,8 @@ function Invoke-CheckStatus {
     if (Test-Path $SignatureFile) {
         $info = Get-Item $SignatureFile
         Write-Host "EXISTS  ($([math]::Round($info.Length/1))B, modified $($info.LastWriteTime.ToString('yyyy-MM-dd HH:mm')))" -ForegroundColor Green
-    } else {
+    }
+    else {
         Write-Host "NOT FOUND" -ForegroundColor Yellow
     }
 
@@ -233,11 +286,12 @@ function Invoke-CheckStatus {
     Write-Host "  Git status of public artifacts:" -ForegroundColor Cyan
     foreach ($f in $tracked) {
         $status = git -C $RepoRoot status --porcelain -- $f 2>$null
-        $label  = $f.Split("/")[-1]
+        $label = $f.Split("/")[-1]
         Write-Host "    $label : " -NoNewline
         if ([string]::IsNullOrWhiteSpace($status)) {
             Write-Host "committed / unchanged" -ForegroundColor DarkGray
-        } else {
+        }
+        else {
             Write-Host $status.Trim() -ForegroundColor Yellow
         }
     }
@@ -265,7 +319,8 @@ function Invoke-Sign {
 
     if ([string]::IsNullOrWhiteSpace($PreCapturedPassphrase)) {
         $pass = Read-SecurePassphrase "  Enter signing key passphrase"
-    } else {
+    }
+    else {
         $pass = $PreCapturedPassphrase
         Write-Host "  (using passphrase from key-creation step)" -ForegroundColor DarkGray
     }
@@ -296,7 +351,8 @@ function Invoke-Sign {
             if ([string]::IsNullOrWhiteSpace($PreCapturedPassphrase)) { Press-AnyKey }
             return $false
         }
-    } finally {
+    }
+    finally {
         $env:YAI_SIGNING_KEY_PASSPHRASE = $null
         [Environment]::SetEnvironmentVariable("YAI_SIGNING_KEY_PASSPHRASE", $null, "Process")
     }
@@ -327,10 +383,12 @@ function Invoke-Commit {
             if (-not [string]::IsNullOrWhiteSpace($status)) {
                 $toCommit += $f
                 Write-Host "  [staged] $f" -ForegroundColor Yellow
-            } else {
+            }
+            else {
                 Write-Host "  [clean]  $f" -ForegroundColor DarkGray
             }
-        } else {
+        }
+        else {
             Write-Host "  [skip]   $f  (file not found)" -ForegroundColor DarkGray
         }
     }
@@ -353,7 +411,8 @@ function Invoke-Commit {
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host "  git commit failed." -ForegroundColor Red
-    } else {
+    }
+    else {
         Write-Host ""
         Write-Host "  ✓ Committed." -ForegroundColor Green
     }
@@ -376,26 +435,34 @@ function Invoke-FirstTimeSetup {
 
     # ── Guard: already have a key ────────────────────────────────────────────
     if (Test-Path $PrivateKey) {
-        Write-Host "  A private key already exists at:" -ForegroundColor Yellow
-        Write-Host "  $PrivateKey" -ForegroundColor Yellow
-        Write-Host "  Use [4] Sign (or [6] Sign and commit) if you only need to re-sign." -ForegroundColor Gray
+        $info = Get-Item $PrivateKey
+        $backupTarget = Join-Path (Join-Path $SecretsDir "backups") ("yai-signing-private-key.{0}.pem" -f (Get-TimestampSafe))
+
+        Write-Host "  Existing signing key detected" -ForegroundColor Yellow
+        Write-Host "    Private key : $PrivateKey" -ForegroundColor Yellow
+        Write-Host "    Modified    : $($info.LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss'))" -ForegroundColor Yellow
+        Write-Host "    Size        : $([math]::Round($info.Length / 1KB, 1)) KB" -ForegroundColor Yellow
+        Write-Host "    Backup      : $backupTarget" -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "  Use option [2] to back it up and delete it first if you want a fresh key pair." -ForegroundColor Yellow
+        Write-Host "  Use [4] Sign or [6] Sign and commit if you only need to reuse the current key." -ForegroundColor Gray
         Press-AnyKey; return
     }
 
     Assert-OpenSSL
 
     if (Test-Path $PublicKey) {
-        Write-Host "  A public key already exists at $PublicKey" -ForegroundColor Yellow
-        Write-Host "  Remove it manually before running first-time setup." -ForegroundColor Yellow
-        Press-AnyKey; return
+        Write-Host "  Existing public key detected. It will be replaced in place." -ForegroundColor DarkGray
+        Write-Host "  Path         : $PublicKey" -ForegroundColor DarkGray
+        Write-Host ""
     }
 
     # ── Step 1: capture passphrase ────────────────────────────────────────────
-    $pass    = Read-SecurePassphrase "  [Step 1/3] Enter new signing key passphrase"
+    $pass = Read-SecurePassphrase "  [Step 1/3] Enter new signing key passphrase"
     $confirm = Read-SecurePassphrase "             Confirm passphrase"
 
     if ([string]::IsNullOrWhiteSpace($pass)) { Write-Host "  Passphrase cannot be empty." -ForegroundColor Red; Press-AnyKey; return }
-    if ($pass -ne $confirm)                  { Write-Host "  Passphrases do not match."   -ForegroundColor Red; Press-AnyKey; return }
+    if ($pass -ne $confirm) { Write-Host "  Passphrases do not match."   -ForegroundColor Red; Press-AnyKey; return }
     $confirm = $null
 
     # ── Step 2: generate key pair ─────────────────────────────────────────────
@@ -441,7 +508,7 @@ while ($true) {
 
     Write-Host "  ┌─────────────────────────────────────────────┐" -ForegroundColor DarkCyan
     Write-Host "  │  [1]  Create new signing key pair           │" -ForegroundColor White
-    Write-Host "  │  [2]  Delete existing private key           │" -ForegroundColor White
+    Write-Host "  │  [2]  Back up & delete private key          │" -ForegroundColor White
     Write-Host "  │  [3]  Check key / manifest status           │" -ForegroundColor White
     Write-Host "  │  [4]  Sign official resources               │" -ForegroundColor White
     Write-Host "  │  [5]  Commit public artifacts               │" -ForegroundColor White

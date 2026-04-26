@@ -31,7 +31,7 @@ The diagram below is intentionally detailed because the startup path touches bot
 
 ## Notes on the current implementation
 
-The current CLI is command-driven. It now performs a lightweight bootstrap-state check before the preflight and model-selection work begins. Chat-style commands (`--ask`, `--translate`, and `--talk`) require a completed bootstrap and exit early with a local warning if `config/first-run.json` is missing or incomplete. Informational and maintenance commands such as `--help`, `--version`, `--lenna`, `--show-paths`, and `--gonuclear` also return before the normal bootstrap path, and the `--gonuclear` screen can optionally create a zip backup before it deletes the roots.
+The current CLI is command-driven. It now performs a lightweight bootstrap-state check before the preflight and model-selection work begins. Chat-style commands (`--ask`, `--translate`, and `--talk`) require a completed bootstrap and exit early with a local warning if `config/first-run.json` is missing or incomplete. Informational and maintenance commands such as `--help`, `--version`, `--lenna`, `--show-paths`, `--show-cli-path`, `--add-to-path`, and `--gonuclear` also return before the normal bootstrap path, and the `--gonuclear` screen can optionally create a zip backup before it deletes the roots.
 
 After that early gate, the process runs the filesystem and logging bootstrap, builds the service provider, loads the persisted bootstrap state again through `ConfigService`, shows the balance and banner, selects an OpenRouter model if one is not already configured, seeds the runtime workspace, and then either dispatches the requested command or runs the explicit `--bootstrap` ritual. When the startup path detects a first run, the bootstrap intro clears the console and scrollback and renders the centered 800x600 YAi splash from `yai_logo_ansi_800x600.ps1` through the shared PowerShell splash helper before the workspace setup message appears. The earlier note that `Program.cs` does not call `LoadBootstrapState()` during startup is stale.
 
@@ -97,7 +97,7 @@ sequenceDiagram
 
     alt --help or --version or --lenna
         Program-->>Shell: print help, version, or run Lenna and exit
-    else --show-paths or --gonuclear
+    else --show-paths or --show-cli-path or --add-to-path or --gonuclear
         Program->>Program: run maintenance screen
         Program-->>Shell: return
     else chat-style command and bootstrap incomplete

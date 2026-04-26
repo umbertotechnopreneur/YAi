@@ -15,7 +15,7 @@ Local-first agent runtime inspired by OpenClaw, built for high-control environme
 
 This project is a local-first agent system designed for environments where security and control cannot be delegated. It follows an OpenClaw-like model for skills and workflow compatibility, but runs under tighter local constraints, with stronger permission boundaries, improved auditability, and a more predictable execution model. The goal is to preserve interoperability with the OpenClaw ecosystem while making local trust, safety, and operational control the default.
 
-YAi! is intended to remain multiplatform across Windows, macOS, and Linux. When you add, rename, or remove configuration files, memory files, skill files, workspace files, or the local SQLite storage path, keep the path inventory used by `--show-paths` and the reset backup location used by `--gonuclear` in sync with the code and documentation.
+YAi! is intended to remain multiplatform across Windows, macOS, and Linux. When you add, rename, or remove configuration files, memory files, skill files, workspace files, or the local SQLite storage path, keep the path inventory used by `--show-paths`, `--show-cli-path`, and `--add-to-path`, the workspace security files under `workspace/config`, and the reset backup location used by `--gonuclear` in sync with the code and documentation.
 
 > YAi!
 >
@@ -34,11 +34,12 @@ YAi! is intended to remain multiplatform across Windows, macOS, and Linux. When 
 
 ## What this repository is for
 
-- A C# and .NET-based local companion for assistant workflows, controlled automation, and task execution via CLI.
+- A C# and .NET-based local companion for assistant workflows, controlled automation, task execution, PATH inspection, and Windows PATH registration via CLI.
 - A system that keeps the user in charge of decisions instead of hiding behavior behind background automation.
 - A codebase that stays close to portable skill and workflow ideas so features can move between ecosystems with minimal friction.
 - A built-in skill system that starts with `system_info`, seeds bundled `SKILL.md` files into the runtime workspace, and keeps the first tool loop fully local and auditable.
 - A linear workflow runtime that resolves step outputs into later steps, gates write-capable actions behind explicit approval, and records structured audit output for each run.
+- An optional app-lock and encrypted secret store that protects local provider credentials before sensitive workflows run.
 
 ## Design Goals
 
@@ -95,6 +96,8 @@ This project is under active development. Public-facing APIs, workflows, and con
 ## Security
 
 - Do not commit secrets, tokens, or private endpoints.
+- Use `dotnet run --project src/YAi.Client.CLI -- --security setup-lock` to enable the local app lock and encrypt the OpenRouter secret at rest.
+- Keep `workspace/config/security.json` and `workspace/config/secrets.json` out of any shared or published workspace snapshots.
 - Prefer reversible changes and explicit operations.
 - Review any code that touches file access, automation, or external services carefully.
 

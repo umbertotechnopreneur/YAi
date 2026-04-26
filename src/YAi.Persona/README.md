@@ -26,10 +26,11 @@ dotnet run --project YAi.Persona.csproj
 ## Usage
 
 - Consumed by `src/YAi.Client.CLI` through project reference.
-- `AppPaths` resolves the packaged asset workspace from the CLI output, the runtime workspace from `%USERPROFILE%\.yai\workspace` unless `YAI_WORKSPACE_ROOT` overrides it, and the data root from `%LOCALAPPDATA%\YAi\data` unless `YAI_DATA_ROOT` overrides it.
+- `AppPaths` resolves the packaged asset workspace from the CLI output, the runtime workspace from `%USERPROFILE%\.yai\workspace` unless `YAI_WORKSPACE_ROOT` overrides it, the workspace config root at `workspace/config`, and the data root from `%LOCALAPPDATA%\YAi\data` unless `YAI_DATA_ROOT` overrides it.
 - `WorkspaceProfileService` copies the shipped markdown templates into the user workspace on first run and preserves existing files.
 - `SkillLoader` reads bundled and runtime `SKILL.md` files from `workspace/skills/` and exposes the available built-in skills for prompt injection.
 - `ToolRegistry` exposes the registered built-in tools, starting with `system_info`.
+- `AppLockService` loads `workspace/config/security.json`, manages the unlock passphrase verifier, and stores encrypted local secrets in `workspace/config/secrets.json`.
 - `WorkflowVariableResolver` resolves step outputs into later workflow inputs using structured JSON traversal.
 - `WorkflowExecutor` runs linear workflows in order, `WorkflowApprovalService` gates approval-required steps, and `WorkflowAuditService` writes structured per-step audit records.
 

@@ -29,6 +29,7 @@ using Microsoft.Extensions.DependencyInjection;
 using YAi.Persona.Models;
 using YAi.Persona.Services;
 using YAi.Persona.Services.Operations.Safety;
+using YAi.Persona.Services.Security.AppLock;
 using YAi.Persona.Services.Security.ResourceIntegrity;
 using YAi.Persona.Services.Skills;
 using YAi.Persona.Services.Skills.Validation;
@@ -74,6 +75,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<DreamingService>();
         services.AddSingleton<PromotionService>();
         services.AddSingleton<ConfigService>();
+        services.AddSingleton<AppLockService>();
+        services.AddSingleton<IAppLockService>(sp => sp.GetRequiredService<AppLockService>());
         services.AddSingleton(sp => sp.GetRequiredService<ConfigService>().LoadConfig());
         services.AddSingleton<HistoryService>();
         services.AddSingleton<RuntimeState>();
@@ -114,6 +117,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<OpenRouterClient>(sp => new OpenRouterClient(
             sp.GetRequiredService<IHttpClientFactory>().CreateClient("OpenRouter"),
             sp.GetRequiredService<AppConfig>(),
+            sp.GetRequiredService<IAppLockService>(),
             sp.GetRequiredService<ILlmCallLogRepository>()));
 
         services.AddSingleton<OpenRouterCatalogService>();

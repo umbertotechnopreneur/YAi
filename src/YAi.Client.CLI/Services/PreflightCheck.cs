@@ -40,7 +40,6 @@ public sealed class PreflightCheck
 {
 	#region Fields
 
-	private const string OpenRouterApiKeyEnvironmentVariable = "YAI_OPENROUTER_API_KEY";
 	private const string ConnectivityTestUrl = "http://www.msftconnecttest.com/connecttest.txt";
 	private const int ConnectivityTestAttempts = 3;
 	private static readonly TimeSpan ConnectivityTestTimeout = TimeSpan.FromSeconds (3);
@@ -52,38 +51,7 @@ public sealed class PreflightCheck
 	/// </summary>
 	public static async Task Validate ()
 	{
-		WarnIfOpenRouterApiKeyIsMissing ();
-
 		await WarnIfInternetConnectionIsUnavailableAsync ().ConfigureAwait (false);
-	}
-
-	private static void WarnIfOpenRouterApiKeyIsMissing ()
-	{
-		string openRouterApiKey =
-			Environment.GetEnvironmentVariable(OpenRouterApiKeyEnvironmentVariable)
-			?? Environment.GetEnvironmentVariable(OpenRouterApiKeyEnvironmentVariable, EnvironmentVariableTarget.User)
-			?? string.Empty;
-
-		if (!string.IsNullOrWhiteSpace (openRouterApiKey))
-		{
-			string masked = MaskKey(openRouterApiKey);
-			AnsiConsole.MarkupLine($"[green]Using OpenRouter API key:[/] {Markup.Escape(masked)}");
-			return;
-		}
-
-		AnsiConsole.MarkupLine("[red]✖ YAI_OPENROUTER_API_KEY is not set. Exiting.[/]");
-		Environment.Exit(1);
-	}
-
-	private static string MaskKey(string key)
-	{
-		if (string.IsNullOrEmpty(key))
-			return string.Empty;
-
-		if (key.Length <= 8)
-			return new string('*', key.Length);
-
-		return string.Concat(key.AsSpan(0, 4), "...", key.AsSpan(key.Length - 4));
 	}
 
 	private static async Task WarnIfInternetConnectionIsUnavailableAsync ()

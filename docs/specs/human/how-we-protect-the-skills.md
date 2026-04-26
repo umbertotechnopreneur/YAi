@@ -17,123 +17,128 @@ Umberto Giacobbi is a founder, consultant, advisor, developer, and operator with
 
 This document may include content generated, refined, or reviewed with the assistance of one or more AI models. It should be reviewed and validated before external distribution or operational use. Final responsibility for its verification, interpretation, and application remains with the author(s) and the organization.
 
-# How YAi! Protects Its Built-In Skills
+# How YAi! Checks Its Built-In Skills Before Trusting Them
 
-## 1. The Simple Version
+## 1. The Big Idea
 
-YAi! treats its official built-in skills a bit like sealed ingredients in a trusted kitchen. Before it uses them, it checks that the label still matches the contents and that nobody quietly swapped anything out.
+YAi! is designed to be careful.
 
-That matters because built-in skills, templates, and prompt assets are part of what YAi! trusts by default. If those files could change silently, then the system could start behaving differently without anyone noticing. YAi! is designed to avoid that kind of quiet surprise.
+Before it trusts its own built-in skills, templates, and prompt files, it checks that they are the real ones and that they have not been quietly changed.
 
-So the rule is simple: before YAi! loads its own official resources as trusted, it verifies that they are still exactly the files the project intended to ship.
+You can think of it like this: if a child brings home a lunchbox with a safety seal, you feel better when the seal is still intact. It does not mean the world is perfectly safe. It means one important check has already been done.
 
-## 2. What Is Being Protected
+That is what this system is for. It is one line of defence. Not the only line of defence, but an important one.
 
-The protected files live under `src/YAi.Resources/reference/`. That folder contains official YAi! resources such as built-in skill definitions, workspace templates, and prompt-related assets.
+## 2. What YAi! Is Checking
 
-These are not the same as ordinary user files. They are part of YAi!'s trusted starting kit. In plain English, they are the files YAi! is allowed to treat as "official" rather than "just something it found on disk."
+YAi! has some files that it treats as part of its official starting kit. These include built-in skills, templates, and prompt assets.
 
-User-created content is different. If you write your own notes, templates, or third-party skills, YAi! does not automatically pretend those are official YAi! resources. That boundary is intentional.
+These files matter because they help shape how YAi! behaves. If someone changed them without permission, the system could act differently from what the project intended.
 
-## 3. How the Protection Works
+So YAi! does not simply say, "The files are here, so they must be fine." It checks them first.
 
-The protection model is based on a signed manifest. If that phrase sounds technical, think of it as a tamper-evident packing list.
+## 3. A Child-Sized Explanation
 
-YAi! keeps three important files with the official resources:
+Imagine you have a toy box with a list on the lid that says what should be inside.
 
-- A public key that helps confirm the signature is genuine.
-- A manifest that lists the official files and their details.
-- A digital signature that proves the manifest came from the trusted signer.
+The list says:
 
-When YAi! starts checking its resources, it does not just trust the folder because the folder exists. It first checks that the manifest itself has a valid signature. Then it checks each listed file to make sure the file still exists and still matches the recorded details.
+- which toys belong in the box,
+- how many there should be,
+- and what they should look like.
 
-If everything matches, YAi! treats those resources as trusted.
+Now imagine the box also has a special stamp that shows the list came from a trusted grown-up.
 
-If something does not match, YAi! does not quietly shrug and continue as if nothing happened. It stops trusting those built-in resources and reports the problem.
+Before YAi! opens the box and uses what is inside, it does two simple things:
 
-## 4. Why This Matters
+1. It checks that the list really came from the trusted source.
+2. It checks that the things in the box still match the list.
 
-This is not security theater. It supports one of YAi!'s core ideas: trust should be earned, checked, and visible.
+If both checks pass, YAi! can say, "Good. This looks like the right box with the right things inside."
 
-Without this kind of verification, a built-in skill could be edited, replaced, or corrupted and YAi! might load it anyway. That would be the software version of finding that someone changed the recipe card after the meal was already served.
+If the checks do not pass, YAi! does not pretend everything is okay. It stops trusting those files and tells you there is a problem.
 
-With signing and verification in place, YAi! can say something much more useful:
+## 4. What The Files Do
 
-"These are the official files we expected, and we confirmed they still match."
+Behind the scenes, YAi! uses three small helper files for this check:
 
-That helps developers, operators, and non-technical reviewers alike understand that YAi! is not just hoping its trusted pieces are fine. It is checking.
+- a public key,
+- a manifest,
+- and a digital signature.
 
-## 5. What Happens During Normal Development
+You do not need to know the technical details to understand the job.
 
-Most of the time, nothing dramatic happens.
+Together, these files help YAi! answer a simple question:
 
-If a developer builds the project without changing any official resource files, the build proceeds normally. No extra ceremony is needed because the existing manifest and signature are still current.
+"Are these really the official files we expected, or has something changed?"
 
-If a developer changes one of the protected official files, the project notices that the trusted packing list is now out of date. At that point, the signing tool needs to refresh the manifest and signature so the official record matches the new approved contents.
+### Verification Flow
 
-In everyday terms, this is less like a security alarm and more like updating the inventory sheet after you intentionally changed what belongs in the box.
+```mermaid
+flowchart TD
+    A[YAi begins its trust check] --> B[Check the signed list]
+    B --> C{Does the signed list look valid?}
+    C -->|Yes| D[Check the official files]
+    C -->|No| X[Do not trust them and report a problem]
+    D --> E{Do the files match the list?}
+    E -->|Yes| F[Trust the built-in resources]
+    E -->|No| X
+```
 
-## 6. Why the Private Key Stays Separate
+## 5. Why This Matters
 
-The signing key that approves official resources is kept outside the repository in a local secrets location. That private key is not supposed to be committed to source control.
+This matters because trust should not be based on hope.
 
-The reason is straightforward: the public key can be shared so anyone can verify; the private key must stay protected so not everyone can pretend to be the signer.
+It is easy for software projects to say they are safe. It is more useful when they can show one of the checks they actually perform.
 
-You can think of it like a wax seal stamp. Anyone can look at the seal and inspect it. Not everyone should own the stamp.
+This mechanism helps YAi! notice if an official skill or tool file has been changed, replaced, damaged, or gone missing. That makes silent surprises less likely.
 
-## 7. What Happens in CI and Automated Builds
+Again, this is one line of defence. It is not the whole safety story. YAi! also needs careful boundaries, approvals, audits, and clear reporting. But this check is an important first gate.
 
-In automated environments such as CI, the normal job is verification, not signing.
+## 6. What Happens When Everything Is Fine
 
-That means the pipeline checks whether the committed official files still match the signed manifest. It does not usually create new signatures on the fly. This keeps the automation simpler and safer.
+When the files match what YAi! expects, the experience is simple.
 
-If someone changed a protected file but forgot to refresh the manifest and signature, CI should fail clearly. That failure is useful. It means the system caught a mismatch instead of shipping something ambiguous.
+YAi! verifies them and moves on.
 
-## 8. What Happens If Something Is Wrong
+There is no drama, no noise, and no extra burden for the user. The system just confirms that its official starting pieces still look genuine.
 
-If YAi! finds that a protected file no longer matches the signed manifest, it treats that as a trust problem, not as a tiny detail to ignore.
+## 7. What Happens When Something Is Wrong
 
-That could happen because:
+If something does not match, YAi! does not quietly look the other way.
 
-- a file was edited on purpose but not re-signed,
-- a file was changed accidentally,
-- a file is missing,
-- or the signed manifest itself is no longer valid.
+It does not say, "Close enough."
 
-In those cases, YAi! does not want to guess. It wants to surface the issue clearly so a human can fix it.
+It does not pretend nothing happened.
 
-This is very aligned with the broader YAi! philosophy in [MANIFEST.md](../../MANIFEST.md): do not fake confidence, do not hide failure, and do not silently trust what has not been verified.
+Instead, it treats the mismatch as a warning sign. That could mean a file was changed on purpose, changed by mistake, or altered in a way nobody expected.
 
-## 9. What This Means for Ordinary Users
+In those cases, YAi! reports the problem instead of trusting the files blindly.
 
-If you are not a developer, the main takeaway is simple: YAi! has a way to check whether its built-in trusted ingredients are still authentic.
+## 8. Why This Helps Non-Technical People Too
 
-You do not need to memorize file names or understand digital signatures to understand the purpose. The purpose is to reduce silent tampering, reduce accidental trust, and make the system's starting point more believable.
+You do not need to be a developer to care about this.
 
-In plain English, YAi! is trying to say:
+If a system says, "Trust me," a sensible person should be able to ask, "Why?"
 
-"Before I trust my own built-in skills, I make sure they are really the official ones."
+This document describes one practical answer. YAi! checks that the official built-in pieces still match the approved version before it treats them as trusted.
 
-## 10. The Bigger Trust Story
+That does not make the system magical. It makes the system more honest.
 
-This protection model fits the larger YAi! worldview.
+## 9. Looking Ahead
 
-YAi! is not trying to be magical. It is trying to be inspectable. It is not trying to look clever by skipping checks. It is trying to behave in a way that sensible people can audit and understand.
+Today, this protection is focused on YAi!'s official built-in resources.
 
-That is why built-in skills are protected with signed manifests, why risky actions should cross approval boundaries, and why the project keeps coming back to the same idea: trust over autonomy.
+In the future, the same idea can help certify third-party skills or tools too. That means even resources that are not directly under YAi!'s control can still be checked for tampering before they are trusted.
 
-If you want the shortest possible summary, it is this:
+That future direction follows the same principle: do not trust first and inspect later. Check first.
 
-YAi! protects its official built-in skills the same way a careful organization protects trusted records: with signatures, verification, and a refusal to quietly ignore mismatches.
+## 10. The Shortest Summary
 
-## 11. For Technical Readers
+YAi! checks its built-in skills before trusting them.
 
-If you do want the more technical version later, the underlying implementation still follows the same model as before:
+It does this so changed or suspicious files are easier to catch.
 
-- `public-key.yai.pem` is used for verification.
-- `manifest.yai.json` records expected file details.
-- `manifest.yai.sig` signs that manifest.
-- The private signing key stays outside the repository.
-- Runtime trust depends on successful verification.
+It is one line of defence in a bigger trust model.
 
-The difference in this document is only the explanation style. The trust model itself remains the same.
+If you want the broader trust philosophy behind this, see [MANIFEST.md](../../MANIFEST.md).

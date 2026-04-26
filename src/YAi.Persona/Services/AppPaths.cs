@@ -75,6 +75,9 @@ public sealed class AppPaths
     /// </summary>
     public string WorkspaceRoot { get; }
 
+    /// <summary>Gets the root directory for workspace-local configuration files.</summary>
+    public string WorkspaceConfigRoot => Path.Combine(WorkspaceRoot, "config");
+
     /// <summary>Gets the memory files directory under <see cref="WorkspaceRoot"/>.</summary>
     public string MemoryRoot => Path.Combine(WorkspaceRoot, "memory");
 
@@ -128,6 +131,12 @@ public sealed class AppPaths
 
     /// <summary>Gets the path to the user overlay configuration file.</summary>
     public string AppConfigPath => Path.Combine(ConfigRoot, "appconfig.json");
+
+    /// <summary>Gets the path to the workspace app-lock configuration file.</summary>
+    public string WorkspaceSecurityPath => Path.Combine(WorkspaceConfigRoot, "security.json");
+
+    /// <summary>Gets the path to the workspace encrypted secret store.</summary>
+    public string WorkspaceSecretsPath => Path.Combine(WorkspaceConfigRoot, "secrets.json");
 
     /// <summary>Gets the path to the cached OpenRouter model catalog.</summary>
     public string OpenRouterCatalogCachePath => Path.Combine(ConfigRoot, "openrouter-model-catalog.json");
@@ -221,6 +230,7 @@ public sealed class AppPaths
     {
         // Workspace subtrees
         Directory.CreateDirectory(WorkspaceRoot);
+        Directory.CreateDirectory(WorkspaceConfigRoot);
         Directory.CreateDirectory(MemoryRoot);
         Directory.CreateDirectory(EpisodesRoot);
         Directory.CreateDirectory(PromptRoot);
@@ -274,6 +284,7 @@ public sealed class AppPaths
             ("Assets", "Bundled skills root", AssetSkillsRoot, false),
             ("Assets", "Default appsettings.json", AppSettingsPath, false),
             ("Workspace", "Workspace root", WorkspaceRoot, true),
+            ("Workspace", "Workspace config root", WorkspaceConfigRoot, true),
             ("Workspace", "Memory root", MemoryRoot, true),
             ("Workspace", "Episodes root", EpisodesRoot, true),
             ("Workspace", "Prompts root", PromptRoot, true),
@@ -293,6 +304,8 @@ public sealed class AppPaths
             ("Data", "LLM call database", LlmDbPath, true),
             ("Config", "Config root", ConfigRoot, true),
             ("Config", "User appconfig.json", AppConfigPath, true),
+            ("Config", "Workspace security.json", WorkspaceSecurityPath, true),
+            ("Config", "Workspace secrets.json", WorkspaceSecretsPath, true),
             ("Config", "OpenRouter catalog cache", OpenRouterCatalogCachePath, true),
             ("Config", "First-run state", FirstRunPath, true),
             ("Logs", "Logs root", LogsRoot, true)

@@ -31,6 +31,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using YAi.Persona.Models;
+using YAi.Persona.Services.Security.AppLock;
 
 #endregion
 
@@ -39,6 +40,7 @@ namespace YAi.Persona.Services;
 public sealed class OpenRouterClient
 {
     private const string ApiKeyEnvironmentVariable = "YAI_OPENROUTER_API_KEY";
+    private const string ProtectedSecretName = "OpenRouterApiKey";
 
     /// <summary>Reads the API key from the process env var, falling back to the user-level store.</summary>
     private static string ReadApiKey() =>
@@ -87,8 +89,9 @@ public sealed class OpenRouterClient
     /// </summary>
     /// <param name="http">The pre-configured <see cref="HttpClient"/> for OpenRouter requests.</param>
     /// <param name="config">Application configuration supplying the model and API options.</param>
+    /// <param name="appLockService">Optional app-lock service used to resolve protected local secrets.</param>
     /// <param name="logRepository">Optional repository for persisting LLM call records.</param>
-    public OpenRouterClient(HttpClient http, AppConfig config, ILlmCallLogRepository? logRepository = null)
+    public OpenRouterClient(HttpClient http, AppConfig config, IAppLockService? appLockService = null, ILlmCallLogRepository? logRepository = null)
     {
         _http = http ?? throw new ArgumentNullException(nameof(http));
 
@@ -97,7 +100,7 @@ public sealed class OpenRouterClient
 
         _logRepository = logRepository;
 
-        _apiKey = ReadApiKey();
+    _apiKey = ResolveApiKey(appLockService);
 
         _model = string.IsNullOrWhiteSpace(config.OpenRouter.Model)
             ? string.Empty
@@ -120,6 +123,16 @@ public sealed class OpenRouterClient
     public bool CacheEnabled => _cacheEnabled;
 
     public bool HasApiKey => !string.IsNullOrWhiteSpace(_apiKey);
+
+    private static string ResolveApiKey(IAppLockService? appLockService)
+    {
+        if (appLockService is not null && appLockService.TryGetSecret(ProtectedSecretName, out string? protectedKey) && !string.IsNullOrWhiteSpace(protectedKey))
+        {
+            return protectedKey;
+        }
+
+        return ReadApiKey();
+    }
 
     private static string GetProviderName(string modelId)
     {

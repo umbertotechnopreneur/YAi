@@ -50,6 +50,7 @@ using YAi.Persona.Extensions;
 using YAi.Persona.Models;
 using YAi.Persona.Services;
 using YAi.Persona.Services.Execution;
+using YAi.Persona.Services.Security.AppLock;
 using YAi.Persona.Services.Tools;
 using System.Text;
 #endregion
@@ -108,6 +109,30 @@ RegisterGlobalExceptionHandlers();
 
 try
 {
+	if (IsAddToPathRequest(cliArgs))
+	{
+		try
+		{
+			RunAddToPath();
+		}
+		catch (YAiPlatformNotSupporetedException ex)
+		{
+			ClearConsole();
+			WriteBanner();
+			AnsiConsole.WriteLine();
+			AnsiConsole.MarkupLine($"[red]✖ {Markup.Escape(ex.Message)}[/]");
+			Environment.ExitCode = 1;
+		}
+
+		return;
+	}
+
+	if (IsShowCliPathRequest(cliArgs))
+	{
+		RunShowCliPath();
+		return;
+	}
+
 	AppPaths appPaths = new AppPaths();
 
 	if (IsShowPathsRequest(cliArgs))
@@ -115,14 +140,6 @@ try
 		RunShowPaths(appPaths);
 		return;
 	}
-
-	if (IsGoNuclearRequest(cliArgs))
-	{
-		await RunGoNuclearAsync();
-		return;
-	}
-
-	await PreflightCheck.Validate();
 
 	appPaths.EnsureDirectories();
 
@@ -142,6 +159,28 @@ try
 		sp.GetRequiredService<YAi.Persona.Services.Tools.Filesystem.IApprovalCardPresenter>());
 
 	await using ServiceProvider sp = services.BuildServiceProvider();
+	IAppLockService appLockService = sp.GetRequiredService<IAppLockService>();
+
+	if (IsSecurityRequest(cliArgs))
+	{
+		await HandleSecurityCommandAsync(appPaths, cliArgs, appLockService).ConfigureAwait(false);
+		return;
+	}
+
+	string normalizedCmd = cmd == "-talk" ? "--talk" : cmd;
+
+	if (!await EnsureUnlockIfRequiredAsync(normalizedCmd, appLockService).ConfigureAwait(false))
+	{
+		return;
+	}
+
+	if (IsGoNuclearRequest(cliArgs))
+	{
+		await RunGoNuclearAsync().ConfigureAwait(false);
+		return;
+	}
+
+	await PreflightCheck.Validate().ConfigureAwait(false);
 
 	CliServices svc = ResolveCliServices(sp);
 	BuildAppHeaderState(appPaths, svc.OpenRouterClient);
@@ -234,7 +273,6 @@ try
 	}
 	else
 	{
-		string normalizedCmd = cmd == "-talk" ? "--talk" : cmd;
 		Log.Information("Dispatching command {Command}", normalizedCmd);
 
 		Dictionary<string, Func<Task>> dispatcher = new(StringComparer.OrdinalIgnoreCase)
@@ -378,11 +416,14 @@ static bool IsRecognizedCommand(string cmd)
 		or "--dream"
 		or "--gonuclear"
 		or "--help"
+		or "--security"
 		or "--knowledge"
 		or "--lenna"
 		or "--ask"
 		or "--manifesto"
+		or "--add-to-path"
 		or "--show-banner"
+		or "--show-cli-path"
 		or "--show-paths"
 		or "--talk"
 		or "--translate"
@@ -397,6 +438,20 @@ static bool IsShowPathsRequest(string[] args)
 	return string.Equals(firstArg, "--show-paths", StringComparison.OrdinalIgnoreCase);
 }
 
+static bool IsAddToPathRequest(string[] args)
+{
+	string? firstArg = args.FirstOrDefault();
+
+	return string.Equals(firstArg, "--add-to-path", StringComparison.OrdinalIgnoreCase);
+}
+
+static bool IsShowCliPathRequest(string[] args)
+{
+	string? firstArg = args.FirstOrDefault();
+
+	return string.Equals(firstArg, "--show-cli-path", StringComparison.OrdinalIgnoreCase);
+}
+
 static bool IsGoNuclearRequest(string[] args)
 {
 	string? firstArg = args.FirstOrDefault();
@@ -404,9 +459,265 @@ static bool IsGoNuclearRequest(string[] args)
 	return string.Equals(firstArg, "--gonuclear", StringComparison.OrdinalIgnoreCase);
 }
 
+static bool IsSecurityRequest(string[] args)
+{
+	string? firstArg = args.FirstOrDefault();
+
+	return string.Equals(firstArg, "--security", StringComparison.OrdinalIgnoreCase);
+}
+
 static bool RequiresCompletedBootstrap(string cmd)
 {
 	return cmd is "--ask" or "--translate" or "--talk" or "-talk";
+}
+
+static bool RequiresUnlock(string cmd)
+{
+	return cmd is "--ask"
+		or "--bootstrap"
+		or "--dream"
+		or "--gonuclear"
+		or "--knowledge"
+		or "--talk"
+		or "--translate"
+		or "-talk";
+}
+
+static Task HandleSecurityCommandAsync(AppPaths appPaths, string[] args, IAppLockService appLockService)
+{
+	string subCommand = args.Length > 1 ? args[1].ToLowerInvariant() : string.Empty;
+	bool showDebug = args.Any(arg => string.Equals(arg, "--debug", StringComparison.OrdinalIgnoreCase));
+
+	ClearConsole();
+	WriteBanner();
+	AnsiConsole.WriteLine();
+
+	return subCommand switch
+	{
+		"setup-lock" => HandleSetupLockAsync(appLockService),
+		"disable-lock" => HandleDisableLockAsync(appLockService),
+		"change-passphrase" => HandleChangePassphraseAsync(appLockService),
+		"status" => HandleSecurityStatusAsync(appPaths, appLockService, showDebug),
+		_ => HandleUnknownSecurityCommandAsync()
+	};
+}
+
+static Task<bool> EnsureUnlockIfRequiredAsync(string cmd, IAppLockService appLockService)
+{
+	if (!RequiresUnlock(cmd))
+	{
+		return Task.FromResult(true);
+	}
+
+	try
+	{
+		AppLockConfiguration? configuration = appLockService.LoadConfiguration();
+		if (configuration is null || !configuration.AppLockEnabled)
+		{
+			return Task.FromResult(true);
+		}
+
+		if (appLockService.IsUnlocked)
+		{
+			return Task.FromResult(true);
+		}
+
+		char[] passphrase = SecureSecretReader.ReadHiddenPassphrase("Enter YAi unlock passphrase: ");
+
+		try
+		{
+			AppUnlockResult result = appLockService.Unlock(passphrase);
+
+			if (!result.Success)
+			{
+				AnsiConsole.MarkupLine($"[red]✖ {Markup.Escape(result.Message ?? "Unlock failed.")}[/]");
+				Environment.ExitCode = 1;
+				return Task.FromResult(false);
+			}
+
+			return Task.FromResult(true);
+		}
+		finally
+		{
+			SecureSecretReader.Clear(passphrase);
+		}
+	}
+	catch (InvalidDataException ex)
+	{
+		AnsiConsole.MarkupLine($"[red]✖ {Markup.Escape(ex.Message)}[/]");
+		Environment.ExitCode = 1;
+		return Task.FromResult(false);
+	}
+}
+
+static Task HandleSetupLockAsync(IAppLockService appLockService)
+{
+	char[] firstPassphrase = SecureSecretReader.ReadHiddenPassphrase("Enter YAi unlock passphrase: ");
+	char[] secondPassphrase = SecureSecretReader.ReadHiddenPassphrase("Confirm YAi unlock passphrase: ");
+
+	try
+	{
+		if (!ArePassphrasesEqual(firstPassphrase, secondPassphrase))
+		{
+			AnsiConsole.MarkupLine("[red]✖ Passphrases do not match.[/]");
+			Environment.ExitCode = 1;
+			return Task.CompletedTask;
+		}
+
+		AppUnlockResult result = appLockService.SetupLock(firstPassphrase);
+		if (!result.Success)
+		{
+			AnsiConsole.MarkupLine($"[red]✖ {Markup.Escape(result.Message ?? "Unable to enable app lock.")}[/]");
+			Environment.ExitCode = 1;
+			return Task.CompletedTask;
+		}
+
+		string? apiKey = Environment.GetEnvironmentVariable("YAI_OPENROUTER_API_KEY")
+			?? Environment.GetEnvironmentVariable("YAI_OPENROUTER_API_KEY", EnvironmentVariableTarget.User);
+
+		if (!string.IsNullOrWhiteSpace(apiKey))
+		{
+			AppUnlockResult secretResult = appLockService.SetSecret("OpenRouterApiKey", apiKey, "openrouter");
+			if (!secretResult.Success)
+			{
+				AnsiConsole.MarkupLine($"[yellow]⚠ {Markup.Escape(secretResult.Message ?? "App lock was enabled, but the OpenRouter key could not be imported.")}[/]");
+			}
+			else
+			{
+				AnsiConsole.MarkupLine("[green]Imported the current OpenRouter key into encrypted storage.[/]");
+			}
+		}
+
+		AnsiConsole.MarkupLine("[green]App lock enabled.[/]");
+		return Task.CompletedTask;
+	}
+	finally
+	{
+		SecureSecretReader.Clear(firstPassphrase);
+		SecureSecretReader.Clear(secondPassphrase);
+	}
+}
+
+static Task HandleDisableLockAsync(IAppLockService appLockService)
+{
+	char[] currentPassphrase = SecureSecretReader.ReadHiddenPassphrase("Enter current YAi unlock passphrase: ");
+
+	try
+	{
+		AppUnlockResult result = appLockService.DisableLock(currentPassphrase);
+		if (!result.Success)
+		{
+			AnsiConsole.MarkupLine($"[red]✖ {Markup.Escape(result.Message ?? "Unable to disable app lock.")}[/]");
+			Environment.ExitCode = 1;
+			return Task.CompletedTask;
+		}
+
+		AnsiConsole.MarkupLine("[green]App lock disabled.[/]");
+		return Task.CompletedTask;
+	}
+	finally
+	{
+		SecureSecretReader.Clear(currentPassphrase);
+	}
+}
+
+static Task HandleChangePassphraseAsync(IAppLockService appLockService)
+{
+	char[] currentPassphrase = SecureSecretReader.ReadHiddenPassphrase("Enter current YAi unlock passphrase: ");
+	char[] firstNewPassphrase = SecureSecretReader.ReadHiddenPassphrase("Enter new YAi unlock passphrase: ");
+	char[] secondNewPassphrase = SecureSecretReader.ReadHiddenPassphrase("Confirm new YAi unlock passphrase: ");
+
+	try
+	{
+		if (!ArePassphrasesEqual(firstNewPassphrase, secondNewPassphrase))
+		{
+			AnsiConsole.MarkupLine("[red]✖ Passphrases do not match.[/]");
+			Environment.ExitCode = 1;
+			return Task.CompletedTask;
+		}
+
+		AppUnlockResult result = appLockService.ChangePassphrase(currentPassphrase, firstNewPassphrase);
+		if (!result.Success)
+		{
+			AnsiConsole.MarkupLine($"[red]✖ {Markup.Escape(result.Message ?? "Unable to change passphrase.")}[/]");
+			Environment.ExitCode = 1;
+			return Task.CompletedTask;
+		}
+
+		AnsiConsole.MarkupLine("[green]Passphrase changed.[/]");
+		return Task.CompletedTask;
+	}
+	finally
+	{
+		SecureSecretReader.Clear(currentPassphrase);
+		SecureSecretReader.Clear(firstNewPassphrase);
+		SecureSecretReader.Clear(secondNewPassphrase);
+	}
+}
+
+static Task HandleSecurityStatusAsync(AppPaths appPaths, IAppLockService appLockService, bool showDebug)
+{
+	try
+	{
+		ClearConsole();
+		WriteBanner();
+		AnsiConsole.WriteLine();
+
+		AnsiConsole.MarkupLine("[bold cyan]Security status[/]");
+		AnsiConsole.MarkupLine($"[grey70]Security file:[/] {Markup.Escape(appPaths.WorkspaceSecurityPath)}");
+		AnsiConsole.MarkupLine($"[grey70]Secrets file:[/] {Markup.Escape(appPaths.WorkspaceSecretsPath)}");
+		AnsiConsole.WriteLine();
+
+		AppLockConfiguration? configuration = appLockService.LoadConfiguration();
+		AnsiConsole.MarkupLine($"[grey70]App lock:[/] {(configuration?.AppLockEnabled == true ? "[green]enabled[/]" : "[yellow]disabled[/]")}");
+		AnsiConsole.MarkupLine($"[grey70]Unlocked:[/] {(appLockService.IsUnlocked ? "[green]yes[/]" : "[yellow]no[/]")}");
+
+		foreach (AppLockDiagnostic diagnostic in appLockService.GetDiagnostics(showDebug))
+		{
+			if (diagnostic.IsSensitive && !showDebug)
+			{
+				continue;
+			}
+
+			AnsiConsole.MarkupLine($"[grey70]{Markup.Escape(diagnostic.Message)}[/]");
+		}
+
+		if (showDebug)
+		{
+			AnsiConsole.WriteLine();
+			AnsiConsole.MarkupLine("[yellow]Debug details enabled.[/]");
+		}
+
+		return Task.CompletedTask;
+	}
+	catch (InvalidDataException ex)
+	{
+		AnsiConsole.MarkupLine($"[red]✖ {Markup.Escape(ex.Message)}[/]");
+		Environment.ExitCode = 1;
+		return Task.CompletedTask;
+	}
+}
+
+static Task HandleUnknownSecurityCommandAsync()
+{
+	AnsiConsole.MarkupLine("[yellow]Usage:[/] [bold]--security setup-lock|disable-lock|change-passphrase|status[/]");
+	Environment.ExitCode = 1;
+	return Task.CompletedTask;
+}
+
+static bool ArePassphrasesEqual(char[] left, char[] right)
+{
+	int maxLength = Math.Max(left.Length, right.Length);
+	int diff = left.Length ^ right.Length;
+
+	for (int i = 0; i < maxLength; i++)
+	{
+		char leftChar = i < left.Length ? left[i] : '\0';
+		char rightChar = i < right.Length ? right[i] : '\0';
+		diff |= leftChar ^ rightChar;
+	}
+
+	return diff == 0;
 }
 
 static void ClearConsole(bool clearScrollback = false)
@@ -449,6 +760,107 @@ static void RunShowPaths(AppPaths appPaths)
 
 	AnsiConsole.WriteLine();
 	PromptToOpenConfiguredPath(entries);
+}
+
+static void RunShowCliPath()
+{
+	(IReadOnlyList<string> userMatches, IReadOnlyList<string> processMatches, string currentExecutablePath, string currentDirectory) = CliPathManager.GetCliPathStatus();
+
+	ClearConsole();
+	WriteBanner();
+	AnsiConsole.WriteLine();
+
+	AnsiConsole.MarkupLine("[bold cyan]CLI PATH status[/]");
+	AnsiConsole.MarkupLine("[grey70]This checks whether the current CLI executable directory appears in the current user PATH and the inherited process PATH.[/]");
+	AnsiConsole.WriteLine();
+
+	Table summaryTable = new Table()
+		.Border(TableBorder.Rounded)
+		.Expand()
+		.AddColumn(new TableColumn("[bold]Check[/]"))
+		.AddColumn(new TableColumn("[bold]Value[/]"));
+
+	summaryTable.AddRow("Executable", Markup.Escape(currentExecutablePath));
+	summaryTable.AddRow("Install directory", Markup.Escape(currentDirectory));
+	summaryTable.AddRow("User PATH", OperatingSystem.IsWindows()
+		? userMatches.Count > 0 ? "[green]found[/]" : "[yellow]not found[/]"
+		: "[grey70]not available[/]");
+	summaryTable.AddRow("Process PATH", processMatches.Count > 0 ? "[green]found[/]" : "[yellow]not found[/]");
+
+	AnsiConsole.Write(summaryTable);
+	AnsiConsole.WriteLine();
+
+	WriteCliPathMatchSection("User PATH matches", userMatches, isWindowsOnly: true);
+	AnsiConsole.WriteLine();
+	WriteCliPathMatchSection("Current process PATH matches", processMatches, isWindowsOnly: false);
+
+	if (!OperatingSystem.IsWindows())
+	{
+		AnsiConsole.WriteLine();
+		AnsiConsole.MarkupLine("[grey70]PATH registration is Windows-only. The add/update switch fails fast on macOS and Linux, but this read-only status check still works.[/]");
+	}
+}
+
+static void RunAddToPath()
+{
+	(string OriginalUserPath, string UpdatedUserPath, IReadOnlyList<string> RemovedEntries, string CurrentDirectory, string CurrentExecutablePath) = CliPathManager.AddOrUpdateCurrentCliDirectoryOnUserPath();
+
+	ClearConsole();
+	WriteBanner();
+	AnsiConsole.WriteLine();
+
+	AnsiConsole.MarkupLine("[bold cyan]PATH registration[/]");
+	AnsiConsole.MarkupLine("[grey70]This writes the current CLI directory into the current user's PATH on Windows.[/]");
+	AnsiConsole.WriteLine();
+
+	AnsiConsole.MarkupLine($"[green]CLI executable:[/] {Markup.Escape(CurrentExecutablePath)}");
+	AnsiConsole.MarkupLine($"[green]PATH entry:[/] {Markup.Escape(CurrentDirectory)}");
+	AnsiConsole.MarkupLine("[green]Current process PATH mirror:[/] refreshed");
+
+	if (RemovedEntries.Count > 0)
+	{
+		AnsiConsole.WriteLine();
+		AnsiConsole.MarkupLine("[yellow]Removed stale user PATH entries[/]");
+
+		foreach (string removedEntry in RemovedEntries)
+		{
+			AnsiConsole.MarkupLine($"[grey70]-[/] {Markup.Escape(removedEntry)}");
+		}
+	}
+	else if (string.Equals(OriginalUserPath, UpdatedUserPath, StringComparison.Ordinal))
+	{
+		AnsiConsole.MarkupLine("[green]User PATH already contained this directory.[/]");
+	}
+	else
+	{
+		AnsiConsole.MarkupLine("[green]User PATH updated.[/]");
+	}
+
+	AnsiConsole.WriteLine();
+	AnsiConsole.MarkupLine("[yellow]Open a new terminal session, or refresh PATH in the current shell, to use the updated value.[/]");
+	AnsiConsole.MarkupLine("[grey70]Use [bold]--show-cli-path[/] to verify where the CLI is visible on PATH.[/]");
+}
+
+static void WriteCliPathMatchSection(string title, IReadOnlyList<string> matches, bool isWindowsOnly)
+{
+	AnsiConsole.MarkupLine($"[bold]{Markup.Escape(title)}[/]");
+
+	if (isWindowsOnly && !OperatingSystem.IsWindows())
+	{
+		AnsiConsole.MarkupLine("[grey70]User PATH targets are not available on this platform.[/]");
+		return;
+	}
+
+	if (matches.Count == 0)
+	{
+		AnsiConsole.MarkupLine("[grey70]None[/]");
+		return;
+	}
+
+	foreach (string match in matches)
+	{
+		AnsiConsole.MarkupLine($"[green]-[/] {Markup.Escape(match)}");
+	}
 }
 
 static void RunShowBanner()
@@ -747,8 +1159,8 @@ static void PrintHelp()
 {
 	AnsiConsole.Write(new Panel(Align.Center(new Markup(
 		"[bold cyan]YAi! CLI[/]\n" +
-		"[grey70]Interactive command line client for bootstrap, banner splash, ask, translate, talk, local path review, custom data reset, and Lenna citation flows.[/]\n\n" +
-		"[yellow]Tip:[/] First launch bootstraps automatically unless you pass [bold]--help[/], [bold]--version[/], [bold]--bootstrap[/], [bold]--show-banner[/], [bold]--manifesto[/], [bold]--lenna[/], [bold]--show-paths[/], or [bold]--gonuclear[/].")))
+		"[grey70]Interactive command line client for bootstrap, banner splash, ask, translate, talk, PATH inspection, Windows PATH registration, local path review, custom data reset, and Lenna citation flows.[/]\n\n" +
+		"[yellow]Tip:[/] First launch bootstraps automatically unless you pass [bold]--help[/], [bold]--version[/], [bold]--bootstrap[/], [bold]--show-banner[/], [bold]--manifesto[/], [bold]--lenna[/], [bold]--show-paths[/], [bold]--show-cli-path[/], [bold]--add-to-path[/], [bold]--security[/], or [bold]--gonuclear[/].")))
 	{
 		Border = BoxBorder.Rounded,
 		BorderStyle = new Style(Color.Cyan1),
@@ -769,8 +1181,11 @@ static void PrintHelp()
 	table.AddRow("[cyan1]--show-banner[/]", "🖼️ Show the CLI banner splash and exit.");
 	table.AddRow("[cyan1]--manifesto[/]", "🧾 Show the banner splash, then the manifesto excerpt, and exit.");
 	table.AddRow("[cyan1]--show-paths[/]", "📍 Show the resolved config, memory, skill, and storage paths.");
+	table.AddRow("[cyan1]--show-cli-path[/]", "🔎 Show whether the CLI executable directory is already visible on PATH and where it was found.");
+	table.AddRow("[cyan1]--add-to-path[/]", "🛠️ Add the current CLI directory to the current user PATH on Windows, removing older YAi entries when possible.");
 	table.AddRow("[red1]--gonuclear[/]", "☢️ Confirm and permanently delete the workspace, data, and config roots. Cannot be undone.");
 	table.AddRow("[orchid1]--lenna[/]", "🖼️ Run the Lenna citation script and exit.");
+	table.AddRow("[turquoise2]--security <command>[/]", "🔐 Manage app lock and encrypted local secrets.");
 	table.AddRow("[deepskyblue1]--ask <text>[/]", "💬 Send a single prompt to the model. Requires a completed bootstrap.");
 	table.AddRow("[orange1]--translate <text>[/]", "🌍 Translate or rewrite text with persona prompts. Requires a completed bootstrap.");
 	table.AddRow("[mediumspringgreen]--talk[/]", "🗣️ Start the interactive REPL. Requires a completed bootstrap.");
@@ -790,6 +1205,12 @@ static void PrintHelp()
 	AnsiConsole.WriteLine();
 	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --show-paths[/]")));
 	AnsiConsole.WriteLine();
+	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --show-cli-path[/]")));
+	AnsiConsole.WriteLine();
+	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --add-to-path[/]")));
+	AnsiConsole.WriteLine();
+	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --security status[/]")));
+	AnsiConsole.WriteLine();
 	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --gonuclear[/]")));
 	AnsiConsole.WriteLine();
 	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --lenna[/]")));
@@ -798,7 +1219,7 @@ static void PrintHelp()
 	AnsiConsole.WriteLine();
 	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --talk[/]")));
 	AnsiConsole.WriteLine();
-	AnsiConsole.Write(Align.Center(new Markup("[yellow]Requires:[/] [bold]YAI_OPENROUTER_API_KEY[/] for [bold]--ask[/], [bold]--translate[/], [bold]--talk[/], and [bold]--bootstrap[/]. [bold]--ask[/], [bold]--translate[/], and [bold]--talk[/] also require a completed bootstrap. [bold]--show-paths[/] and [bold]--gonuclear[/] are local maintenance flows and do not need the key. The model selector can still open without the key when a cached catalog is available.")));
+	AnsiConsole.Write(Align.Center(new Markup("[yellow]Requires:[/] [bold]--ask[/], [bold]--translate[/], [bold]--talk[/], and [bold]--bootstrap[/] need a configured OpenRouter secret or [bold]YAI_OPENROUTER_API_KEY[/] plus a completed bootstrap. [bold]--show-paths[/], [bold]--show-cli-path[/], [bold]--add-to-path[/], [bold]--security[/], and [bold]--gonuclear[/] are local maintenance flows. [bold]--add-to-path[/] is Windows-only and will fail fast on macOS/Linux. The model selector can still open without the secret when a cached catalog is available.")));
 }
 
 static async Task<bool> EnsureOpenRouterModelSelectedAsync(
@@ -848,7 +1269,7 @@ static async Task<bool> EnsureOpenRouterModelSelectedAsync(
 		AnsiConsole.MarkupLine("[red]✖ Unable to load the OpenRouter model catalog.[/]");
 		if (ex.InnerException is not null)
 			AnsiConsole.MarkupLine($"[grey70]Cause: {Markup.Escape(ex.InnerException.Message)}[/]");
-		AnsiConsole.MarkupLine("[yellow]Restore network access or check YAI_OPENROUTER_API_KEY, then run the command again.[/]");
+		AnsiConsole.MarkupLine("[yellow]Restore network access or check the protected OpenRouter secret or YAI_OPENROUTER_API_KEY, then run the command again.[/]");
 		Environment.ExitCode = 1;
 		return false;
 	}
@@ -888,21 +1309,6 @@ static async Task ShowOpenRouterBalanceAsync(
 			.SpinnerStyle(new Style(Color.Cyan1))
 			.StartAsync("[cyan]Checking OpenRouter balance...[/]", _ => openRouterBalance.GetBalanceAsync(cancellationToken: default))
 			.ConfigureAwait(false);
-
-		// Show the configured API key (masked) so users can confirm which key is used.
-		string apiKey =
-			Environment.GetEnvironmentVariable("YAI_OPENROUTER_API_KEY")
-			?? Environment.GetEnvironmentVariable("YAI_OPENROUTER_API_KEY", EnvironmentVariableTarget.User)
-			?? string.Empty;
-		if (!string.IsNullOrWhiteSpace(apiKey))
-		{
-			string masked = apiKey.Length <= 8 ? new string('*', apiKey.Length) : string.Concat(apiKey.AsSpan(0, 4), "...", apiKey.AsSpan(apiKey.Length - 4));
-			AnsiConsole.MarkupLine($"[green]Using OpenRouter API key:[/] {Markup.Escape(masked)}");
-		}
-		else
-		{
-			AnsiConsole.MarkupLine("[red]✖ No OpenRouter API key configured (YAI_OPENROUTER_API_KEY).[/]");
-		}
 
 		if (!string.IsNullOrWhiteSpace(snapshot.ErrorMessage))
 		{

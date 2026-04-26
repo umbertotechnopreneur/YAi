@@ -25,12 +25,18 @@ Quick usage
 - `--bootstrap` — initialize runtime workspace and copy identity templates into the user data root. If no OpenRouter model is configured, the CLI prompts you to choose one first. After preflight passes at startup, the CLI shows the current OpenRouter balance first, then continues into the boot flow. On first launch, the bootstrap intro clears the screen and scrollback, then prints the centered 800x600 YAi logo splash before the workspace setup message.
 - `--show-banner` — show the CLI banner splash and the top app header, then exit. This does not require an OpenRouter key.
 - `--manifesto` — show the CLI banner splash, then the manifesto excerpt with the repository link at the bottom, and exit. This does not require an OpenRouter key.
-- `--show-paths` — show the resolved asset, config, memory, skill, history, and storage paths.
+- `--show-paths` — show the resolved asset, config, memory, skill, history, storage, and workspace security paths.
+- `--show-cli-path` — show whether the CLI executable directory is already visible on PATH and where it was found.
+- `--add-to-path` — add the current CLI directory to the current user PATH on Windows, removing older YAi CLI entries when found. This fails fast on macOS and Linux.
+- `--security status` — show app-lock state, KDF settings, and secret-vault paths.
+- `--security setup-lock` — enable app lock, create `workspace/config/security.json`, and import the current OpenRouter key into encrypted storage when one is available.
+- `--security disable-lock` — disable app lock after verifying the current passphrase.
+- `--security change-passphrase` — change the unlock passphrase and re-encrypt local secrets.
 - `--gonuclear` — show the custom data wipe screen, optionally create a zip backup with the workspace/data/config folder structure first, then delete the user data root and all custom runtime state. The backup archive is written outside the deleted roots under `%LOCALAPPDATA%\YAi\backups\yyyyMMdd\`.
 - `--lenna` — run the Lenna citation script and exit. This does not require an OpenRouter key.
-- `--ask "text"` — single-shot prompt; requires a completed bootstrap, `YAI_OPENROUTER_API_KEY` in environment, and a selected OpenRouter model. The CLI shows the cached OpenRouter balance before sending the prompt.
-- `--translate "text"` — translation-style prompt using persona prompts; requires a completed bootstrap, `YAI_OPENROUTER_API_KEY`, and a selected OpenRouter model. The CLI shows the cached OpenRouter balance before sending the prompt.
-- `--talk` — interactive REPL (type `exit` to quit); requires a completed bootstrap, `YAI_OPENROUTER_API_KEY`, and a selected OpenRouter model. The CLI shows the cached OpenRouter balance before entering the loop.
+- `--ask "text"` — single-shot prompt; requires a completed bootstrap, a configured OpenRouter secret or `YAI_OPENROUTER_API_KEY`, and a selected OpenRouter model. When app lock is enabled, the CLI prompts for the unlock passphrase first.
+- `--translate "text"` — translation-style prompt using persona prompts; requires a completed bootstrap, a configured OpenRouter secret or `YAI_OPENROUTER_API_KEY`, and a selected OpenRouter model. When app lock is enabled, the CLI prompts for the unlock passphrase first.
+- `--talk` — interactive REPL (type `exit` to quit); requires a completed bootstrap, a configured OpenRouter secret or `YAI_OPENROUTER_API_KEY`, and a selected OpenRouter model. When app lock is enabled, the CLI prompts for the unlock passphrase first.
 
 Chat display
 
@@ -45,10 +51,13 @@ Versioning
 
 Environment
 
-- `YAI_OPENROUTER_API_KEY` — required API key for OpenRouter chat/bootstrap flows and the credits lookup. The CLI can still start without it so the model selector and cached catalog can load.
+- `YAI_OPENROUTER_API_KEY` — optional fallback API key for OpenRouter chat/bootstrap flows and the credits lookup when the protected secret store has not been configured yet.
+- `workspace/config/security.json` — workspace-local app-lock verifier file. Created by `--security setup-lock`.
+- `workspace/config/secrets.json` — workspace-local encrypted secret store for OpenRouter and future provider credentials.
 - Internet access is checked at startup and the CLI now warns instead of failing fast. Remote chat flows still need connectivity.
 - `YAI_WORKSPACE_ROOT` — (optional) absolute path to override the runtime workspace root (where memory files, prompts, regex, and skills are stored). Defaults to `%USERPROFILE%\.yai\workspace`.
 - `YAI_DATA_ROOT` — (optional) absolute path to override the data root (where logs, history, dreams, and the local SQLite database are written). Defaults to `%LOCALAPPDATA%\YAi\data`. Both roots must not be under the application install directory.
+- PATH registration is Windows-only. `--add-to-path` updates the current user PATH and removes older YAi CLI directory entries when it can. `--show-cli-path` is read-only and can still report whether the CLI directory is already visible on PATH on macOS and Linux. Open a new terminal session, or refresh the shell environment, after running `--add-to-path` so the updated user PATH is picked up.
 
 Catalog cache
 
@@ -68,7 +77,7 @@ The shipped markdown templates live in `src/YAi.Resources/reference/templates` a
 
 The splash scripts `lenna.ps1` and `yai_logo_ansi_800x600.ps1` share `splash-helpers.ps1` for centered rendering and console/scrollback clearing.
 
-The first built-in skill is `system_info`. When `--ask`, `--translate`, or `--talk` runs after bootstrap, the prompt includes the available skills and tools, and the CLI can execute `[TOOL: system_info ...]` calls before producing the final answer.
+The first built-in skill is `system_info`. When `--ask`, `--translate`, or `--talk` runs after bootstrap, the prompt includes the available skills and tools, and the CLI can execute `[TOOL: system_info ...]` calls before producing the final answer. When app lock is enabled, the CLI unlocks before loading memory or tools.
 
 
 Examples
@@ -123,7 +132,7 @@ Run the bootstrap command to verify templates are copied and the app can write t
 dotnet run --project src/YAi.Client.CLI -- --bootstrap
 ```
 
-If you want to exercise network flows, set a valid `YAI_OPENROUTER_API_KEY`. The CLI now warns during preflight instead of failing fast, but chat/bootstrap flows still need a working key and connectivity.
+If you want to exercise network flows, set a valid `YAI_OPENROUTER_API_KEY` or configure the encrypted OpenRouter secret through `--security setup-lock`. The CLI now warns during preflight instead of failing fast, but chat/bootstrap flows still need a working key or secret and connectivity.
 
 If the runtime `appsettings.json` does not yet contain a model, the CLI opens the model selector before bootstrap or chat flows and writes the selected model back to that runtime config file. After preflight passes, the CLI shows the current balance first at boot and still respects the 10-minute in-memory cache.
 

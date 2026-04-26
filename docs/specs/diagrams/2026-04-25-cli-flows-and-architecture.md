@@ -27,6 +27,7 @@ YAi CLI is a local-first assistant shell that uses OpenRouter-backed chat flows,
 
 The main runtime modes are:
 - Help and maintenance commands such as `--help`, `--version`, `--lenna`, `--show-paths`, and `--gonuclear`.
+- PATH registration and inspection via `--add-to-path` and `--show-cli-path`.
 - First-run or explicit bootstrap via `--bootstrap`.
 - Chat-style flows via `--ask`, `--translate`, and `--talk`.
 - Workspace inspection and memory review via `--knowledge` and `--dream`.
@@ -97,6 +98,8 @@ flowchart TD
     Commands --> Dream[--dream]
     Commands --> Bootstrap[--bootstrap]
     Commands --> ShowPaths[--show-paths]
+    Commands --> ShowCliPath[--show-cli-path]
+    Commands --> AddToPath[--add-to-path]
     Commands --> GoNuclear[--gonuclear]
     Commands --> Lenna[--lenna]
 
@@ -137,6 +140,8 @@ flowchart TD
 | `--version` | Print the compiled CLI version and exit | `IsVersionRequest()` | `PrintVersion()` | Implemented | Uses the shared `Directory.Build.props` version so every assembly reports the same build number. |
 | `--bootstrap` | Run the first-run bootstrap ritual | Top-level `Program.cs` flow | `DoBootstrapAsync()` | Implemented | If no model is configured, the selector runs first. Returns early after the ritual completes. |
 | `--show-paths` | Show resolved path inventory | `IsShowPathsRequest()` | `RunShowPathsAsync()` | Implemented | Uses `ConfiguredPathsScreenHost`; skips the normal startup branch. |
+| `--show-cli-path` | Show whether the CLI executable directory is already visible on PATH and where it was found | `IsShowCliPathRequest()` | `RunShowCliPath()` | Implemented | Read-only. Reports user PATH and inherited process PATH matches. |
+| `--add-to-path` | Add the current CLI directory to the current user's PATH on Windows, replacing stale YAi CLI entries when found | `IsAddToPathRequest()` | `RunAddToPath()` | Implemented | Windows-only. Fails fast on macOS/Linux with `YAiPlatformNotSupporetedException`. |
 | `--gonuclear` | Optionally back up the workspace, data, and config folder structure, then delete the roots | `IsGoNuclearRequest()` | `RunGoNuclearAsync()` | Implemented | Uses `NuclearResetScreenHost`; the backup archive is written outside the deleted roots under `%LOCALAPPDATA%\YAi\backups\yyyyMMdd\`. |
 | `--lenna` | Run the Lenna citation script and exit | `IsLennaRequest()` | `RunLennaAsync()` | Implemented | Tries `pwsh` first, then `powershell`. |
 | `--ask <text>` | Single-shot chat prompt | Main dispatch branch | `DoAskAsync()` | Implemented | Requires a completed bootstrap and `YAI_OPENROUTER_API_KEY`. Tool calls are allowed through `ToolRegistry`. |
@@ -605,6 +610,8 @@ This is a manual reflection pass, not a background worker. The review screen exi
 - `yai --knowledge` opens the knowledge hub.
 - `yai --dream` stages candidates and regenerates `DREAMS.md`.
 - `yai --show-paths` prints the path inventory.
+- `yai --show-cli-path` prints the current CLI PATH status.
+- `yai --add-to-path` updates the current user PATH on Windows and fails fast on macOS/Linux.
 - `yai --gonuclear` deletes only the temp workspace roots in a sandbox.
 - `yai --ask` without bootstrap shows the bootstrap warning and exits.
 - `yai --ask` without a model or API key hits the documented failure path.

@@ -32,7 +32,7 @@ This file tracks CLI-local documentation history that does not belong in the sha
 - Documented that interactive `--ask` and `--translate` now route completed responses through the reusable Razor response screen host, while `--talk` and `--bootstrap` still keep their current REPL-style response output.
 - Updated the talk and bootstrap REPL flows so completed assistant turns now render through the same shared response state and inline response panel formatting used by the reusable response screen, while keeping the existing prompt-entry loop intact.
 - Updated the non-screen `--ask` and `--translate` fallback path so redirected output now uses the shared inline response panel and metadata layout instead of the old one-line assistant output.
-- Migrated the interactive `--talk` and `--bootstrap` prompt/transcript loop to a combined conversation screen host that keeps prior turns, response metadata, and the next multiline prompt on one reusable RazorConsole surface.
+- Migrated the interactive `--talk` and `--bootstrap` prompt/transcript loop to a combined conversation window that keeps prior turns, response metadata, and the next multiline prompt on one reusable Terminal.Gui surface.
 
 ## 2026-04-26
 

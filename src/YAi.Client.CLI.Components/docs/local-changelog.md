@@ -29,7 +29,9 @@ This file tracks component-local documentation history that should stay close to
 - Expanded the component docs index so prompt-editor, prompt-history, initial-text, cancel, and wrapped-line cursor behavior stay anchored to the owning components project instead of being implied only through `Program.cs` call sites.
 - Added the first reusable response-screen host path for ask and translate flows, including `ResponseViewState`, `ResponsePanel`, and the `ResponseScreen*` host trio so response presentation can move out of `Program.cs` without changing the shared prompt editor core.
 - Extracted shared response formatting into `Rendering/ResponseMarkupRenderer.cs` so the same `ResponseViewState` now drives both the response screen and the inline talk/bootstrap response panels.
-- Added `ConversationTranscriptEntryViewState` together with the `ConversationPromptScreen*` host path so interactive talk/bootstrap can render the live transcript and collect the next multiline prompt from one reusable RazorConsole screen.
+- Added `ConversationTranscriptEntryViewState` together with the interactive conversation prompt path so talk/bootstrap could render the live transcript and collect the next multiline prompt from one reusable screen.
+- Migrated the conversation prompt flow to `Screens/ConversationPromptWindow.cs` so the transcript and multiline prompt now run on Terminal.Gui v2 while preserving the shared `ConversationPromptScreenResult` contract.
+- Migrated the filesystem approval workflow to `Screens/Tools/Filesystem/ApprovalCardWindow.cs` and `FilesystemApprovalCardPresenter.cs`, then removed the remaining RazorConsole-backed screens, presenters, and the Razor SDK from the components project.
 
 ## 2026-04-26
 

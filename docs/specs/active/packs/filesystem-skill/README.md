@@ -35,7 +35,7 @@ This pack replaces the earlier filesystem concept pack with a narrower descripti
 - `src/YAi.Persona/Extensions/ServiceCollectionExtensions.cs`
 - `src/YAi.Persona.Tests/FilesystemToolCreateFileTests.cs`
 - `src/YAi.Persona.Tests/WorkflowExecutorTests.cs`
-- `src/YAi.Client.CLI.Components/Components/Cards/ApprovalCard.razor`
+- `src/YAi.Client.CLI.Components/Screens/Tools/Filesystem/ApprovalCardWindow.cs`
 
 ## Why this pack was rewritten
 

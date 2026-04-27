@@ -1,4 +1,4 @@
-/*
+﻿/*
  * YAi!
  *
  * Copyright © 2019-2026 UmbertoGiacobbiDotBiz. All rights reserved.
@@ -156,15 +156,16 @@ try
 	string logFile = Path.Combine(appPaths.LogsRoot, "yai.log");
 	Log.Logger = new LoggerConfiguration()
 		.MinimumLevel.Debug()
-		.WriteTo.File(logFile)
+		.WriteTo.File(logFile, shared: true)
 		.CreateLogger();
+	TryStartDebugLogConsole(logFile);
 
 	// YAi.Persona owns the app lock, bootstrap, prompt, tool, and model services.
 	ServiceCollection services = new ServiceCollection();
 	services.AddLogging(logging => logging.AddSerilog(Log.Logger, dispose: false));
 	services.AddYAiPersonaServices(appPaths);
 	services.AddSingleton<YAi.Persona.Services.Tools.Filesystem.IApprovalCardPresenter,
-		RazorConsoleApprovalCardPresenter>();
+		FilesystemApprovalCardPresenter>();
 	services.AddSingleton<YAi.Persona.Services.Operations.Approval.IOperationApprovalPresenter>(sp =>
 		(YAi.Persona.Services.Operations.Approval.IOperationApprovalPresenter)
 		sp.GetRequiredService<YAi.Persona.Services.Tools.Filesystem.IApprovalCardPresenter>());
@@ -224,7 +225,7 @@ try
 	bool shouldBootstrap = isExplicitBootstrap || isFirstRun;
 
 	await ShowOpenRouterBalanceAsync(svc.OpenRouterBalance, true, true);
-	await new BannerScreenHost().RunAsync();
+	await new BannerWindow().RunAsync();
 
 	if (!await EnsureOpenRouterModelSelectedAsync(svc.Config, svc.AppConfig, svc.OpenRouterClient, svc.OpenRouterCatalog).ConfigureAwait(false))
 	{
@@ -335,7 +336,7 @@ try
 			["--knowledge"] = async () =>
 			{
 				Log.Information("Opening Knowledge Hub");
-				await new KnowledgeHubScreenHost(appPaths).RunAsync().ConfigureAwait(false);
+				await new KnowledgeHubWindow(appPaths).RunAsync().ConfigureAwait(false);
 				Log.Information("Knowledge Hub closed");
 			}
 		};
@@ -353,7 +354,7 @@ try
 }
 catch (Exception ex)
 {
-	new ExceptionScreenHost(ex, "Unhandled exception in YAi CLI").RunAsync().GetAwaiter().GetResult();
+	new ExceptionWindow(ex, "Unhandled exception in YAi CLI").RunAsync().GetAwaiter().GetResult();
 	Log.Fatal(ex, "Unhandled exception in YAi CLI");
 	Environment.ExitCode = 1;
 }
@@ -394,7 +395,7 @@ static void HandleUnhandledException(Exception exception, string title)
 {
 	try
 	{
-		new ExceptionScreenHost(exception, title).RunAsync().GetAwaiter().GetResult();
+		new ExceptionWindow(exception, title).RunAsync().GetAwaiter().GetResult();
 		Log.Fatal(exception, title);
 		Environment.ExitCode = 1;
 	}
@@ -990,7 +991,7 @@ static void RunShowBanner()
 static async Task RunManifestoAsync()
 {
 	ClearConsole();
-	await new BannerScreenHost().RunAsync().ConfigureAwait(false);
+	await new BannerWindow().RunAsync().ConfigureAwait(false);
 	AnsiConsole.WriteLine();
 	WriteManifesto();
 }
@@ -1161,7 +1162,7 @@ static async Task RunUnknownCommandAsync(string command)
 {
 	// Unknown-command handling stays in the CLI because it is purely user-facing.
 	ClearConsole();
-	await new BannerScreenHost().RunAsync().ConfigureAwait(false);
+	await new BannerWindow().RunAsync().ConfigureAwait(false);
 	AnsiConsole.WriteLine();
 	AnsiConsole.MarkupLine($"[red]✖ Unrecognized command line argument:[/] [bold]{Markup.Escape(command)}[/]");
 	AnsiConsole.MarkupLine("[yellow]Run [bold]--help[/] to see the supported commands.[/]");
@@ -1177,7 +1178,7 @@ static async Task RunGoNuclearAsync()
 {
 	// Nuclear reset is a screen-host driven flow in YAi.Client.CLI.Components.Screens.
 	AppPaths appPaths = new AppPaths();
-	await new NuclearResetScreenHost(appPaths).RunAsync().ConfigureAwait(false);
+	await new NuclearResetWindow(appPaths).RunAsync().ConfigureAwait(false);
 }
 
 /// <summary>
@@ -1186,7 +1187,7 @@ static async Task RunGoNuclearAsync()
 static async Task PrintVersionAsync()
 {
 	ClearConsole();
-	await new BannerScreenHost().RunAsync().ConfigureAwait(false);
+	await new BannerWindow().RunAsync().ConfigureAwait(false);
 	AnsiConsole.WriteLine();
 
 	string version = GetVersionString();
@@ -1312,6 +1313,117 @@ static async Task<bool> TryRunPowerShellScriptAsync(
 }
 
 /// <summary>
+/// Opens a separate PowerShell window that tails the Serilog file during debug runs on Windows.
+/// </summary>
+static void TryStartDebugLogConsole(string logFile)
+{
+#if DEBUG
+	if (!OperatingSystem.IsWindows())
+	{
+		return;
+	}
+
+	try
+	{
+		Directory.CreateDirectory(Path.GetDirectoryName(logFile) ?? AppContext.BaseDirectory);
+
+		if (!File.Exists(logFile))
+		{
+			File.WriteAllText(logFile, string.Empty);
+		}
+
+		string[] executables = ["pwsh", "powershell"];
+		string encodedCommand = BuildDebugLogTailEncodedCommand(logFile);
+
+		foreach (string executable in executables)
+		{
+			if (!TryResolveExecutablePath(executable, out string? resolvedExecutablePath))
+			{
+				continue;
+			}
+
+			ProcessStartInfo startInfo = new ProcessStartInfo
+			{
+				FileName = "cmd.exe",
+				Arguments = $"/c start \"YAi Debug Log\" \"{resolvedExecutablePath}\" -NoLogo -NoExit -EncodedCommand {encodedCommand}",
+				UseShellExecute = true,
+				WorkingDirectory = AppContext.BaseDirectory
+			};
+
+			try
+			{
+				Process.Start(startInfo);
+				return;
+			}
+			catch (Win32Exception)
+			{
+				continue;
+			}
+		}
+	}
+	catch
+	{
+		// Avoid blocking the CLI when the debug tail window cannot be opened.
+	}
+#endif
+}
+
+/// <summary>
+/// Builds the encoded PowerShell command used by the debug log tail window.
+/// </summary>
+static string BuildDebugLogTailEncodedCommand(string logFile)
+{
+	string escapedPath = logFile.Replace("'", "''", StringComparison.Ordinal);
+	string command = $$"""
+$Host.UI.RawUI.WindowTitle = 'YAi Debug Log';
+$path = '{{escapedPath}}';
+Write-Host ('Tailing ' + $path) -ForegroundColor Cyan;
+Get-Content -LiteralPath $path -Tail 20 -Wait;
+""";
+
+	return Convert.ToBase64String(Encoding.Unicode.GetBytes(command));
+}
+
+/// <summary>
+/// Resolves an executable from PATH so it can be launched by a secondary console window.
+/// </summary>
+static bool TryResolveExecutablePath(string executableName, out string? executablePath)
+{
+	if (Path.IsPathRooted(executableName) && File.Exists(executableName))
+	{
+		executablePath = executableName;
+		return true;
+	}
+
+	string[] searchPaths = (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
+		.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+	string[] extensions = Path.HasExtension(executableName)
+		? [string.Empty]
+		: [".exe", ".cmd", ".bat", ".com"];
+
+	foreach (string searchPath in searchPaths)
+	{
+		string normalizedSearchPath = searchPath.Trim('"');
+
+		foreach (string extension in extensions)
+		{
+			string candidatePath = Path.Combine(normalizedSearchPath, executableName + extension);
+
+			if (!File.Exists(candidatePath))
+			{
+				continue;
+			}
+
+			executablePath = candidatePath;
+			return true;
+		}
+	}
+
+	executablePath = null;
+	return false;
+}
+
+/// <summary>
 /// Prints the CLI command reference and common usage examples.
 /// </summary>
 static void PrintHelp()
@@ -1401,7 +1513,7 @@ static async Task<bool> EnsureOpenRouterModelSelectedAsync(
 
 	try
 	{
-		OpenRouterModel? selectedModel = await new OpenRouterModelSelectionScreenHost(openRouterCatalog, appConfig)
+		OpenRouterModel? selectedModel = await new OpenRouterModelSelectionWindow(openRouterCatalog, appConfig)
 			.RunAsync()
 			.ConfigureAwait(false);
 
@@ -1467,7 +1579,7 @@ static async Task ShowOpenRouterBalanceAsync(
 
 		if (showBanner)
 		{
-			await new BannerScreenHost().RunAsync().ConfigureAwait(false);
+			await new BannerWindow().RunAsync().ConfigureAwait(false);
 			AnsiConsole.WriteLine();
 		}
 
@@ -1507,7 +1619,7 @@ static async Task ShowOpenRouterBalanceAsync(
 			AnsiConsole.WriteLine(preview);
 		}
 
-		await new OpenRouterBalanceScreenHost(snapshot).RunAsync().ConfigureAwait(false);
+		await new OpenRouterBalanceWindow(snapshot).RunAsync().ConfigureAwait(false);
 	}
 	catch (Exception ex)
 	{
@@ -1736,7 +1848,7 @@ static Task<ResponseScreenResult> ShowResponseScreenAsync(
 		AllowDismissWithEscape = true
 	};
 
-	return new ResponseScreenHost(screenParameters)
+	return new ResponseWindow(screenParameters)
 		.RunAsync();
 }
 
@@ -1773,7 +1885,7 @@ static Task<ConversationPromptScreenResult> ShowConversationPromptScreenAsync(
 		TranscriptEntries = transcriptEntries
 	};
 
-	return new ConversationPromptScreenHost(screenParameters)
+	return new ConversationPromptWindow(screenParameters)
 		.RunAsync();
 }
 
@@ -1794,13 +1906,13 @@ static async Task ShowComingAliveBannerAsync(bool useLogoSplash)
 		if (!rendered)
 		{
 			ClearConsole(clearScrollback: true);
-			await new BannerScreenHost().RunAsync().ConfigureAwait(false);
+			await new BannerWindow().RunAsync().ConfigureAwait(false);
 		}
 	}
 	else
 	{
 		ClearConsole(clearScrollback: true);
-		await new BannerScreenHost().RunAsync().ConfigureAwait(false);
+		await new BannerWindow().RunAsync().ConfigureAwait(false);
 	}
 
 	AnsiConsole.WriteLine();
@@ -1833,12 +1945,13 @@ static async Task DoBootstrapAsync(
 		List<ConversationTranscriptEntryViewState> transcriptEntries = [];
 		List<string> promptHistoryEntries = [.. LoadPromptHistoryEntries(history)];
 		string userName = runtime.UserName ?? "You";
-		string promptMarkup = GetUserPromptMarkup(userName);
-		string promptText = GetUserPromptText(userName);
+		string bootstrapPromptLabel = "User";
+		string promptMarkup = GetUserPromptMarkup(bootstrapPromptLabel);
+		string promptText = GetUserPromptText(bootstrapPromptLabel);
 		MultilinePromptEditor? promptEditor = useConversationScreen ? null : new MultilinePromptEditor(promptHistoryEntries);
 
 		ClearConsole(clearScrollback: true);
-		await new BannerScreenHost().RunAsync();
+		await new BannerWindow().RunAsync();
 		AnsiConsole.WriteLine();
 
 		if (!useConversationScreen)
@@ -2187,7 +2300,7 @@ static async Task<PromptEditorScreenResult> ResolveAskPromptAsync(AppPaths appPa
 		HistoryEntries = LoadPromptHistoryEntries(history)
 	};
 
-	return await new PromptEditorScreenHost(screenParameters)
+	return await new PromptEditorWindow(screenParameters)
 		.RunAsync()
 		.ConfigureAwait(false);
 }
@@ -2490,7 +2603,7 @@ static void RecordHistoryEntry(HistoryService history, AppConfig appConfig, stri
 /// </summary>
 static void ReportRecoverableException(Exception exception, string logMessage, string panelTitle)
 {
-	new ExceptionScreenHost(exception, panelTitle).RunAsync().GetAwaiter().GetResult();
+	new ExceptionWindow(exception, panelTitle).RunAsync().GetAwaiter().GetResult();
 	Log.Warning(exception, logMessage);
 }
 

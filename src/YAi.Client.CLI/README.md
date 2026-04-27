@@ -26,6 +26,8 @@ Run (development)
 dotnet run --project src/YAi.Client.CLI -- --help
 ```
 
+On Windows, Debug builds now open a second PowerShell window that tails the active Serilog log file so runtime diagnostics stay visible while the main CLI keeps its interactive screen flow.
+
 PowerShell output helper
 
 Run the launcher from the solution root to move into the compiled output directory.
@@ -42,7 +44,7 @@ The script defaults to `bin/Debug/net10.0`, switches to `bin/Release/net10.0` wi
 Quick usage
 
 - `--help` — show the colored Spectre.Console help screen.
-- `--version` — show the banner splash from `BannerScreen.razor`, then the compiled CLI and assembly version, and exit.
+- `--version` — show the banner splash from `BannerWindow.cs`, then the compiled CLI and assembly version, and exit.
 - Unrecognized arguments fail fast with the banner, a short explanation, and the help screen.
 - `--bootstrap` — initialize runtime workspace and copy identity templates into the user data root. If no OpenRouter model is configured, the CLI prompts you to choose one first. After preflight passes at startup, the CLI shows the current OpenRouter balance first, then continues into the boot flow. On first launch, the bootstrap intro clears the screen and scrollback, then tries to print the centered 800x600 YAi logo splash before the workspace setup message, falling back to the banner when the script cannot be rendered. Bootstrap input now accepts multi-line paste as one turn, sends on `Enter`, uses `Shift+Enter` to insert a newline, and restores the current draft when you browse prompt history with `Up` and `Down`. Interactive bootstrap now runs through a combined conversation screen that keeps the transcript, response metadata, and next prompt on one host surface, while non-screen fallback output still uses the shared inline response panel.
 - `--show-banner` — show the CLI banner splash and the top app header, then exit. This does not require an OpenRouter key.

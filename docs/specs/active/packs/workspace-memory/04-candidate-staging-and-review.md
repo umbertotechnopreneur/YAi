@@ -40,7 +40,7 @@ The part that is definitely wired into the CLI today is the dream pass:
 - `DreamingService` stages proposals in `candidates.jsonl`
 - `CandidateStore` regenerates `DREAMS.md`
 
-The review UI also exists as `DreamsReviewScreen.razor` in `YAi.Client.CLI.Components`.
+The review UI also exists as `DreamsReviewWindow.cs` in `YAi.Client.CLI.Components`.
 
 ## What is only partial today
 

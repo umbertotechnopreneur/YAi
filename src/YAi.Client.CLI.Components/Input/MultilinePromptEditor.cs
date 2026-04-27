@@ -83,25 +83,11 @@ public sealed class MultilinePromptEditor
 
         PromptEditorCore core = new (options.PromptText, _historyEntries, options.InitialText);
 
-        previousRenderLineCount = RenderEditor (options, core, originLeft, originTop, previousRenderLineCount);
+        previousRenderLineCount = RenderEditor (options, core, originLeft, ref originTop, previousRenderLineCount);
 
         while (true)
         {
-            ConsoleKeyInfo key = Console.ReadKey (intercept: true);
-
-            if (options.AllowCancelWithEscape && key.Key == ConsoleKey.Escape)
-            {
-                Console.SetCursorPosition (originLeft, originTop + previousRenderLineCount - 1);
-                Console.WriteLine ();
-
-                return null;
-            }
-
-            bool insertNewLine = key.Key == ConsoleKey.Enter
-                && ((key.Modifiers & ConsoleModifiers.Shift) != 0
-                    || HasBufferedConsoleInput (options.PasteDetectionWindowMilliseconds));
-
-            PromptEditorKeyResult result = core.ApplyKey (key, insertNewLine);
+            PromptEditorKeyResult result = ApplyKey (core, options, Console.ReadKey (intercept: true));
 
             if (result == PromptEditorKeyResult.Cancel)
             {
@@ -119,7 +105,28 @@ public sealed class MultilinePromptEditor
                 return core.ToSubmittedText ();
             }
 
-            previousRenderLineCount = RenderEditor (options, core, originLeft, originTop, previousRenderLineCount);
+            while (Console.KeyAvailable)
+            {
+                result = ApplyKey (core, options, Console.ReadKey (intercept: true));
+
+                if (result == PromptEditorKeyResult.Cancel)
+                {
+                    Console.SetCursorPosition (originLeft, originTop + previousRenderLineCount - 1);
+                    Console.WriteLine ();
+
+                    return null;
+                }
+
+                if (result == PromptEditorKeyResult.Submit)
+                {
+                    Console.SetCursorPosition (originLeft, originTop + previousRenderLineCount - 1);
+                    Console.WriteLine ();
+
+                    return core.ToSubmittedText ();
+                }
+            }
+
+            previousRenderLineCount = RenderEditor (options, core, originLeft, ref originTop, previousRenderLineCount);
         }
     }
 
@@ -153,11 +160,20 @@ public sealed class MultilinePromptEditor
         return false;
     }
 
+    private static PromptEditorKeyResult ApplyKey (PromptEditorCore core, MultilinePromptEditorOptions options, ConsoleKeyInfo key)
+    {
+        bool insertNewLine = key.Key == ConsoleKey.Enter
+            && ((key.Modifiers & ConsoleModifiers.Shift) != 0
+                || HasBufferedConsoleInput (options.PasteDetectionWindowMilliseconds));
+
+        return core.ApplyKey (key, insertNewLine);
+    }
+
     private static int RenderEditor (
         MultilinePromptEditorOptions options,
         PromptEditorCore core,
         int originLeft,
-        int originTop,
+        ref int originTop,
         int previousRenderLineCount)
     {
         (List<string> lines, (int left, int top) cursorPos) = core.GetRenderData ();
@@ -168,6 +184,7 @@ public sealed class MultilinePromptEditor
         WriteRenderArea (options, lines, originLeft, originTop);
 
         Console.SetCursorPosition (originLeft + cursorPos.left, originTop + cursorPos.top);
+        originTop = Console.CursorTop - cursorPos.top;
 
         return lineCount;
     }

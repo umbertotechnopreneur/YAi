@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Purpose | Local documentation index for YAi CLI screen hosts, Razor screens, and shared CLI presentation state |
+| Purpose | Local documentation index for YAi CLI Terminal.Gui windows and shared CLI presentation state |
 | Audience | Project maintainers and contributors |
 | Status | Active |
 | Last reviewed | 2026-04-27 |
@@ -11,10 +11,10 @@
 
 Use this folder for component-local notes about:
 
-- Razor screen hosts under `Screens/`
+- screen hosts and Terminal.Gui windows under `Screens/`
 - reusable presentation components under `Components/`
 - reusable response view state and response screens under `ResponseViewState.cs` and `Screens/ResponseScreen*`
-- reusable conversation transcript state and conversation prompt screens under `ConversationTranscriptEntryViewState.cs` and `Screens/ConversationPromptScreen*`
+- reusable conversation transcript state and conversation prompt windows under `ConversationTranscriptEntryViewState.cs` and `Screens/ConversationPromptWindow.cs`
 - reusable prompt editors and history-navigation helpers under `Input/`
 - markup renderers under `Rendering/`
 - `AppHeaderState.cs`
@@ -34,6 +34,8 @@ Use this folder for component-local notes about:
 
 - `Screens/`
 - `Components/`
+- `Screens/ConversationPromptWindow.cs`
+- `Screens/Tools/Filesystem/ApprovalCardWindow.cs`
 - `ConversationTranscriptEntryViewState.cs`
 - `ResponseViewState.cs`
 - `Input/`

@@ -19,7 +19,7 @@
  * with YAi!. If not, see <https://www.gnu.org/licenses/>.
  *
  * YAi.Client.CLI
- * RazorConsoleApprovalCardPresenter — CLI implementation of IApprovalCardPresenter using RazorConsole
+ * FilesystemApprovalCardPresenter — CLI implementation of IApprovalCardPresenter using Terminal.Gui v2
  */
 
 #region Using directives
@@ -39,26 +39,30 @@ namespace YAi.Client.CLI.Services;
 
 /// <summary>
 /// CLI implementation of <see cref="IApprovalCardPresenter"/>.
-/// Uses RazorConsole-backed screen hosts to display approval cards and plan overviews.
+/// Uses Terminal.Gui v2 windows to display approval cards and Spectre.Console output for plan progress.
 /// </summary>
-public sealed class RazorConsoleApprovalCardPresenter : IApprovalCardPresenter
+public sealed class FilesystemApprovalCardPresenter : IApprovalCardPresenter
 {
     #region Fields
 
-    private readonly ILogger<RazorConsoleApprovalCardPresenter> _logger;
+    private readonly ILogger<FilesystemApprovalCardPresenter> _logger;
 
     #endregion
 
     #region Constructor
 
-    /// <summary>Initializes the presenter with a logger.</summary>
+    /// <summary>
+    /// Initializes the presenter with a logger.
+    /// </summary>
     /// <param name="logger">Logger for diagnostics.</param>
-    public RazorConsoleApprovalCardPresenter (ILogger<RazorConsoleApprovalCardPresenter> logger)
+    public FilesystemApprovalCardPresenter (ILogger<FilesystemApprovalCardPresenter> logger)
     {
         _logger = logger;
     }
 
     #endregion
+
+    #region Public methods
 
     /// <inheritdoc />
     public async Task<ApprovalDecision> ShowCardAsync (OperationStep step, CancellationToken ct)
@@ -67,8 +71,7 @@ public sealed class RazorConsoleApprovalCardPresenter : IApprovalCardPresenter
             "Showing approval card for step {StepId}: {Title}",
             step.StepId, step.Title);
 
-        ApprovalCardScreenHost host = new(step, remainingCount: 0);
-        ApprovalDecision decision = await host.RunAsync (ct);
+        ApprovalDecision decision = await new ApprovalCardWindow (step).RunAsync (ct).ConfigureAwait (false);
 
         _logger.LogDebug (
             "User decision for step {StepId}: {Decision}",
@@ -104,10 +107,10 @@ public sealed class RazorConsoleApprovalCardPresenter : IApprovalCardPresenter
         Color statusColor = step.Status switch
         {
             StepStatus.Succeeded => Color.Green,
-            StepStatus.Failed    => Color.Red,
-            StepStatus.Skipped   => Color.Grey,
+            StepStatus.Failed => Color.Red,
+            StepStatus.Skipped => Color.Grey,
             StepStatus.Cancelled => Color.OrangeRed1,
-            _                    => Color.White
+            _ => Color.White
         };
 
         AnsiConsole.MarkupLine (
@@ -119,4 +122,6 @@ public sealed class RazorConsoleApprovalCardPresenter : IApprovalCardPresenter
 
         return Task.CompletedTask;
     }
+
+    #endregion
 }

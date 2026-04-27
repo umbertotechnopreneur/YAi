@@ -19,10 +19,9 @@
         <Rows>
             <RawMarkup Content="@Spectre.Console.Markup.Escape(Message)" Foreground="@_foreground" />
             <Newline />
-            <TextButton Content="[Esc] OK"
-                        OnClick="DismissClicked"
-                        BackgroundColor="@Color.Grey"
-                        FocusedColor="@Color.Silver" />
+            <ActionButton Content="[Esc] OK"
+                          OnClick="DismissClicked"
+                          Tone="neutral" />
         </Rows>
     </Panel>
 </Rows>

@@ -84,14 +84,8 @@
 
                 <Newline />
                 <Columns>
-                    <TextButton Content="[Enter] Proceed"
-                                OnClick="ProceedClicked"
-                                BackgroundColor="@Color.Green"
-                                FocusedColor="@Color.Green3" />
-                    <TextButton Content="[Esc] Cancel"
-                                OnClick="CancelClicked"
-                                BackgroundColor="@Color.Grey"
-                                FocusedColor="@Color.Silver" />
+                    <ActionButton Content="[Enter] Proceed" OnClick="ProceedClicked" Tone="primary" />
+                    <ActionButton Content="[Esc] Cancel" OnClick="CancelClicked" Tone="neutral" />
                 </Columns>
             </Rows>
         </Panel>

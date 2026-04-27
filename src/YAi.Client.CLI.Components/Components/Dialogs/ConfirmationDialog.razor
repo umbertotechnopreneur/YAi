@@ -20,13 +20,10 @@
             <RawMarkup Content="@Spectre.Console.Markup.Escape(Message)" Foreground="@_riskColor" />
             <Newline />
             <Columns>
-                <TextButton Content="[Y] Yes"
-                            OnClick="ConfirmClicked"
-                            BackgroundColor="@Color.Green"
-                            FocusedColor="@Color.Green3" />
-                <TextButton Content="[Esc] Cancel"                           OnClick="CancelClicked"
-                            BackgroundColor="@Color.Grey"
-                            FocusedColor="@Color.Silver" />
+                <ActionButton Content="[Y] Yes" OnClick="ConfirmClicked"                              Tone="primary" />
+                <ActionButton Content="[Esc] Cancel"
+                              OnClick="CancelClicked"
+                              Tone="neutral" />
             </Columns>
         </Rows>
     </Panel>

@@ -208,6 +208,13 @@ try
 		return;
 	}
 
+	if (cliArgs.Length == 0 && bootstrapState?.IsCompleted == true)
+	{
+		PrintHelp();
+
+		return;
+	}
+
 	// Fall back to app config values until bootstrap or selection fills them in.
 	svc.Runtime.AgentName = string.IsNullOrWhiteSpace(svc.AppConfig.App.Name) ? "YAi" : svc.AppConfig.App.Name;
 	svc.Runtime.UserName = string.IsNullOrWhiteSpace(svc.AppConfig.App.UserName) ? Environment.UserName : svc.AppConfig.App.UserName;
@@ -267,15 +274,17 @@ try
 	{
 		Log.Information("Starting bootstrap workflow (explicit={Explicit}, hasCompletedState={HasState})",
 			isExplicitBootstrap, bootstrapState?.IsCompleted == true);
-		await DoBootstrapAsync(appPaths, svc.Config, svc.Runtime, svc.Workspace, svc.BootstrapSvc, svc.History, svc.AppConfig, svc.OpenRouterBalance, svc.OpenRouterClient);
+		bool bootstrapCompleted = await DoBootstrapAsync(appPaths, svc.Config, svc.Runtime, svc.Workspace, svc.BootstrapSvc, svc.History, svc.AppConfig, svc.OpenRouterBalance, svc.OpenRouterClient);
+
+		if (!bootstrapCompleted)
+		{
+			return;
+		}
+
 		Log.Information("Bootstrap workflow completed");
 
-		// After automatic bootstrap on first run, fall through to normal use
-		// rather than exiting so the user can immediately start chatting.
 		if (!isExplicitBootstrap && cliArgs.Length == 0)
 		{
-			PrintHelp();
-
 			return;
 		}
 
@@ -289,7 +298,7 @@ try
 	// The dispatch table calls into other modules for the actual work.
 	if (cliArgs.Length == 0)
 	{
-		PrintHelp();
+		return;
 	}
 	else
 	{
@@ -1166,7 +1175,6 @@ static async Task RunUnknownCommandAsync(string command)
 	AnsiConsole.MarkupLine($"[red]✖ Unrecognized command line argument:[/] [bold]{Markup.Escape(command)}[/]");
 	AnsiConsole.MarkupLine("[yellow]Run [bold]--help[/] to see the supported commands.[/]");
 	AnsiConsole.WriteLine();
-	PrintHelp();
 	Environment.ExitCode = 1;
 }
 
@@ -1312,7 +1320,7 @@ static async Task<bool> TryRunPowerShellScriptAsync(
 }
 
 /// <summary>
-/// Prints the CLI command reference and common usage examples.
+/// Prints the CLI command reference.
 /// </summary>
 static void PrintHelp()
 {
@@ -1352,34 +1360,6 @@ static void PrintHelp()
 	table.AddRow("[grey70]-h, --help[/]", "❓ Show this help and exit.");
 
 	AnsiConsole.Write(Align.Center(table));
-	AnsiConsole.WriteLine();
-	AnsiConsole.Write(Align.Center(new Markup("[bold]Examples[/]")));
-	AnsiConsole.WriteLine();
-	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --bootstrap[/]")));
-	AnsiConsole.WriteLine();
-	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --version[/]")));
-	AnsiConsole.WriteLine();
-	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --show-banner[/]")));
-	AnsiConsole.WriteLine();
-	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --manifesto[/]")));
-	AnsiConsole.WriteLine();
-	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --show-paths[/]")));
-	AnsiConsole.WriteLine();
-	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --show-cli-path[/]")));
-	AnsiConsole.WriteLine();
-	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --add-to-path[/]")));
-	AnsiConsole.WriteLine();
-	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --security status[/]")));
-	AnsiConsole.WriteLine();
-	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --gonuclear[/]")));
-	AnsiConsole.WriteLine();
-	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --lenna[/]")));
-	AnsiConsole.WriteLine();
-	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --ask \"Hello\"[/]")));
-	AnsiConsole.WriteLine();
-	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --ask[/]")));
-	AnsiConsole.WriteLine();
-	AnsiConsole.Write(Align.Center(new Markup("[grey70]dotnet run --project src/YAi.Client.CLI -- --talk[/]")));
 	AnsiConsole.WriteLine();
 	AnsiConsole.Write(Align.Center(new Markup("[yellow]Requires:[/] [bold]--ask[/], [bold]--translate[/], [bold]--talk[/], and [bold]--bootstrap[/] need a configured OpenRouter secret or [bold]YAI_OPENROUTER_API_KEY[/] plus a completed bootstrap. [bold]--show-paths[/], [bold]--show-cli-path[/], [bold]--add-to-path[/], [bold]--security[/], and [bold]--gonuclear[/] are local maintenance flows. [bold]--add-to-path[/] is Windows-only and will fail fast on macOS/Linux. The model selector can still open without the secret when a cached catalog is available.")));
 }
@@ -1812,7 +1792,8 @@ static async Task ShowComingAliveBannerAsync(bool useLogoSplash)
 /// <summary>
 /// Runs the first-run bootstrap conversation, persists the generated profile files, and marks setup complete.
 /// </summary>
-static async Task DoBootstrapAsync(
+/// <returns>True when bootstrap completes and the profile state is persisted; otherwise, false.</returns>
+static async Task<bool> DoBootstrapAsync(
 	AppPaths appPaths,
 	ConfigService config,
 	RuntimeState runtime,
@@ -1836,6 +1817,7 @@ static async Task DoBootstrapAsync(
 		string promptMarkup = GetUserPromptMarkup(userName);
 		string promptText = GetUserPromptText(userName);
 		MultilinePromptEditor? promptEditor = useConversationScreen ? null : new MultilinePromptEditor(promptHistoryEntries);
+		bool bootstrapCanceled = false;
 
 		ClearConsole(clearScrollback: true);
 		await new BannerScreenHost().RunAsync();
@@ -1934,6 +1916,7 @@ static async Task DoBootstrapAsync(
 
 				if (screenResult.IsCanceled)
 				{
+					bootstrapCanceled = true;
 					break;
 				}
 
@@ -1950,6 +1933,7 @@ static async Task DoBootstrapAsync(
 
 			if (line == null)
 			{
+				bootstrapCanceled = true;
 				break;
 			}
 
@@ -2023,6 +2007,11 @@ static async Task DoBootstrapAsync(
 			}
 		}
 
+		if (bootstrapCanceled)
+		{
+			return false;
+		}
+
 		AnsiConsole.WriteLine();
 		WriteStatusBar(StatusBarState.Local("saving", "bootstrap profiles"));
 		AnsiConsole.WriteLine();
@@ -2060,10 +2049,13 @@ static async Task DoBootstrapAsync(
 		AnsiConsole.WriteLine();
 		AnsiConsole.MarkupLine("[green]Bootstrap complete. Your profiles are saved.[/]");
 		AnsiConsole.WriteLine();
+
+		return true;
 	}
 	catch (Exception ex)
 	{
 		ReportRecoverableException(ex, "Bootstrap workflow failed", "Bootstrap workflow failed");
+		return false;
 	}
 }
 

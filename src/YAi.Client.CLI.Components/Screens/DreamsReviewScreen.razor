@@ -38,7 +38,7 @@
                 <RawMarkup Content="[grey]No pending proposals found in candidates.jsonl.[/]" />
                 <RawMarkup Content="[grey]Run [bold]--dream[/] first to generate new proposals.[/]" />
                 <Newline />
-                <TextButton Content="[Enter] Back" OnClick="BackClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.Silver" />
+                <ActionButton Content="[Enter] Back" OnClick="BackClicked" Tone="neutral" />
             }
             else if (_view is DreamsView.List)
             {
@@ -51,14 +51,12 @@
                     int proposalIndex = i;
 
                     <RawMarkup Content="@card.SummaryMarkup" />
-                    <TextButton Content="@($"Review {card.Number}")"
-                                OnClick="@(() => OpenProposal (proposalIndex))"
-                                BackgroundColor="@Color.Grey"
-                                FocusedColor="@Color.SpringGreen2" />
+                    <ActionButton Content="@($"Review {card.Number}")" OnClick="@(() => OpenProposal(proposalIndex))"
+                                  Tone="neutral" />
                 }
 
                 <Newline />
-                <TextButton Content="Back" OnClick="BackClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.Silver" />
+                <ActionButton Content="Back" OnClick="BackClicked" Tone="neutral" />
             }
             else if (_view is DreamsView.Detail && _selectedProposal is not null)
             {
@@ -69,15 +67,9 @@
                         <RawMarkup Content="@_detailRationaleMarkup" />
                         <RawMarkup Content="@_detailConfidenceMarkup" />
                         <Newline />
-                        <TextButton Content="[A] Approve"
-                                    OnClick="ApproveClicked"
-                                    BackgroundColor="@Color.Green"
-                                    FocusedColor="@Color.Green3" />
-                        <TextButton Content="[R] Reject"
-                                    OnClick="RejectClicked"
-                                    BackgroundColor="@Color.DarkRed"
-                                    FocusedColor="@Color.OrangeRed1" />
-                        <TextButton Content="Back" OnClick="BackToListClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.Silver" />
+                        <ActionButton Content="[A] Approve" OnClick="ApproveClicked" Tone="primary" />
+                        <ActionButton Content="[R] Reject" OnClick="RejectClicked" Tone="danger" />
+                        <ActionButton Content="Back" OnClick="BackToListClicked" Tone="neutral" />
                     </Rows>
                 </Panel>
             }
@@ -91,7 +83,7 @@
             {
                 <RawMarkup Content="[grey]All proposals reviewed.[/]" />
                 <Newline />
-                <TextButton Content="[Enter] Return" OnClick="BackClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.Silver" />
+                <ActionButton Content="[Enter] Return" OnClick="BackClicked" Tone="neutral" />
             }
         </Rows>
     </Panel>

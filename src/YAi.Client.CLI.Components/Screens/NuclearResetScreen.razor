@@ -23,122 +23,115 @@
 <Rows>
     <AppHeader />
 
-    <Panel Title="Go nuclear">
-        <Panel Title="Go nuclear">
+    <Newline />
+
+    <RawMarkup Content="@GetIntroMarkup()" />
+    <Newline />
+
+    <Columns Expand="true">
+        <Panel Title="Impact" Expand="true">
             <Rows>
-                <RawMarkup Content="@GetIntroMarkup()" />
-                <Newline />
-
-                <Columns>
-                    <Panel Title="Impact">
-                        <Rows>
-                            <RawMarkup Content="@GetImpactSummaryMarkup()" />
-                        </Rows>
-                    </Panel>
-                    <Panel Title="Backup">
-                        <Rows>
-                            <RawMarkup Content="@GetBackupSummaryMarkup()" />
-                        </Rows>
-                    </Panel>
-                    <Panel Title="Safety">
-                        <Rows>
-                            <RawMarkup Content="@GetSafetySummaryMarkup()" />
-                        </Rows>
-                    </Panel>
-                </Columns>
-
-                <Newline />
-
-                <Panel Title="Paths scheduled for removal">
-                    <Rows>
-                        @if (_customEntries.Count > 0)
-                        {
-                            @foreach ((string Category, string Label, string Path, bool IsCustom) entry in _customEntries)
-                            {
-                                <RawMarkup Content="@(NuclearResetCleanupHelper.FormatEntry(entry))" />
-                                <Newline />
-                            }
-                        }
-                        else
-                        {
-                            <RawMarkup
-                            Content="[grey70]No custom paths were discovered. The workspace, data, and config roots will still be cleared.[/]" />
-                        }
-                    </Rows>
-                </Panel>
-
-                <Newline />
-
-                <RawMarkup Content="@GetActionPromptMarkup()" />
-                <Newline />
-
-                @if (_view is ResetView.Confirm)
-                {
-                    <Columns>
-                        <TextButton Content="[B] Backup + delete" OnClick="BackupAndDeleteClicked"
-                                    BackgroundColor="@Color.Green" FocusedColor="@Color.Green3" />
-                        <TextButton Content="[D] Delete only" OnClick="DeleteOnlyClicked" BackgroundColor="@Color.DarkRed"
-                                    FocusedColor="@Color.OrangeRed1" />
-                        <TextButton Content="[Esc] Cancel" OnClick="CancelDelete" BackgroundColor="@Color.Grey"
-                                    FocusedColor="@Color.Silver" />
-                    </Columns>
-                }
-                else if (_view is ResetView.BackingUp)
-                {
-                    <Panel Title="Creating backup">
-                        <Rows>
-                            <RawMarkup Content="[cyan]Creating zip backup...[/]" />
-                            <RawMarkup Content="@GetBackupArchiveDirectoryMarkup()" Foreground="@Color.Grey70" />
-                        </Rows>
-                    </Panel>
-                }
-                else if (_view is ResetView.Deleting)
-                {
-                    <Panel Title="Deleting">
-                        <Rows>
-                            @if (!string.IsNullOrWhiteSpace(_backupArchivePath))
-                            {
-                                <RawMarkup Content="[green]Backup archive ready.[/]" />
-                                <RawMarkup Content="@GetBackupArchivePathMarkup()" Foreground="@Color.Grey70" />
-                                <Newline />
-                            }
-
-                            <RawMarkup Content="[red]Deleting workspace, data, and config roots...[/]" />
-                        </Rows>
-                    </Panel>
-                }
-                else if (_view is ResetView.Outcome)
-                {
-                    <Panel Title="Deletion result">
-                        <Rows>
-                            @if (_customEntries.Count > 0)
-                            {
-                                @foreach ((string Category, string Label, string Path, bool IsCustom) entry in _customEntries)
-                                {
-                                    <RawMarkup Content="@(NuclearResetCleanupHelper.FormatOutcome(entry, _rootExisted))" />
-                                    <Newline />
-                                }
-                            }
-                            else
-                            {
-                                <RawMarkup Content="[grey70]No custom paths were discovered.[/]" />
-                                <Newline />
-                            }
-
-                            <RawMarkup Content="@_statusMarkup" />
-                            <Newline />
-                            <TextButton Content="[Enter] OK" OnClick="CloseClicked" BackgroundColor="@Color.Grey"
-                                        FocusedColor="@Color.Silver" />
-                        </Rows>
-                    </Panel>
-                }
-                else if (_view is ResetView.Notice)
-                {
-                    <MessageBox Severity="@_noticeSeverity" Message="@_noticeMessage" OnDismiss="DismissNotice" />
-                }
+                <RawMarkup Content="@GetImpactSummaryMarkup()" />
             </Rows>
         </Panel>
+        <Panel Title="Backup" Expand="true">
+            <Rows>
+                <RawMarkup Content="@GetBackupSummaryMarkup()" />
+            </Rows>
+        </Panel>
+        <Panel Title="Safety" Expand="true">
+            <Rows>
+                <RawMarkup Content="@GetSafetySummaryMarkup()" />
+            </Rows>
+        </Panel>
+    </Columns>
+
+    <Newline />
+
+    <Panel Title="Paths scheduled for removal" Expand="true">
+        <Rows>
+            @if (_customEntries.Count > 0)
+            {
+                <Grid Columns="2" Expand="true">
+                    @foreach ((string Category, string Label, string Path, bool IsCustom) entry in _customEntries)
+                    {
+                        <RawMarkup Content="@(NuclearResetCleanupHelper.FormatEntry(entry))" />
+                    }
+                </Grid>
+            }
+            else
+            {
+                <RawMarkup
+                Content="[grey70]No custom paths were discovered. The workspace, data, and config roots will still be cleared.[/]" />
+            }
+        </Rows>
     </Panel>
+
+    <Newline />
+
+    <RawMarkup Content="@GetActionPromptMarkup()" />
+    <Newline />
+
+    @if (_view is ResetView.Confirm)
+    {
+        <Columns>
+            <ActionButton Content="[B] Backup + delete" OnClick="BackupAndDeleteClicked" Tone="primary" />
+            <ActionButton Content="[D] Delete only" OnClick="DeleteOnlyClicked" Tone="danger" />
+            <ActionButton Content="[Esc] Cancel" OnClick="CancelDelete" Tone="neutral" />
+        </Columns>
+    }
+    else if (_view is ResetView.BackingUp)
+    {
+        <Panel Title="Creating backup">
+            <Rows>
+                <RawMarkup Content="[cyan]Creating zip backup...[/]" />
+                <RawMarkup Content="@GetBackupArchiveDirectoryMarkup()" Foreground="@Color.Grey70" />
+            </Rows>
+        </Panel>
+    }
+    else if (_view is ResetView.Deleting)
+    {
+        <Panel Title="Deleting">
+            <Rows>
+                @if (!string.IsNullOrWhiteSpace(_backupArchivePath))
+                {
+                    <RawMarkup Content="[green]Backup archive ready.[/]" />
+                    <RawMarkup Content="@GetBackupArchivePathMarkup()" Foreground="@Color.Grey70" />
+                    <Newline />
+                }
+
+                <RawMarkup Content="[red]Deleting workspace, data, and config roots...[/]" />
+            </Rows>
+        </Panel>
+    }
+    else if (_view is ResetView.Outcome)
+    {
+        <Panel Title="Deletion result">
+            <Rows>
+                @if (_customEntries.Count > 0)
+                {
+                    @foreach ((string Category, string Label, string Path, bool IsCustom) entry in _customEntries)
+                    {
+                        <RawMarkup Content="@(NuclearResetCleanupHelper.FormatOutcome(entry, _rootExisted))" />
+                        <Newline />
+                    }
+                }
+                else
+                {
+                    <RawMarkup Content="[grey70]No custom paths were discovered.[/]" />
+                    <Newline />
+                }
+
+                <RawMarkup Content="@_statusMarkup" />
+                <Newline />
+                <ActionButton Content="[Enter] OK" OnClick="CloseClicked" Tone="neutral" />
+            </Rows>
+        </Panel>
+    }
+    else if (_view is ResetView.Notice)
+    {
+        <MessageBox Severity="@_noticeSeverity" Message="@_noticeMessage" OnDismiss="DismissNotice" />
+    }
 </Rows>
 
 @code {

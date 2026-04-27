@@ -23,6 +23,9 @@ This file tracks component-local documentation history that should stay close to
 
 ## 2026-04-27
 
+- Added a shared `ActionButton.razor` wrapper around `TextButton` so button tone defaults live in one place instead of being repeated at every call site.
+- Migrated the dialog, card, and screen button call sites to the shared wrapper with green primary, amber danger, and light-gray neutral backgrounds.
+
 - Added the first real component-owned entry by recording the local docs index for `Screens/`, `Components/`, `AppHeaderState.cs`, and `StatusBarState.cs`.
 - Linked the component docs surface to the shared filesystem skill pack so approval-card and workflow UX dependencies point back to the shared contract instead of duplicating it locally.
 - Documented the new reusable multiline prompt editor under `Input/` together with the `PromptEditorScreen*` Razor host path that now lets CLI flows reuse one prompt-capture surface instead of duplicating console input logic.

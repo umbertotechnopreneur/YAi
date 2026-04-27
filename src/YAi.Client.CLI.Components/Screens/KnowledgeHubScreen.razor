@@ -33,16 +33,16 @@
                 <RawMarkup Content="[bold springgreen2]Select a knowledge store to open:[/]" />
                 <Newline />
 
-                <TextButton Content="USER.md" OnClick="SelectUserClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.SpringGreen2" />
-                <TextButton Content="SOUL.md" OnClick="SelectSoulClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.SpringGreen2" />
-                <TextButton Content="IDENTITY.md" OnClick="SelectIdentityClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.SpringGreen2" />
-                <TextButton Content="MEMORIES.md" OnClick="SelectMemoriesClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.SpringGreen2" />
-                <TextButton Content="LESSONS.md" OnClick="SelectLessonsClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.SpringGreen2" />
-                <TextButton Content="LIMITS.md" OnClick="SelectLimitsClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.SpringGreen2" />
-                <TextButton Content="AGENTS.md" OnClick="SelectAgentsClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.SpringGreen2" />
-                <TextButton Content="Episodes" OnClick="SelectEpisodesClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.SpringGreen2" />
-                <TextButton Content="Dreams" OnClick="SelectDreamsClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.SpringGreen2" />
-                <TextButton Content="Back" OnClick="BackClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.Silver" />
+                <ActionButton Content="USER.md" OnClick="SelectUserClicked" Tone="neutral" />
+                <ActionButton Content="SOUL.md" OnClick="SelectSoulClicked" Tone="neutral" />
+                <ActionButton Content="IDENTITY.md" OnClick="SelectIdentityClicked" Tone="neutral" />
+                <ActionButton Content="MEMORIES.md" OnClick="SelectMemoriesClicked" Tone="neutral" />
+                <ActionButton Content="LESSONS.md" OnClick="SelectLessonsClicked" Tone="neutral" />
+                <ActionButton Content="LIMITS.md" OnClick="SelectLimitsClicked" Tone="neutral" />
+                <ActionButton Content="AGENTS.md" OnClick="SelectAgentsClicked" Tone="neutral" />
+                <ActionButton Content="Episodes" OnClick="SelectEpisodesClicked" Tone="neutral" />
+                <ActionButton Content="Dreams" OnClick="SelectDreamsClicked" Tone="neutral" />
+                <ActionButton Content="Back" OnClick="BackClicked" Tone="neutral" />
             }
             else if (_view is HubView.FileActions)
             {
@@ -50,9 +50,9 @@
                     <Rows>
                         <RawMarkup Content="@_selectedPathMarkup" />
                         <RawMarkup Content="[grey70]What would you like to do?[/]" />
-                        <TextButton Content="Open in editor" OnClick="OpenInEditorClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.SpringGreen2" />
-                        <TextButton Content="View inline" OnClick="ViewInlineClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.SpringGreen2" />
-                        <TextButton Content="Back" OnClick="BackToMenuClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.Silver" />
+                        <ActionButton Content="Open in editor" OnClick="OpenInEditorClicked" Tone="neutral" />
+                        <ActionButton Content="View inline" OnClick="ViewInlineClicked" Tone="neutral" />
+                        <ActionButton Content="Back" OnClick="BackToMenuClicked" Tone="neutral" />
                     </Rows>
                 </Panel>
             }
@@ -71,7 +71,7 @@
                 }
 
                 <Newline />
-                <TextButton Content="Back" OnClick="BackToMenuClicked" BackgroundColor="@Color.Grey" FocusedColor="@Color.Silver" />
+                <ActionButton Content="Back" OnClick="BackToMenuClicked" Tone="neutral" />
             }
             else if (_view is HubView.Notice)
             {

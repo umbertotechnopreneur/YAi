@@ -34,11 +34,14 @@ Use this folder for component-local notes about:
 
 - `Screens/`
 - `Components/`
+- `ActionButton.razor`
 - `ConversationTranscriptEntryViewState.cs`
 - `ResponseViewState.cs`
 - `Input/`
 - `Rendering/`
 - `AppHeaderState.cs`
 - `StatusBarState.cs`
+
+The shared action-button wrapper now lives in `Components/ActionButton.razor` and centralizes the `TextButton` styling used by dialogs, cards, and screens with green primary, amber danger, and light-gray neutral variants.
 
 Approval-card behavior, workflow UX, and screen-local implementation notes belong here when they only describe the CLI presentation layer.

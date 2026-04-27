@@ -87,31 +87,24 @@
                 <RawMarkup Content="⛔ This step is blocked and cannot be approved." Foreground="@Color.Red" />
                 <Newline />
                 <Columns>
-                    <TextButton Content="[D] Deny"
-                                OnClick="DenyClicked"
-                                BackgroundColor="@Color.DarkRed"
-                                FocusedColor="@Color.OrangeRed1" />
-                    <TextButton Content="[Esc] Cancel workflow"
-                                OnClick="CancelWorkflowClicked"
-                                BackgroundColor="@Color.Grey"
-                                FocusedColor="@Color.Silver" />
+                    <ActionButton Content="[D] Deny" OnClick="DenyClicked"             Tone="danger" />
+                    <ActionButton Content="[Esc] Cancel workflow"
+                                  OnClick="CancelWorkflowClicked"
+                                  Tone="neutral" />
                 </Columns>
             }
             else
             {
                 <Columns>
-                    <TextButton Content="[A] Approve"
-                                OnClick="ApproveClicked"
-                                BackgroundColor="@Color.Green"
-                                FocusedColor="@Color.Green3" />
-                    <TextButton Content="[D] Deny"
-                                OnClick="DenyClicked"
-                                BackgroundColor="@Color.DarkRed"
-                                FocusedColor="@Color.OrangeRed1" />
-                    <TextButton Content="[Esc] Cancel workflow"
-                                OnClick="CancelWorkflowClicked"
-                                BackgroundColor="@Color.Grey"
-                                FocusedColor="@Color.Silver" />
+                    <ActionButton Content="[A] Approve"
+                                  OnClick="ApproveClicked"
+                                  Tone="primary" />
+                    <ActionButton Content="[D] Deny"
+                                  OnClick="DenyClicked"
+                                  Tone="danger" />
+                    <ActionButton Content="[Esc] Cancel workflow"
+                                  OnClick="CancelWorkflowClicked"
+                                  Tone="neutral" />
                 </Columns>
             }
         </Rows>

@@ -37,14 +37,14 @@ Run the launcher from the solution root to move into the compiled output directo
 .\jump-cli-output.ps1 --release --run
 ```
 
-The script defaults to `bin/Debug/net10.0`, switches to `bin/Release/net10.0` with `--release`, and launches the compiled app with no arguments when `--run` is present. Use `--help` to print the built-in usage text.
+The script defaults to `bin/Debug/net10.0`, switches to `bin/Release/net10.0` with `--release`, and launches the compiled app with no arguments when `--run` is present. When bootstrap is already complete, that no-argument launch now prints the help screen and exits. Use `--help` to print the built-in usage text.
 
 Quick usage
 
 - `--help` — show the colored Spectre.Console help screen.
 - `--version` — show the banner splash from `BannerScreen.razor`, then the compiled CLI and assembly version, and exit.
-- Unrecognized arguments fail fast with the banner, a short explanation, and the help screen.
-- `--bootstrap` — initialize runtime workspace and copy identity templates into the user data root. If no OpenRouter model is configured, the CLI prompts you to choose one first. After preflight passes at startup, the CLI shows the current OpenRouter balance first, then continues into the boot flow. On first launch, the bootstrap intro clears the screen and scrollback, then tries to print the centered 800x600 YAi logo splash before the workspace setup message, falling back to the banner when the script cannot be rendered. Bootstrap input now accepts multi-line paste as one turn, sends on `Enter`, uses `Shift+Enter` to insert a newline, and restores the current draft when you browse prompt history with `Up` and `Down`. Interactive bootstrap now runs through a combined conversation screen that keeps the transcript, response metadata, and next prompt on one host surface, while non-screen fallback output still uses the shared inline response panel.
+- Unrecognized arguments fail fast with the banner and a short explanation; use `--help` to see the supported commands.
+- `--bootstrap` — initialize runtime workspace and copy identity templates into the user data root. If no OpenRouter model is configured, the CLI prompts you to choose one first. After preflight passes at startup, the CLI shows the current OpenRouter balance first, then continues into the boot flow. On first launch, the bootstrap intro clears the screen and scrollback, then tries to print the centered 800x600 YAi logo splash before the workspace setup message, falling back to the banner when the script cannot be rendered. Bootstrap input now accepts multi-line paste as one turn, sends on `Enter`, uses `Shift+Enter` to insert a newline, and restores the current draft when you browse prompt history with `Up` and `Down`. Esc now cancels the bootstrap flow without saving. Interactive bootstrap now runs through a combined conversation screen that keeps the transcript, response metadata, and next prompt on one host surface, while non-screen fallback output still uses the shared inline response panel.
 - `--show-banner` — show the CLI banner splash and the top app header, then exit. This does not require an OpenRouter key.
 - `--manifesto` — show the CLI banner splash, then the manifesto excerpt with the repository link at the bottom, and exit. This does not require an OpenRouter key.
 - `--show-paths` — show the resolved asset, workspace, memory, data, config, and logs paths, including the workspace security and secret-store files.
